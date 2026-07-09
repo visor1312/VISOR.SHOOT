@@ -1,7 +1,8 @@
 """Gradio-Oberflaeche fuer den Rap-Video Auto-Editor.
 
-Phase 1 (Sync) + Phase 2 (Untertitel). Ruft die pipeline-Funktionen direkt auf
-(kein HTTP-Umweg ueber backend/main.py noetig fuer ein lokales
+Phase 1 (Sync) + Phase 2 (Untertitel) + Phase 3 (Farbgrading, Beat-Effekte,
+Multi-Take-Schnitt, optionales Upscaling). Ruft die pipeline-Funktionen direkt
+auf (kein HTTP-Umweg ueber backend/main.py noetig fuer ein lokales
 Einzelnutzer-Tool), nutzt aber dieselbe Verzeichnisstruktur (backend/storage.py)
 und denselben Projektstatus (backend/db.py) wie das FastAPI-Backend.
 """
@@ -18,11 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import gradio as gr
 
 from backend import db, storage
+from backend.pipeline.beat_detect import detect_beats
+from backend.pipeline.effects_grading import COLOR_PRESETS, BeatEffectConfig, render_with_beat_effects
 from backend.pipeline.extract_audio import extract_audio
+from backend.pipeline.multitake_cut import TakeInfo, compute_multitake_plan, render_multitake_cut
 from backend.pipeline.render_sync import render_synced_video
 from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
 from backend.pipeline.sync_offset import LOW_CONFIDENCE_THRESHOLD, compute_offset
 from backend.pipeline.transcribe import DEFAULT_MODEL_SIZE, MODEL_SIZES, Word, transcribe
+from backend.pipeline.upscale import upscale_video
+
+db.init_db()
 
 INTRO_MD = """
 # Rap-Video Auto-Editor
@@ -31,7 +38,9 @@ Lade **eine Songdatei** (die fertig produzierte Studio-Version) und **einen oder
 mehrere Video-Takes** hoch, in denen du zu genau dieser Songstelle mitgerappt
 hast. Jeder Take wird einzeln gegen den Song synchronisiert (eigener
 Zeitversatz pro Take) und als 9:16-Video mit der sauberen Songspur exportiert.
-Danach kannst du pro Take automatisch deutsche Untertitel erzeugen (Phase 2).
+Danach kannst du pro Take automatisch deutsche Untertitel erzeugen (Phase 2),
+Farbgrading und beat-synchrone Effekte anwenden, und bei mehreren Takes einen
+automatischen, taktgenauen Schnitt zwischen ihnen erzeugen lassen (Phase 3).
 
 **Was dieses Tool NICHT macht:** Es gibt kein KI-generiertes Lip-Sync - das ist
 hier unnoetig, weil deine Lippen beim Filmen bereits zum abgespielten Song
@@ -51,7 +60,11 @@ LIMITATIONS_MD = """
   pruefen, bevor du die Untertitel renderst.**
 - Groessere Whisper-Modelle (medium/large-v3) sind auf reiner CPU-Rechenleistung
   langsamer, aber genauer als kleinere (tiny/base/small).
-- Beat-Effekte, Multi-Take-Schnitt, Farbgrading und Upscaling folgen in Phase 3.
+- Beat-Effekte/Farbgrading werden auf den taktgenau erkannten Schlaegen der
+  jeweiligen Tonspur berechnet - bei sehr leiser/percussion-armer Musik kann
+  die Takterkennung ungenau sein.
+- Multi-Take-Schnitt braucht mindestens 2 erfolgreich synchronisierte Takes,
+  die sich im Song ausreichend ueberlappen (gleiche Songstelle).
 """
 
 
@@ -88,7 +101,8 @@ def process(
         output_path = storage.take_output_path(project_id, take_id)
         entry: dict[str, Any] = {
             "name": Path(video_file).name, "project_id": project_id, "take_id": take_id,
-            "words": None, "final_output_path": None,
+            "words": None, "final_output_path": None, "effects_output_path": None,
+            "upscaled_output_path": None,
         }
         try:
             extract_audio(video_dest, audio_path)
@@ -138,6 +152,66 @@ def _make_transcribe_handler(take_id: str):
     return _handler
 
 
+def _make_effects_handler(take_id: str):
+    def _handler(
+        color_preset: str, zoom: float, flash: float, shake: float, rgb_split: float,
+        current_results: list[dict[str, Any]],
+        progress: gr.Progress = gr.Progress(),
+    ) -> list[dict[str, Any]]:
+        new_results = []
+        for r in current_results:
+            if r["take_id"] == take_id:
+                progress(0, desc="Takte erkennen und Effekte rendern...")
+                try:
+                    beats = detect_beats(r["output_path"])
+                    take_dir = storage.take_dir(r["project_id"], take_id)
+                    effects_path = take_dir / "output_with_effects.mp4"
+                    render_with_beat_effects(
+                        r["output_path"], beats.beat_times_sec, effects_path,
+                        color_preset=None if color_preset == "keins" else color_preset,
+                        effects=BeatEffectConfig(
+                            zoom=zoom or None, flash=flash or None,
+                            shake=shake or None, rgb_split=rgb_split or None,
+                        ),
+                    )
+                except Exception as e:
+                    raise gr.Error(f"Effekt-Rendering fehlgeschlagen: {e}")
+                r = {**r, "effects_output_path": str(effects_path)}
+            new_results.append(r)
+        return new_results
+
+    return _handler
+
+
+def _best_source_path(entry: dict[str, Any]) -> str:
+    return entry.get("effects_output_path") or entry.get("final_output_path") or entry["output_path"]
+
+
+def _make_upscale_handler(take_id: str):
+    def _handler(
+        scale: int, current_results: list[dict[str, Any]], progress: gr.Progress = gr.Progress(),
+    ) -> list[dict[str, Any]]:
+        new_results = []
+        for r in current_results:
+            if r["take_id"] == take_id:
+                source = _best_source_path(r)
+
+                def _cb(done: int, total: int, progress=progress) -> None:
+                    progress(done / max(total, 1), desc=f"Upscaling: Frame {done}/{total}")
+
+                try:
+                    take_dir = storage.take_dir(r["project_id"], take_id)
+                    upscaled_path = take_dir / "output_upscaled.mp4"
+                    upscale_video(source, upscaled_path, scale=scale, progress_cb=_cb)
+                except Exception as e:
+                    raise gr.Error(f"Upscaling fehlgeschlagen: {e}")
+                r = {**r, "upscaled_output_path": str(upscaled_path)}
+            new_results.append(r)
+        return new_results
+
+    return _handler
+
+
 def _make_burn_handler(take_id: str):
     def _handler(
         df_value: list[list[Any]], karaoke: bool, current_results: list[dict[str, Any]],
@@ -167,6 +241,33 @@ def _make_burn_handler(take_id: str):
         return new_results
 
     return _handler
+
+
+def multitake_cut_handler(
+    beat_interval: int, order_mode: str, current_results: list[dict[str, Any]],
+    progress: gr.Progress = gr.Progress(),
+) -> dict[str, Any] | None:
+    usable = [r for r in current_results if not r.get("error")]
+    if len(usable) < 2:
+        raise gr.Error("Multi-Take-Schnitt braucht mindestens 2 erfolgreich synchronisierte Takes.")
+
+    project_id = usable[0]["project_id"]
+    project = db.get_project(project_id)
+    if not project:
+        raise gr.Error("Projekt nicht gefunden.")
+
+    progress(0, desc="Takte im Song erkennen...")
+    takes = [TakeInfo(video_path=r["output_path"], offset_ms=r["offset_ms"]) for r in usable]
+    try:
+        beats = detect_beats(project["song_path"])
+        plan = compute_multitake_plan(takes, beats.beat_times_sec, beat_interval=beat_interval, order_mode=order_mode)
+        out_path = storage.project_dir(project_id) / "multitake_cut.mp4"
+        progress(0.3, desc="Takes zusammenschneiden...")
+        render_multitake_cut(takes, project["song_path"], plan, out_path)
+    except Exception as e:
+        raise gr.Error(f"Multi-Take-Schnitt fehlgeschlagen: {e}")
+
+    return {"output_path": str(out_path), "num_segments": len(plan)}
 
 
 with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
@@ -254,6 +355,90 @@ with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
                     inputs=[model_size_dd, language_dd, results_state],
                     outputs=results_state,
                 )
+
+                gr.Markdown("#### Farbgrading & Beat-Effekte (Phase 3)")
+                gr.Markdown(
+                    "Taktschlaege werden auf dieser (bereits synchronisierten) Tonspur "
+                    "erkannt. Intensitaet 0 = Effekt aus."
+                )
+                color_dd = gr.Dropdown(
+                    choices=["keins"] + list(COLOR_PRESETS), value="keins", label="Farbpreset",
+                )
+                with gr.Row():
+                    zoom_slider = gr.Slider(0, 1, value=0, step=0.05, label="Zoom-Pulse")
+                    flash_slider = gr.Slider(0, 1, value=0, step=0.05, label="Flash")
+                    shake_slider = gr.Slider(0, 1, value=0, step=0.05, label="Shake")
+                    rgb_split_slider = gr.Slider(0, 1, value=0, step=0.05, label="RGB-Split-Kick")
+                effects_btn = gr.Button("Effekte anwenden")
+
+                if entry.get("effects_output_path"):
+                    gr.Video(value=entry["effects_output_path"], label="Vorschau mit Effekten")
+                    gr.File(value=entry["effects_output_path"], label="Download (mit Effekten)")
+
+                effects_btn.click(
+                    _make_effects_handler(take_id),
+                    inputs=[color_dd, zoom_slider, flash_slider, shake_slider, rgb_split_slider, results_state],
+                    outputs=results_state,
+                )
+
+                gr.Markdown("#### Upscaling (optional, Phase 3)")
+                gr.Markdown(
+                    "⚠️ **Kostet Rechenzeit** (auf reiner CPU ohne dedizierte GPU koennen es "
+                    "leicht mehrere zehn Minuten bis Stunden pro Video werden, nicht nur ein "
+                    "paar Minuten) und **erfindet keine neuen Bilddetails** - nur eine glaettere "
+                    "Hochskalierung als einfache Interpolation. Wirkt auf die zuletzt erzeugte "
+                    "Version (mit Effekten > mit Untertiteln > nur Sync)."
+                )
+                with gr.Row():
+                    scale_radio = gr.Radio(choices=[2, 3, 4], value=2, label="Skalierungsfaktor")
+                    upscale_btn = gr.Button("Hochskalieren")
+
+                if entry.get("upscaled_output_path"):
+                    gr.Video(value=entry["upscaled_output_path"], label="Vorschau hochskaliert")
+                    gr.File(value=entry["upscaled_output_path"], label="Download (hochskaliert)")
+
+                upscale_btn.click(
+                    _make_upscale_handler(take_id),
+                    inputs=[scale_radio, results_state],
+                    outputs=results_state,
+                )
+
+    @gr.render(inputs=results_state)
+    def show_multitake_section(results: list[dict[str, Any]]):
+        usable = [r for r in results if not r.get("error")]
+        if len(usable) < 2:
+            return
+        with gr.Group():
+            gr.Markdown(
+                "### Multi-Take-Schnitt (Phase 3)\n"
+                f"{len(usable)} synchronisierte Takes gefunden - automatischer, taktgenauer "
+                "Wechsel zwischen ihnen (kein Sprung im durchgehenden Songton, da alle Takes "
+                "gegen denselben Song synchronisiert sind)."
+            )
+            with gr.Row():
+                beat_interval_radio = gr.Radio(
+                    choices=[("Jeden Takt", 1), ("Jeden 2. Takt", 2), ("Jeden 4. Takt", 4)],
+                    value=1, label="Wechsel-Rhythmus",
+                )
+                order_radio = gr.Radio(
+                    choices=[("Feste Reihenfolge", "fixed"), ("Zufaellig", "random")],
+                    value="fixed", label="Take-Reihenfolge",
+                )
+            multitake_btn = gr.Button("Multi-Take-Schnitt erstellen", variant="primary")
+            multitake_output = gr.State(None)
+            multitake_btn.click(
+                multitake_cut_handler,
+                inputs=[beat_interval_radio, order_radio, results_state],
+                outputs=multitake_output,
+            )
+
+            @gr.render(inputs=multitake_output)
+            def show_multitake_result(result: dict[str, Any] | None):
+                if not result:
+                    return
+                gr.Markdown(f"**{result['num_segments']} Segmente** geschnitten.")
+                gr.Video(value=result["output_path"], label="Multi-Take-Schnitt")
+                gr.File(value=result["output_path"], label="Download (Multi-Take-Schnitt)")
 
     gr.Markdown(LIMITATIONS_MD)
 

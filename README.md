@@ -9,8 +9,8 @@ im Video passen bereits zum Song (Playback lief beim Filmen). Die einzige
 Aufgabe ist Audio-Video-Synchronisation: die richtige Stelle im Song finden und
 zeitlich exakt über das Video legen.
 
-Aktueller Stand: **Phase 1 (Sync)** und **Phase 2 (Untertitel)** sind fertig
-und lauffähig, beide mit echtem Handymaterial getestet.
+Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)** und **Phase 3
+(Effekte, Grading, Upscaling)** sind fertig und lauffähig.
 
 ## Setup
 
@@ -25,6 +25,15 @@ o.ä.) - wird nicht über pip installiert.
 Spracherkennungsmodell von Hugging Face herunter (je nach Modellgröße
 100 MB - ~3 GB, siehe Abschnitt "Untertitel"). Dafür ist beim ersten Mal
 Internetzugang nötig, danach läuft alles offline.
+
+**Upscaling (Phase 3) ist optional** und braucht zusätzliche, in
+`requirements.txt` nur auskommentierte Pakete (torch/basicsr/realesrgan).
+Installation in zwei Schritten (siehe Abschnitt "Upscaling" für den Grund):
+
+```bash
+pip install torch torchvision opencv-python
+pip install --no-build-isolation basicsr realesrgan
+```
 
 ## Nutzung
 
@@ -48,6 +57,18 @@ Sprache waehlbar). Das erkannte Transkript erscheint als editierbare Tabelle
 Fehler). Danach steht ein zweites Video mit eingebrannten Untertiteln zum
 Download bereit, optional im TikTok-typischen Karaoke-Stil (aktuelles Wort
 farblich hervorgehoben).
+
+Darunter: **Farbgrading & Beat-Effekte** (Farbpreset waehlen, vier Effekte
+mit Intensitaetsregler 0-1: Zoom-Pulse, Flash, Shake, RGB-Split-Kick, alle
+takgenau auf die erkannten Taktschlaege dieses Takes). Wurden **mindestens 2
+Takes** erfolgreich synchronisiert, erscheint darunter der Bereich
+**Multi-Take-Schnitt**: Wechsel-Rhythmus (jeden/jeden 2./jeden 4. Takt) und
+Take-Reihenfolge (fest/zufaellig) waehlen, ein Klick erzeugt einen
+durchgehenden Song mit taktgenau geschnittenem Bildwechsel zwischen den Takes.
+
+Ganz unten pro Take: **Upscaling** (optional, siehe Warnhinweis im UI zur
+Rechenzeit) - wirkt auf die zuletzt erzeugte Version dieses Takes (mit
+Effekten > mit Untertiteln > nur Sync).
 
 ### FastAPI-Backend (programmatischer Zugriff)
 
@@ -74,6 +95,15 @@ python -m backend.pipeline.render_sync video.mp4 song.wav <offset_ms> output.mp4
 # Phase 2 (Untertitel):
 python -m backend.pipeline.transcribe output.mp4 --language de --model-size large-v3 --json > words.json
 python -m backend.pipeline.subtitles words.json subs.ass --karaoke --burn-into output.mp4 --burn-out output_with_subs.mp4
+
+# Phase 3 (Beat-Erkennung, Effekte/Grading, Upscaling):
+python -m backend.pipeline.beat_detect output.mp4 --json > beats.json
+python -m backend.pipeline.effects_grading output.mp4 out_fx.mp4 --beats-json beats.json \
+  --color-preset cold_urban --zoom 0.15 --flash 0.3 --shake 0.5 --rgb-split 0.5
+python -m backend.pipeline.upscale out_fx.mp4 out_upscaled.mp4 --scale 2   # optional, langsam auf CPU
+
+# Phase 3 (Multi-Take-Schnitt, config.json mit takes/song_path/beat_times_sec):
+python -m backend.pipeline.multitake_cut config.json multitake_cut.mp4 --beat-interval 2 --order-mode fixed
 ```
 
 ## Architektur
@@ -86,6 +116,10 @@ backend/
     render_sync.py       # Song synchron über Video legen, 9:16 H.264 Export (ffmpeg)
     transcribe.py         # Deutsche Transkription mit Wort-Zeitstempeln (faster-whisper)
     subtitles.py           # Wort-Zeitstempel -> ASS-Datei (+ Karaoke-Stil), Einbrennen (ffmpeg)
+    beat_detect.py          # Taktschlaege erkennen (librosa.beat.beat_track)
+    effects_grading.py       # Farbpresets + beat-synchrone Effekte (ffmpeg eq/crop/rgbashift/sendcmd)
+    multitake_cut.py          # Taktgenauer Schnitt zwischen mehreren synchronisierten Takes
+    upscale.py                 # Optionales Real-ESRGAN-Upscaling (PyTorch, CPU oder CUDA)
   db.py                  # SQLite: Projekte + Takes
   storage.py              # gemeinsame Verzeichnis-Konventionen (/projects/<id>/...)
   main.py                  # FastAPI-Endpunkte
@@ -144,6 +178,44 @@ schreibt eine ASS-Datei und brennt sie per ffmpeg (`ass`-Filter, libass) ins
 Video ein. Zwei Stile stehen zur Wahl: normale Zeilen oder TikTok-typischer
 Karaoke-Stil, bei dem das gerade gesprochene Wort gelb hervorgehoben wird.
 
+## Wie Phase 3 funktioniert
+
+**Beat-Erkennung** (`beat_detect.py`) laeuft wie Transkription/Subtitles auf
+der bereits synchronisierten Output-Tonspur - Taktschlaege liegen also direkt
+im Zeitrahmen des fertigen Videos.
+
+**Farbgrading** nutzt ffmpegs `eq`-Filter mit vier Presets (`natural`,
+`warm_gold`, `cold_urban`, `high_contrast_mono`). Die **Beat-Effekte** sind
+technisch zweigeteilt:
+- Flash (Helligkeit) und Shake (Positions-Wackeln) nutzen zeitvariable
+  ffmpeg-Filterausdruecke (`eq`/`crop` mit `t`-Referenz), die zu jedem
+  erkannten Takt einen kurzen, abklingenden Impuls erzeugen.
+- Zoom-Pulse und RGB-Split-Kick nutzen ffmpegs `sendcmd`-Mechanismus, weil
+  die dafuer noetigen Filterparameter (`crop`s Breite/Hoehe, `rgbashift`s
+  Kanal-Versatz) keine `t`-Ausdruecke unterstuetzen, aber zur Laufzeit per
+  Kommando aenderbar sind - der Effekt springt zu jedem Takt kurz auf einen
+  Extremwert und wieder zurueck.
+
+**Multi-Take-Schnitt** (`multitake_cut.py`) berechnet zuerst das
+gemeinsame Zeitfenster im Song, das ALLE hochgeladenen Takes abdecken (aus
+`offset_ms` + Videolaenge jedes Takes), filtert die erkannten Taktschlaege
+darauf, bildet Schnittpunkte im gewaehlten Rhythmus (jeder/jeder 2./jeder 4.
+Takt) und weist jedem Segment reihum oder zufaellig einen Take zu. Beim
+Rendern wird aus jedem Take nur der zum Segment passende Bildausschnitt
+(per `trim`) entnommen und aneinandergehaengt (`concat`) - der Ton kommt
+komplett unangetastet aus der durchgehenden Songdatei, daher kein Sprung im
+Ton trotz Bildschnitten.
+
+**Upscaling** (`upscale.py`) nutzt bewusst die PyTorch-Referenzimplementierung
+von Real-ESRGAN (PyPI-Pakete `realesrgan`/`basicsr`) statt eines
+ncnn-Vulkan-Builds, damit es auf jeder Maschine per einfachem `pip install`
+laeuft (mit oder ohne dedizierte GPU) statt einen plattformspezifischen
+Vulkan-Binary-Download zu brauchen. Nutzt automatisch CUDA, falls verfuegbar,
+sonst CPU. Das Modell wird beim ersten Aufruf automatisch von GitHub
+heruntergeladen (ca. 64 MB). Verarbeitung erfolgt Frame fuer Frame (Video
+wird dafuer temporaer in Einzelbilder zerlegt und danach wieder
+zusammengesetzt, Originalton bleibt erhalten).
+
 ## Bekannte Grenzen (bewusst, siehe Nicht-Ziele)
 
 - **Keine Drift-Korrektur:** Falls die Handy-Samplerate über die Videolänge
@@ -161,11 +233,22 @@ Karaoke-Stil, bei dem das gerade gesprochene Wort gelb hervorgehoben wird.
   kein Cloud-Zwang). Größere Modelle (medium/large-v3) sind genauer, aber
   spürbar langsamer als kleinere (tiny/base/small) - bei schwacher CPU lohnt
   sich ein kleineres Modell zum Ausprobieren.
-- **Phase 3 (Beat-Effekte, Multi-Take-Schnitt, Farbgrading, Upscaling)** ist
-  noch nicht umgesetzt.
+- **Takterkennung** ist wie Whisper nicht perfekt - bei sehr leiser oder
+  percussion-armer Musik kann sie ungenau sein; wirkt sich auf Beat-Effekte
+  und Multi-Take-Schnitt aus.
+- **Multi-Take-Schnitt** braucht mindestens 2 erfolgreich synchronisierte
+  Takes, die sich im Song ausreichend ueberlappen (dieselbe Songstelle).
+- **Upscaling ist optional, langsam (auf reiner CPU ohne GPU koennen es
+  leicht mehrere zehn Minuten bis Stunden pro Video werden, nicht nur ein
+  paar Minuten) und erfindet keine neuen Bilddetails** - nur eine glaettere
+  Hochskalierung als einfache Interpolation. Zusaetzliche Pakete
+  (torch/basicsr/realesrgan) muessen separat installiert werden (siehe
+  Setup), das Modell wird beim ersten Aufruf automatisch heruntergeladen.
 
 ## Nächste Schritte
 
-Phase 1 und 2 sind bereit zum Testen mit echtem Material. Rückmeldung, ob
-Sync und Untertitel wie erwartet funktionieren, dann geht es mit Phase 3
-(Beat-Effekte, Multi-Take-Schnitt, Farbgrading, optionales Upscaling) weiter.
+Alle drei Phasen sind bereit zum Testen mit echtem Material - insbesondere
+Multi-Take-Schnitt und Upscaling profitieren von Material mit mehreren Takes
+bzw. laengeren Testlaeufen, die im Rahmen dieser Session nicht vollstaendig
+durchgefuehrt werden konnten (siehe Testabschnitte in den jeweiligen
+Pipeline-Dateien / Commits fuer Details, was bereits validiert wurde).

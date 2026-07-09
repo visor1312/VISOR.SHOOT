@@ -8,3 +8,11 @@ python-multipart==0.0.32
 gradio==6.20.0
 pytest==9.1.1
 faster-whisper==1.2.1
+
+# Optional (Phase 3, nur fuer Upscaling): siehe README, Abschnitt "Upscaling"
+# fuer den genauen Installationsbefehl (basicsr braucht --no-build-isolation).
+# torch==2.13.0
+# torchvision==0.28.0
+# opencv-python==5.0.0.93
+# basicsr==1.4.2
+# realesrgan==0.3.0
