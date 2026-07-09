@@ -444,4 +444,4 @@ with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
 
 
 if __name__ == "__main__":
-    demo.queue().launch()
+    demo.queue().launch(show_error=True)
