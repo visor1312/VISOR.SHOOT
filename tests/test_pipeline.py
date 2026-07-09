@@ -1,18 +1,28 @@
 """End-to-End-Test der Phase-1-Pipeline mit synthetisch erzeugten Video-/Audiodateien.
 
-Erzeugt per ffmpeg eine "Song"-Datei (breitbandiges Rauschen, damit die
-Cross-Correlation nicht durch Periodizitaet gestoert wird - reine Sinustoene
-sind dafuer ein Anti-Testfall) sowie zwei "Video-Takes" mit bekanntem,
-absichtlich eingebautem Zeitversatz (einmal positiv, einmal negativ) und
-prueft, ob sync_offset.py diesen Versatz korrekt erkennt und render_sync.py
-ein gueltiges 9:16 H.264-Video produziert.
+Erzeugt eine synthetische "Song"-Datei aus breitbandigem Rauschen UEBERLAGERT
+mit unregelmaessig getakteten perkussiven Treffern (wie Drums/Vocals in
+echter Musik). Beides ist bewusst so gewaehlt:
+- breitbandig statt reiner Sinuston, damit Rohsignal-Kreuzkorrelation nicht
+  durch Periodizitaet gestoert wird,
+- unregelmaessige (nicht periodische) Treffer, damit die Onset-Einhuellende
+  (siehe sync_offset.py) etwas Eindeutiges zum Erkennen hat - ein reiner
+  Rauschteppich ohne Transienten hat keine erkennbaren Onsets und ist damit
+  kein guter Stellvertreter fuer echte Musik.
+
+Dazu zwei "Video-Takes" mit bekanntem, absichtlich eingebautem Zeitversatz
+(einmal positiv, einmal negativ), die pruefen, ob sync_offset.py diesen
+Versatz korrekt erkennt und render_sync.py ein gueltiges 9:16 H.264-Video
+produziert.
 """
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pytest
+import soundfile as sf
 
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.render_sync import render_synced_video
@@ -25,13 +35,26 @@ def _run(cmd: list[str]) -> None:
 
 @pytest.fixture(scope="module")
 def song(tmp_path_factory) -> Path:
+    sr = 44100
+    duration_sec = 15.0
+    rng = np.random.default_rng(42)
+
+    n_samples = int(duration_sec * sr)
+    texture = rng.normal(scale=0.15, size=n_samples)
+
+    # Unregelmaessig getaktete perkussive Treffer (aperiodisch, wie Drums/Vocals).
+    hit_times_sec = np.cumsum(rng.uniform(0.3, 1.1, size=40))
+    hit_times_sec = hit_times_sec[hit_times_sec < duration_sec - 0.1]
+    decay_len = int(0.12 * sr)
+    decay_env = np.exp(-np.linspace(0, 12, decay_len))
+    for t in hit_times_sec:
+        start = int(t * sr)
+        hit = rng.normal(scale=1.0, size=decay_len) * decay_env
+        texture[start:start + decay_len] += hit
+
+    texture = texture / np.max(np.abs(texture)) * 0.8
     out = tmp_path_factory.mktemp("fixtures") / "song.wav"
-    _run([
-        "ffmpeg", "-y", "-f", "lavfi",
-        "-i", "anoisesrc=color=pink:duration=15:sample_rate=44100:amplitude=0.6",
-        "-af", "aformat=channel_layouts=stereo",
-        str(out),
-    ])
+    sf.write(str(out), np.column_stack([texture, texture]), sr)
     return out
 
 
@@ -89,7 +112,10 @@ def test_sync_offset_detection(tmp_path, song, pre_silence_sec, song_start_sec, 
     extract_audio(take_video, take_audio)
     result = compute_offset(song, take_audio)
 
-    assert result.offset_ms == pytest.approx(expected_offset_ms, abs=5.0)
+    # Toleranz: Die Onset-Einhuellende quantisiert auf Frame-Aufloesung
+    # (hop_length/corr_sample_rate ~ 23ms), das ist die erwartete Praezision -
+    # weit innerhalb der fuer Lippensynchronitaet unmerklichen Grenze (~40ms).
+    assert result.offset_ms == pytest.approx(expected_offset_ms, abs=30.0)
     assert result.confidence > 0.1
 
 

@@ -1,8 +1,16 @@
 """Schritt 02: Zeitversatz zwischen Songdatei und extrahiertem Video-Ton berechnen.
 
-Nutzt FFT-Cross-Correlation (scipy.signal.correlate) zwischen der (ggf. langen)
-Songdatei und dem kurzen Video-Ton, um zu bestimmen, an welcher Stelle im Song
-der Video-Clip zeitlich liegt.
+Kreuzkorreliert die Lautstaerke-/Onset-Einhuellende (nicht das Rohsignal) von
+Songdatei und Video-Ton, um zu bestimmen, an welcher Stelle im Song der
+Video-Clip zeitlich liegt.
+
+Die Einhuellende statt des Rohsignals zu nutzen, hat sich beim Testen mit
+echtem Handymaterial als noetig erwiesen: Eine per Telefonmikro aufgenommene
+Performance (Raumhall, Lautsprecher-/Mikro-Verzerrung) korreliert im
+Rohsignal nur schwach mit einer sauber aufgenommenen Songreferenz (Konfidenz
+~0.1 trotz korrektem Offset), waehrend die Lautstaerke-Einhuellende (die
+Raumhall/Verzerrung weit besser uebersteht) denselben Offset mit deutlich
+hoeherer Konfidenz (~0.5-0.8) findet.
 
 Konvention (wichtig fuer render_sync.py):
   offset_ms > 0  ->  Video-Start (t=0) entspricht `offset_ms` ms *innerhalb* des Songs.
@@ -23,7 +31,9 @@ import librosa
 import numpy as np
 from scipy.signal import correlate, correlation_lags
 
-DEFAULT_CORR_SAMPLE_RATE = 8000
+DEFAULT_CORR_SAMPLE_RATE = 22050
+DEFAULT_HOP_LENGTH = 512
+LOW_CONFIDENCE_THRESHOLD = 0.2
 
 
 @dataclass
@@ -37,10 +47,16 @@ def _load_mono(path: str | Path, sr: int) -> np.ndarray:
     return audio.astype(np.float64) - float(np.mean(audio))
 
 
+def _onset_envelope(audio: np.ndarray, sr: int, hop_length: int) -> np.ndarray:
+    env = librosa.onset.onset_strength(y=audio, sr=sr, hop_length=hop_length)
+    return env - env.mean()
+
+
 def compute_offset(
     song_path: str | Path,
     video_audio_path: str | Path,
     corr_sample_rate: int = DEFAULT_CORR_SAMPLE_RATE,
+    hop_length: int = DEFAULT_HOP_LENGTH,
 ) -> SyncResult:
     """Berechnet den Zeitversatz zwischen Songdatei und Video-Ton.
 
@@ -53,24 +69,28 @@ def compute_offset(
     if len(song) == 0 or len(video_audio) == 0:
         raise ValueError("Song- oder Video-Audio ist leer (Stille/keine Tonspur?)")
 
-    corr = correlate(song, video_audio, mode="full", method="fft")
-    lags = correlation_lags(len(song), len(video_audio), mode="full")
+    song_env = _onset_envelope(song, corr_sample_rate, hop_length)
+    video_env = _onset_envelope(video_audio, corr_sample_rate, hop_length)
+    frame_rate = corr_sample_rate / hop_length
+
+    corr = correlate(song_env, video_env, mode="full", method="fft")
+    lags = correlation_lags(len(song_env), len(video_env), mode="full")
 
     best_idx = int(np.argmax(np.abs(corr)))
-    lag_samples = int(lags[best_idx])
+    lag_frames = int(lags[best_idx])
 
     # Overlappenden Ausschnitt fuer Konfidenzberechnung bestimmen.
-    seg_start = max(lag_samples, 0)
-    seg_end = min(lag_samples + len(video_audio), len(song))
-    song_seg = song[seg_start:seg_end]
-    video_seg_start = max(-lag_samples, 0)
-    video_seg = video_audio[video_seg_start:video_seg_start + len(song_seg)]
+    seg_start = max(lag_frames, 0)
+    seg_end = min(lag_frames + len(video_env), len(song_env))
+    song_seg = song_env[seg_start:seg_end]
+    video_seg_start = max(-lag_frames, 0)
+    video_seg = video_env[video_seg_start:video_seg_start + len(song_seg)]
 
     denom = np.linalg.norm(song_seg) * np.linalg.norm(video_seg)
     confidence = float(abs(np.dot(song_seg, video_seg) / denom)) if denom > 0 else 0.0
     confidence = min(confidence, 1.0)
 
-    offset_ms = (lag_samples / corr_sample_rate) * 1000.0
+    offset_ms = (lag_frames / frame_rate) * 1000.0
     return SyncResult(offset_ms=offset_ms, confidence=confidence)
 
 
@@ -79,11 +99,12 @@ def _main() -> None:
     parser.add_argument("song_path", help="Pfad zur Songdatei (mp3/wav)")
     parser.add_argument("video_audio_path", help="Pfad zur extrahierten Video-Audiodatei (wav)")
     parser.add_argument("--corr-sample-rate", type=int, default=DEFAULT_CORR_SAMPLE_RATE)
+    parser.add_argument("--hop-length", type=int, default=DEFAULT_HOP_LENGTH)
     args = parser.parse_args()
 
-    result = compute_offset(args.song_path, args.video_audio_path, args.corr_sample_rate)
+    result = compute_offset(args.song_path, args.video_audio_path, args.corr_sample_rate, args.hop_length)
     print(f"offset_ms={result.offset_ms:.1f} confidence={result.confidence:.3f}")
-    if result.confidence < 0.15:
+    if result.confidence < LOW_CONFIDENCE_THRESHOLD:
         print("WARNUNG: niedrige Konfidenz - Ergebnis manuell pruefen (z.B. Video ohne brauchbaren Ton).")
 
 

@@ -19,11 +19,9 @@ import gradio as gr
 from backend import db, storage
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.render_sync import render_synced_video
-from backend.pipeline.sync_offset import compute_offset
+from backend.pipeline.sync_offset import LOW_CONFIDENCE_THRESHOLD, compute_offset
 
 db.init_db()
-
-LOW_CONFIDENCE_THRESHOLD = 0.15
 
 INTRO_MD = """
 # Rap-Video Auto-Editor - Phase 1: Sync
@@ -139,22 +137,27 @@ with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
             return
         for entry in results:
             with gr.Group():
+                gr.Markdown(f"### {entry['name']}")
                 if entry.get("error"):
-                    gr.Markdown(f"### {entry['name']} - Fehler")
                     gr.Markdown(f"```\n{entry['error']}\n```")
                     continue
 
                 confidence = entry["confidence"]
-                warning = (
-                    f"\n\n⚠️ Niedrige Konfidenz ({confidence:.2f}) - Ergebnis manuell pruefen."
-                    if confidence < LOW_CONFIDENCE_THRESHOLD else ""
-                )
-                gr.Markdown(
-                    f"### {entry['name']}\n"
-                    f"Offset: **{entry['offset_ms']:.1f} ms** | Konfidenz: **{confidence:.2f}**{warning}"
-                )
-                gr.Video(value=entry["output_path"], label="Vorschau")
-                gr.File(value=entry["output_path"], label="Download")
+                with gr.Row():
+                    with gr.Column(scale=3):
+                        gr.Video(value=entry["output_path"], label="Vorschau")
+                        gr.File(value=entry["output_path"], label="Download")
+                    with gr.Column(scale=1, min_width=160):
+                        gr.Number(
+                            value=round(entry["offset_ms"], 1), label="Zeitversatz (ms)",
+                            interactive=False,
+                        )
+                        gr.Number(
+                            value=round(confidence, 3), label="Konfidenz (0-1)",
+                            interactive=False,
+                        )
+                        if confidence < LOW_CONFIDENCE_THRESHOLD:
+                            gr.Markdown("⚠️ Niedrige Konfidenz - Ergebnis manuell pruefen.")
 
     gr.Markdown(LIMITATIONS_MD)
 
