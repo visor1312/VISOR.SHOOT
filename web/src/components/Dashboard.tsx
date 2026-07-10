@@ -41,7 +41,7 @@ function StatCard({ label, value, delta, icon }: (typeof stats)[number]) {
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onOpenUpload }: { onOpenUpload: () => void }) {
   return (
     <main className="flex-1 min-w-0 px-8 py-7">
       {/* Header */}
@@ -50,7 +50,10 @@ export default function Dashboard() {
           <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted mt-1">Willkommen zurück, YngLyric</p>
         </div>
-        <button className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors">
+        <button
+          onClick={onOpenUpload}
+          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
+        >
           <Plus size={18} />
           Neues Projekt
         </button>
@@ -82,7 +85,10 @@ export default function Dashboard() {
             Lade dein Rap-Video und deinen produzierten Song hoch. Das System
             legt den Song automatisch perfekt synchron über dein Video.
           </p>
-          <button className="mt-5 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors">
+          <button
+            onClick={onOpenUpload}
+            className="mt-5 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
+          >
             Jetzt hochladen
           </button>
         </div>

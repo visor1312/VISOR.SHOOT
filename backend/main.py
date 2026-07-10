@@ -11,7 +11,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend import db, storage
@@ -20,6 +21,16 @@ from backend.pipeline.render_sync import render_synced_video
 from backend.pipeline.sync_offset import compute_offset
 
 app = FastAPI(title="HOOKCUT")
+
+# Fuer die lokale Entwicklung: das React-Dashboard (web/, Vite auf Port 5173)
+# darf das Backend direkt aufrufen. Im Dev-Server laeuft ohnehin ein /api-Proxy
+# (web/vite.config.ts), CORS ist die Absicherung fuer direkte Aufrufe.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
@@ -60,16 +71,16 @@ def create_take(project_id: str, video: UploadFile = File(...), original_audio_m
     return {"take_id": take_id}
 
 
-@app.post("/projects/{project_id}/takes/{take_id}/sync")
-def sync_take(project_id: str, take_id: str):
+def _run_sync_job(project_id: str, take_id: str) -> None:
+    """Laeuft im Hintergrund (FastAPI BackgroundTasks). Aktualisiert den
+    Take-Status in der DB; das Frontend pollt GET .../takes/{take_id}."""
     project = db.get_project(project_id)
     take = db.get_take(take_id)
-    if not project or not take or take["project_id"] != project_id:
-        raise HTTPException(404, "Projekt oder Take nicht gefunden")
+    if not project or not take:
+        return
 
     audio_path = storage.take_audio_path(project_id, take_id)
     output_path = storage.take_output_path(project_id, take_id)
-
     try:
         extract_audio(take["video_path"], audio_path)
         result = compute_offset(project["song_path"], audio_path)
@@ -83,9 +94,18 @@ def sync_take(project_id: str, take_id: str):
         )
     except Exception as e:  # ffmpeg/subprocess Fehler, Audio-Analyse-Fehler, etc.
         db.update_take(take_id, status="error", error=str(e))
-        raise HTTPException(500, f"Sync fehlgeschlagen: {e}")
 
-    return db.get_take(take_id)
+
+@app.post("/projects/{project_id}/takes/{take_id}/sync")
+def sync_take(project_id: str, take_id: str, background_tasks: BackgroundTasks):
+    project = db.get_project(project_id)
+    take = db.get_take(take_id)
+    if not project or not take or take["project_id"] != project_id:
+        raise HTTPException(404, "Projekt oder Take nicht gefunden")
+
+    db.update_take(take_id, status="processing", error=None)
+    background_tasks.add_task(_run_sync_job, project_id, take_id)
+    return {"status": "processing", "take_id": take_id}
 
 
 @app.get("/projects/{project_id}/takes/{take_id}")
