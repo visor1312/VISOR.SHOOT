@@ -41,7 +41,25 @@ pip install --no-build-isolation basicsr realesrgan
 
 ## Nutzung
 
-### Gradio-Oberfläche (empfohlen für den MVP-Workflow)
+### React-Dashboard (neue Produkt-Oberfläche, `web/`)
+
+Das designte HOOKCUT-Dashboard (React + Vite + Tailwind, Dark-Theme) liegt
+unter `web/`. Es ist als eigentliche Produkt-Oberfläche gedacht und spricht
+später das FastAPI-Backend (`backend/main.py`) über `/api/...` an (im
+Dev-Server bereits als Proxy auf `127.0.0.1:8000` konfiguriert).
+
+```bash
+cd web
+npm install        # einmalig
+npm run dev        # startet auf http://127.0.0.1:5173
+```
+
+Aktueller Stand: die Dashboard-Ansicht (Sidebar, Kennzahlen, Aktions-Kacheln,
+zuletzt bearbeitete Projekte, Viral-Hook-Detector-Panel) steht als Shell mit
+Platzhalter-Daten. Die Anbindung der einzelnen Aktionen an das Backend ist der
+nächste Schritt.
+
+### Gradio-Oberfläche (funktionierender MVP-Workflow, alle Features live)
 
 ```bash
 python -m frontend.app

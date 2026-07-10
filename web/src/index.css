@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* HOOKCUT Design-Tokens (aus dem Banani-Mockup abgeleitet).
+   Dark-Theme mit kraeftigem Gruen als Akzent. */
+@theme {
+  --color-ink-950: #0a0b0a;   /* App-Hintergrund */
+  --color-ink-900: #0f100f;   /* Sidebar */
+  --color-ink-850: #141614;   /* Card-Hintergrund */
+  --color-ink-800: #1a1c1a;   /* Card-Hover / Felder */
+  --color-ink-700: #262826;   /* Rahmen */
+  --color-ink-600: #3a3d3a;
+
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22e06b;  /* Haupt-Gruen (Buttons, aktive Nav) */
+  --color-brand-600: #16b657;
+
+  --color-muted: #8b928b;      /* sekundaerer Text */
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink-950);
+  color: #f4f6f4;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* dezente Scrollbar passend zum Dark-Theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
