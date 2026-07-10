@@ -9,6 +9,7 @@ und denselben Projektstatus (backend/db.py) wie das FastAPI-Backend.
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -22,8 +23,9 @@ from backend import db, storage
 from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.effects_grading import COLOR_PRESETS, BeatEffectConfig, render_with_beat_effects
 from backend.pipeline.extract_audio import extract_audio
+from backend.pipeline.hook_detect import HookResult, detect_hook
 from backend.pipeline.multitake_cut import TakeInfo, compute_multitake_plan, render_multitake_cut
-from backend.pipeline.render_sync import render_synced_video
+from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
 from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
 from backend.pipeline.sync_offset import LOW_CONFIDENCE_THRESHOLD, compute_offset
 from backend.pipeline.transcribe import DEFAULT_MODEL_SIZE, MODEL_SIZES, Word, transcribe
@@ -102,7 +104,7 @@ def process(
         entry: dict[str, Any] = {
             "name": Path(video_file).name, "project_id": project_id, "take_id": take_id,
             "words": None, "final_output_path": None, "effects_output_path": None,
-            "upscaled_output_path": None,
+            "upscaled_output_path": None, "hook_output_path": None, "hook_info": None,
         }
         try:
             extract_audio(video_dest, audio_path)
@@ -185,6 +187,100 @@ def _make_effects_handler(take_id: str):
 
 def _best_source_path(entry: dict[str, Any]) -> str:
     return entry.get("effects_output_path") or entry.get("final_output_path") or entry["output_path"]
+
+
+def _format_hook_result(result: HookResult) -> str:
+    b = result.best
+    lines = [
+        f"**Bester Vorschlag: {b.start_sec:.1f}s - {b.end_sec:.1f}s** "
+        f"(Wiederholung: {b.repetition_score:.2f}, Energie: {b.energy_score:.2f}x Songdurchschnitt)"
+    ]
+    for i, alt in enumerate(result.alternatives, 1):
+        lines.append(
+            f"Alternative {i}: {alt.start_sec:.1f}s - {alt.end_sec:.1f}s "
+            f"(Wiederholung: {alt.repetition_score:.2f}, Energie: {alt.energy_score:.2f}x)"
+        )
+    return "\n\n".join(lines)
+
+
+def find_hook_handler(song_file: str | None) -> tuple[str, str | None]:
+    if not song_file:
+        raise gr.Error("Bitte zuerst eine Songdatei hochladen.")
+    try:
+        result = detect_hook(song_file)
+    except ValueError as e:
+        raise gr.Error(str(e))
+
+    snippet_path = Path(song_file).parent / "hook_snippet_preview.wav"
+    b = result.best
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", song_file, "-ss", str(b.start_sec), "-to", str(b.end_sec),
+             str(snippet_path)],
+            check=True, capture_output=True, text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise gr.Error(f"Audio-Vorschau fehlgeschlagen: {e.stderr}")
+    return _format_hook_result(result), str(snippet_path)
+
+
+def _make_hook_trim_handler(take_id: str):
+    def _handler(current_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        new_results = []
+        for r in current_results:
+            if r["take_id"] == take_id:
+                project = db.get_project(r["project_id"])
+                if not project:
+                    raise gr.Error("Projekt nicht gefunden.")
+                try:
+                    hook = detect_hook(project["song_path"])
+                except ValueError as e:
+                    raise gr.Error(f"Hook-Erkennung fehlgeschlagen: {e}")
+
+                source = _best_source_path(r)
+                take_duration = _probe_duration_sec(source)
+                offset_sec = r["offset_ms"] / 1000.0
+
+                chosen = None
+                for candidate in [hook.best, *hook.alternatives]:
+                    local_start = candidate.start_sec - offset_sec
+                    local_end = candidate.end_sec - offset_sec
+                    if local_start >= 0 and local_end <= take_duration:
+                        chosen = (candidate, local_start, local_end)
+                        break
+
+                if chosen is None:
+                    b = hook.best
+                    raise gr.Error(
+                        f"Der erkannte Hook-Bereich ({b.start_sec:.1f}s-{b.end_sec:.1f}s im Song) "
+                        "liegt ausserhalb dessen, was in diesem Take gefilmt wurde. Fuer den naechsten "
+                        f"Take: diesen Songbereich mitfilmen, dann erneut versuchen."
+                    )
+
+                candidate, local_start, local_end = chosen
+                take_dir = storage.take_dir(r["project_id"], take_id)
+                hook_path = take_dir / "output_hook.mp4"
+                try:
+                    subprocess.run(
+                        ["ffmpeg", "-y", "-i", source, "-ss", f"{local_start:.3f}", "-to", f"{local_end:.3f}",
+                         "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-c:a", "aac",
+                         "-movflags", "+faststart", str(hook_path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    raise gr.Error(f"Hook-Zuschnitt fehlgeschlagen: {e.stderr}")
+
+                which = "Top-Vorschlag" if candidate is hook.best else "Alternative (Top-Vorschlag passte nicht ins gefilmte Material)"
+                info = (
+                    f"**Verwendet ({which}): {candidate.start_sec:.1f}s-{candidate.end_sec:.1f}s im Song** "
+                    f"(Wiederholung: {candidate.repetition_score:.2f}, "
+                    f"Energie: {candidate.energy_score:.2f}x Songdurchschnitt)"
+                )
+                r = {**r, "hook_output_path": str(hook_path), "hook_info": info}
+            new_results.append(r)
+        return new_results
+
+    return _handler
 
 
 def _make_upscale_handler(take_id: str):
@@ -277,6 +373,19 @@ with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
         song_input = gr.File(label="Songdatei (mp3/wav)", file_types=["audio"])
         video_input = gr.File(label="Video-Take(s)", file_count="multiple", file_types=["video"])
 
+    with gr.Group():
+        gr.Markdown(
+            "#### 🎯 Hook im Song finden (noch bevor du filmst)\n"
+            "Nur die Songdatei oben hochladen und hier klicken - zeigt dir, welcher "
+            "Abschnitt sich am ehesten als Social-Media-Hook eignet (wiederholt sich "
+            "im Song UND ist ueberdurchschnittlich energiereich, typischerweise der "
+            "Refrain), damit du weisst, WAS du filmen solltest."
+        )
+        find_hook_btn = gr.Button("Hook finden")
+        hook_result_md = gr.Markdown()
+        hook_audio_preview = gr.Audio(label="Hoerprobe des Vorschlags", type="filepath")
+        find_hook_btn.click(find_hook_handler, inputs=[song_input], outputs=[hook_result_md, hook_audio_preview])
+
     with gr.Row():
         audio_mode = gr.Radio(
             choices=["mute", "background"],
@@ -316,6 +425,22 @@ with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
                         gr.Number(value=round(confidence, 3), label="Konfidenz (0-1)", interactive=False)
                         if confidence < LOW_CONFIDENCE_THRESHOLD:
                             gr.Markdown("⚠️ Niedrige Konfidenz - Ergebnis manuell pruefen.")
+
+                gr.Markdown(
+                    "#### Auf Hook zuschneiden\n"
+                    "Findet den vielversprechendsten Abschnitt im Song (Wiederholung + "
+                    "Energie) und schneidet diesen Take automatisch darauf zu - falls der "
+                    "erkannte Bereich im gefilmten Material liegt."
+                )
+                hook_trim_btn = gr.Button("Auf Hook zuschneiden")
+                if entry.get("hook_info"):
+                    gr.Markdown(entry["hook_info"])
+                if entry.get("hook_output_path"):
+                    gr.Video(value=entry["hook_output_path"], label="Vorschau (Hook-Zuschnitt)")
+                    gr.File(value=entry["hook_output_path"], label="Download (Hook-Zuschnitt)")
+                hook_trim_btn.click(
+                    _make_hook_trim_handler(take_id), inputs=[results_state], outputs=results_state,
+                )
 
                 gr.Markdown("#### Untertitel (Phase 2)")
                 with gr.Row():

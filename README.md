@@ -9,8 +9,9 @@ im Video passen bereits zum Song (Playback lief beim Filmen). Die einzige
 Aufgabe ist Audio-Video-Synchronisation: die richtige Stelle im Song finden und
 zeitlich exakt über das Video legen.
 
-Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)** und **Phase 3
-(Effekte, Grading, Upscaling)** sind fertig und lauffähig.
+Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)**, **Phase 3
+(Effekte, Grading, Upscaling)** und **Hook-Erkennung** (Roadmap-Ausbaustufe
+Richtung All-in-One-App fuer Indie-Musiker) sind fertig und lauffähig.
 
 ## Setup
 
@@ -70,6 +71,15 @@ Ganz unten pro Take: **Upscaling** (optional, siehe Warnhinweis im UI zur
 Rechenzeit) - wirkt auf die zuletzt erzeugte Version dieses Takes (mit
 Effekten > mit Untertiteln > nur Sync).
 
+Ganz oben, direkt unter dem Song-Upload: **🎯 Hook im Song finden** - nur die
+Songdatei hochladen (noch kein Video noetig) und auf "Hook finden" klicken,
+um zu erfahren, welcher ~15-30-Sekunden-Abschnitt sich am ehesten als
+Social-Media-Hook eignet, inkl. Hoerprobe. Ist ein Take bereits
+synchronisiert, steht dort zusaetzlich "Auf Hook zuschneiden" - schneidet den
+Take automatisch auf den erkannten Bereich zu (faellt auf die naechstbeste
+Alternative zurueck, falls der Top-Vorschlag ausserhalb des gefilmten
+Materials liegt).
+
 ### FastAPI-Backend (programmatischer Zugriff)
 
 ```bash
@@ -104,6 +114,9 @@ python -m backend.pipeline.upscale out_fx.mp4 out_upscaled.mp4 --scale 2   # opt
 
 # Phase 3 (Multi-Take-Schnitt, config.json mit takes/song_path/beat_times_sec):
 python -m backend.pipeline.multitake_cut config.json multitake_cut.mp4 --beat-interval 2 --order-mode fixed
+
+# Hook-Erkennung (nur die Songdatei noetig, kein Video):
+python -m backend.pipeline.hook_detect song.wav --target-duration 20 --json
 ```
 
 ## Architektur
@@ -120,6 +133,7 @@ backend/
     effects_grading.py       # Farbpresets + beat-synchrone Effekte (ffmpeg eq/crop/rgbashift/sendcmd)
     multitake_cut.py          # Taktgenauer Schnitt zwischen mehreren synchronisierten Takes
     upscale.py                 # Optionales Real-ESRGAN-Upscaling (PyTorch, CPU oder CUDA)
+    hook_detect.py              # Findet den wahrscheinlichsten Hook-/Refrain-Abschnitt eines Songs
   db.py                  # SQLite: Projekte + Takes
   storage.py              # gemeinsame Verzeichnis-Konventionen (/projects/<id>/...)
   main.py                  # FastAPI-Endpunkte
@@ -216,6 +230,45 @@ heruntergeladen (ca. 64 MB). Verarbeitung erfolgt Frame fuer Frame (Video
 wird dafuer temporaer in Einzelbilder zerlegt und danach wieder
 zusammengesetzt, Originalton bleibt erhalten).
 
+## Wie die Hook-Erkennung funktioniert
+
+Loest ein Problem, das VOR dem Filmen auftritt: viele Indie-Artists wissen
+nicht, welche 15-30 Sekunden ihres eigenen Songs am ehesten als Social-Media-
+Hook funktionieren. `hook_detect.py` nutzt eine Standard-MIR-Technik
+("Chorus-Detection via Self-Similarity"), aufgebaut auf bereits vorhandenen
+Bausteinen:
+
+1. `detect_beats()` aus `beat_detect.py` liefert Taktschlaege, daraus werden
+   Takt-Grenzen abgeleitet (4 Beats = 1 Takt, 4/4 angenommen).
+2. Beat-synchrones Chroma (`librosa.feature.chroma_cqt`, pro Takt gemittelt)
+   beschreibt den harmonischen Inhalt jedes Taktes.
+3. Eine Self-Similarity-Matrix zwischen allen Takten findet fuer jedes
+   Kandidatenfenster (Laenge ~ Zieldauer, an Taktgrenzen ausgerichtet) die
+   beste Uebereinstimmung mit einer ANDEREN, nicht ueberlappenden Stelle im
+   Song - der Refrain ist typischerweise der Abschnitt, der sich am
+   eindeutigsten wiederholt.
+4. Zusaetzlich wird die relative Lautstaerke (RMS) jedes Fensters ggue. dem
+   Songdurchschnitt berechnet - Refrains sind meist energiereicher als
+   Strophen. Wiederholung UND Energie zusammen ergeben den Score.
+
+Ergebnis: ein Top-Vorschlag plus 2-3 Alternativen, jeweils mit Zeitbereich,
+Wiederholungs- und Energie-Score - Transparenz-Prinzip wie bei `confidence`
+in `sync_offset.py`.
+
+**Wichtige Einschraenkung, mit echtem Songmaterial gefunden:** Bei Rap/Hip-Hop
+laeuft der Beat oft durchgehend unter Strophe UND Refrain weiter (anders als
+z.B. Pop, wo sich oft die Akkorde aendern) - die chroma-basierte Erkennung
+ist dadurch weniger trennscharf als bei Genres mit klarem harmonischem
+Strophe/Refrain-Kontrast. Score-Werte immer mit anhoeren/gegenpruefen, nicht
+blind vertrauen (gleiches Prinzip wie bei der Sync-Konfidenz).
+
+Fuer bereits gefilmte Takes: Da der erkannte Hook-Bereich ausserhalb dessen
+liegen kann, was tatsaechlich gefilmt wurde (das Video deckt ja nur einen
+Ausschnitt des Songs ab), probiert das Tool automatisch Top-Vorschlag und
+Alternativen der Reihe nach durch und nimmt die erste, die vollstaendig im
+gefilmten Material liegt - passt keine, wird das transparent gemeldet
+(inkl. Hinweis, welchen Songbereich man beim naechsten Take mitfilmen sollte).
+
 ## Bekannte Grenzen (bewusst, siehe Nicht-Ziele)
 
 - **Keine Drift-Korrektur:** Falls die Handy-Samplerate über die Videolänge
@@ -244,10 +297,23 @@ zusammengesetzt, Originalton bleibt erhalten).
   Hochskalierung als einfache Interpolation. Zusaetzliche Pakete
   (torch/basicsr/realesrgan) muessen separat installiert werden (siehe
   Setup), das Modell wird beim ersten Aufruf automatisch heruntergeladen.
+- **Hook-Erkennung ist ein Vorschlag, keine Garantie** - besonders bei
+  Genres mit durchgehendem Beat (siehe oben) immer per Ohr gegenpruefen.
+  Braucht mindestens ~8 Takte (genuegend erkannte Taktschlaege) im Song.
+
+## Roadmap (All-in-One-App fuer Indie-Musiker)
+
+Naechste sinnvolle Bausteine, in ungefaehrer Prioritaet: Multi-Plattform-
+Export-Presets (TikTok/Reels/Shorts/Story gleichzeitig aus einem Take,
+baut direkt auf `render_sync.py` auf) → Batch/Multi-Version-Generator
+(mehrere Preset-Kombinationen automatisch durchprobieren) → Smart-Link/EPK-
+Landingpage (Pre-Save-Links, Social-Links im Look des Videos - erster
+Schritt Richtung Distribution/Business-Seite, aber neuer Baustein
+ausserhalb der Video-Pipeline mit eigenen Hosting-Ueberlegungen).
 
 ## Nächste Schritte
 
-Alle drei Phasen sind bereit zum Testen mit echtem Material - insbesondere
+Alle Bausteine sind bereit zum Testen mit echtem Material - insbesondere
 Multi-Take-Schnitt und Upscaling profitieren von Material mit mehreren Takes
 bzw. laengeren Testlaeufen, die im Rahmen dieser Session nicht vollstaendig
 durchgefuehrt werden konnten (siehe Testabschnitte in den jeweiligen
