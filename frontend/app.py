@@ -1,4 +1,4 @@
-"""Gradio-Oberflaeche fuer den Rap-Video Auto-Editor.
+"""Gradio-Oberflaeche fuer HOOKCUT (Arbeitstitel: Rap-Video Auto-Editor).
 
 Phase 1 (Sync) + Phase 2 (Untertitel) + Phase 3 (Farbgrading, Beat-Effekte,
 Multi-Take-Schnitt, optionales Upscaling). Ruft die pipeline-Funktionen direkt
@@ -34,7 +34,10 @@ from backend.pipeline.upscale import upscale_video
 db.init_db()
 
 INTRO_MD = """
-# Rap-Video Auto-Editor
+# HOOKCUT
+
+**Das Multimedia-Tool fuer Independent Artists** - vom Handyvideo zum
+release-fertigen Social-Media-Clip.
 
 Lade **eine Songdatei** (die fertig produzierte Studio-Version) und **einen oder
 mehrere Video-Takes** hoch, in denen du zu genau dieser Songstelle mitgerappt
@@ -366,7 +369,7 @@ def multitake_cut_handler(
     return {"output_path": str(out_path), "num_segments": len(plan)}
 
 
-with gr.Blocks(title="Rap-Video Auto-Editor") as demo:
+with gr.Blocks(title="HOOKCUT") as demo:
     gr.Markdown(INTRO_MD)
 
     with gr.Row():

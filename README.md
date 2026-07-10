@@ -1,4 +1,7 @@
-# Rap-Video Auto-Editor
+# HOOKCUT
+
+**Das Multimedia-Tool für Independent Artists** — vom Handyvideo zum
+release-fertigen Social-Media-Clip.
 
 Lokal laufendes Tool, um ein zum Playback mitgerapptes Handyvideo zeitlich
 exakt mit der fertig produzierten Songdatei zu synchronisieren und als

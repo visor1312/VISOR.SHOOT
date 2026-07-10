@@ -86,7 +86,7 @@ def _escape_ass_text(text: str) -> str:
 
 def _ass_header(video_width: int, video_height: int, font_size: int) -> str:
     return f"""[Script Info]
-Title: Rap-Video Auto-Editor Untertitel
+Title: HOOKCUT Untertitel
 ScriptType: v4.00+
 PlayResX: {video_width}
 PlayResY: {video_height}

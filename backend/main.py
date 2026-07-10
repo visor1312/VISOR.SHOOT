@@ -1,4 +1,4 @@
-"""FastAPI-Endpunkte fuer den Rap-Video Auto-Editor (Phase 1: Sync).
+"""FastAPI-Endpunkte fuer HOOKCUT (Phase 1: Sync).
 
 Duenne Schicht ueber db.py und den pipeline/-Modulen. Das Gradio-Frontend
 (frontend/app.py) ruft fuer die MVP-Oberflaeche dieselben pipeline-Funktionen
@@ -19,7 +19,7 @@ from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.render_sync import render_synced_video
 from backend.pipeline.sync_offset import compute_offset
 
-app = FastAPI(title="Rap Video Auto-Editor")
+app = FastAPI(title="HOOKCUT")
 
 
 @app.on_event("startup")
