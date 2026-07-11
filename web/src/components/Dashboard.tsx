@@ -100,18 +100,25 @@ export default function Dashboard({
         </div>
 
         {/* Viral Hook Detector */}
-        <div className="bg-ink-850 border border-ink-700 rounded-2xl p-6">
-          <div className="w-12 h-12 rounded-xl bg-ink-800 flex items-center justify-center">
-            <Zap size={24} className="text-muted" />
+        <div className="bg-brand-500/8 border border-brand-500/60 rounded-2xl p-6 relative">
+          <div className="flex items-start justify-between">
+            <div className="w-12 h-12 rounded-xl bg-brand-500 flex items-center justify-center">
+              <Zap size={24} className="text-ink-950" />
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-1 rounded bg-brand-500 text-ink-950">
+              Core
+            </span>
           </div>
-          <h3 className="text-lg font-semibold mt-5">Viral Hook Detector</h3>
+          <h3 className="text-lg font-semibold text-brand-400 mt-5">
+            Viral Hook Detector
+          </h3>
           <p className="text-sm text-muted mt-2 leading-relaxed">
             Lade deinen Song hoch und das System findet automatisch die beste
             Hook-Stelle mit dem höchsten Viralitätsfaktor.
           </p>
           <button
             onClick={onOpenHook}
-            className="mt-5 bg-ink-800 hover:bg-ink-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-colors"
+            className="mt-5 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
           >
             Song analysieren
           </button>
