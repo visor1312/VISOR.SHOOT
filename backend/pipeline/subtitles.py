@@ -143,10 +143,10 @@ def write_ass(
     return out_path
 
 
-def _escape_ffmpeg_filter_path(path: str | Path) -> str:
-    p = str(Path(path).resolve())
-    p = p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    return p
+def _escape_ffmpeg_filter_value(value: str) -> str:
+    # Escaping fuer WERTE innerhalb eines ffmpeg-Filtergraphen (':' trennt
+    # Optionen, '\' ist Escape-Zeichen, ''' begrenzt Strings).
+    return value.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
 def burn_subtitles(
@@ -155,10 +155,18 @@ def burn_subtitles(
     out_path: str | Path,
     crf: int = 19,
 ) -> Path:
-    out_path = Path(out_path)
+    # Windows-Pfade (C:\...) lassen sich nicht zuverlaessig fuer den
+    # ass=-Filter escapen - der Laufwerks-Doppelpunkt wird trotz Escape als
+    # Options-Trenner geparst (ffmpeg haelt den Rest dann fuer die Option
+    # "original_size"). Statt Escaping-Akrobatik: ffmpeg im Ordner der
+    # ASS-Datei starten und nur den Dateinamen referenzieren. Alle anderen
+    # Pfade werden dafuer absolut aufgeloest.
+    video_path = Path(video_path).resolve()
+    ass_path = Path(ass_path).resolve()
+    out_path = Path(out_path).resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    escaped_ass = _escape_ffmpeg_filter_path(ass_path)
+    escaped_ass = _escape_ffmpeg_filter_value(ass_path.name)
     cmd = [
         "ffmpeg", "-y",
         "-i", str(video_path),
@@ -168,7 +176,7 @@ def burn_subtitles(
         "-movflags", "+faststart",
         str(out_path),
     ]
-    subprocess.run(cmd, check=True, capture_output=True, text=True)
+    subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=ass_path.parent)
     return out_path
 
 

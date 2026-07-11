@@ -4,7 +4,13 @@
 
 const BASE = "/api";
 
-export type TakeStatus = "pending" | "processing" | "done" | "error";
+export type TakeStatus =
+  | "pending"
+  | "processing"
+  | "effects"
+  | "subtitles"
+  | "done"
+  | "error";
 
 export interface Take {
   id: string;
@@ -69,6 +75,20 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Projekt inkl. aller Takes, wie GET /projects es liefert. */
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  song_path: string;
+  created_at: string;
+  takes: Take[];
+}
+
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const res = await requestOrExplain(`${BASE}/projects`);
+  return jsonOrThrow<ProjectSummary[]>(res);
+}
+
 export async function createProject(name: string, song: File): Promise<string> {
   const form = new FormData();
   form.append("name", name);
@@ -94,10 +114,35 @@ export async function createTake(
   return data.take_id;
 }
 
-export async function startSync(projectId: string, takeId: string): Promise<void> {
+export interface EditPreset {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export async function listPresets(): Promise<EditPreset[]> {
+  const res = await requestOrExplain(`${BASE}/presets`);
+  return jsonOrThrow<EditPreset[]>(res);
+}
+
+export interface SyncOptions {
+  preset?: string;
+  subtitles?: boolean;
+  language?: "de" | "en";
+}
+
+export async function startSync(
+  projectId: string,
+  takeId: string,
+  { preset = "clean", subtitles = false, language = "de" }: SyncOptions = {},
+): Promise<void> {
+  const form = new FormData();
+  form.append("preset", preset);
+  form.append("subtitles", String(subtitles));
+  form.append("language", language);
   const res = await requestOrExplain(
     `${BASE}/projects/${projectId}/takes/${takeId}/sync`,
-    { method: "POST" },
+    { method: "POST", body: form },
   );
   await jsonOrThrow(res);
 }
@@ -134,6 +179,19 @@ export interface HookJob {
     alternatives: HookCandidate[];
     used_vocals: boolean;
   } | null;
+}
+
+/** Kurzform einer Hook-Analyse, wie GET /hooks sie liefert (nur bester Kandidat). */
+export interface HookJobSummary {
+  job_id: string;
+  status: HookStatus;
+  created_at: string;
+  best: HookCandidate | null;
+}
+
+export async function listRecentHooks(limit = 5): Promise<HookJobSummary[]> {
+  const res = await requestOrExplain(`${BASE}/hooks?limit=${limit}`);
+  return jsonOrThrow<HookJobSummary[]>(res);
 }
 
 export async function analyzeHook(song: File): Promise<string> {

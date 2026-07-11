@@ -53,8 +53,10 @@ def _probe_dimensions(video_path: str | Path) -> tuple[int, int]:
          "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(video_path)],
         check=True, capture_output=True, text=True,
     )
-    width_str, height_str = result.stdout.strip().split("x")
-    return int(width_str), int(height_str)
+    # ffprobe haengt je nach Version/Datei ein ueberzaehliges Trennzeichen an
+    # ("1080x1920x") - daher tolerant parsen statt strikt entpacken.
+    parts = [p for p in result.stdout.strip().split("x") if p]
+    return int(parts[0]), int(parts[1])
 
 
 def compute_multitake_plan(

@@ -41,12 +41,13 @@ pip install --no-build-isolation basicsr realesrgan
 
 ## Nutzung
 
-### React-Dashboard (neue Produkt-Oberfläche, `web/`)
+### React-Dashboard (primäre Oberfläche, `web/`)
 
 Das designte HOOKCUT-Dashboard (React + Vite + Tailwind, Dark-Theme) liegt
-unter `web/`. Es ist als eigentliche Produkt-Oberfläche gedacht und spricht
-später das FastAPI-Backend (`backend/main.py`) über `/api/...` an (im
-Dev-Server bereits als Proxy auf `127.0.0.1:8000` konfiguriert).
+unter `web/`. Es ist **die primäre Produkt-Oberfläche** und spricht das
+FastAPI-Backend (`backend/main.py`) über `/api/...` an (im Dev-Server als
+Proxy auf `127.0.0.1:8000` konfiguriert). Bequemster Start: einfach
+`start-hookcut.bat` doppelklicken (startet Backend + Frontend + Browser).
 
 ```bash
 cd web
@@ -54,12 +55,26 @@ npm install        # einmalig
 npm run dev        # startet auf http://127.0.0.1:5173
 ```
 
-Aktueller Stand: die Dashboard-Ansicht (Sidebar, Kennzahlen, Aktions-Kacheln,
-zuletzt bearbeitete Projekte, Viral-Hook-Detector-Panel) steht als Shell mit
-Platzhalter-Daten. Die Anbindung der einzelnen Aktionen an das Backend ist der
-nächste Schritt.
+Aktueller Stand: Dashboard (Kennzahlen, Projektliste mit Download,
+Hook-Analysen-Panel — alles echte Daten aus dem Backend), Upload-Workflow
+(Projekt + Take anlegen, synchronisieren, herunterladen) und Viral Hook
+Detector (inkl. Vocal-Separation, sofern `demucs` installiert ist).
 
-### Gradio-Oberfläche (funktionierender MVP-Workflow, alle Features live)
+Der Upload-Workflow bietet zusätzlich:
+
+- **12 Editing-Presets** (`backend/pipeline/presets.py`, GET `/presets`):
+  benannte Kombinationen aus Color Grading, beat-synchronen Effekten
+  (Zoom-Kick, Flash, Shake, RGB-Split), Finish-Filtern (Vignette, Korn,
+  Schärfe, Blur, curves-Looks) und Schnitt-Rhythmus (`beat_stride`:
+  Effekt auf jedem 1./2./4. Beat). Presets: Pur, Golden Hour, Urban Ice,
+  Noir, Beat Pulse, Flash, Shake, Glitch, VHS Retro, Vintage Film,
+  Dreamy, Hard Trap.
+- **Automatische Untertitel** (Toggle, Sprache de/en): Whisper-Modell
+  "small" (~460 MB einmaliger Download) transkribiert die Audiospur des
+  fertigen Videos, Karaoke-ASS wird eingebrannt. Job-Status durchläuft
+  `processing -> effects -> subtitles -> done`.
+
+### Gradio-Oberfläche (Legacy-MVP, alle Pipeline-Features direkt bedienbar)
 
 ```bash
 python -m frontend.app

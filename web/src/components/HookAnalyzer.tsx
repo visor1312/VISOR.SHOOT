@@ -17,6 +17,7 @@ interface Props {
 const RUNNING_LABEL: Record<string, string> = {
   upload: "Song wird hochgeladen…",
   pending: "In der Warteschlange…",
+  separating: "Gesang wird vom Beat getrennt…",
   analyzing: "Song-Struktur wird analysiert…",
 };
 
@@ -111,7 +112,9 @@ export default function HookAnalyzer({ onClose }: Props) {
                 {RUNNING_LABEL[statusLabel] ?? "Wird verarbeitet…"}
               </p>
               <p className="text-sm text-muted mt-1">
-                Dauert je nach Songlänge nur ein paar Sekunden.
+                {statusLabel === "separating"
+                  ? "Die Gesangs-Trennung kann 1–3 Minuten dauern — sie macht die Analyse deutlich genauer."
+                  : "Dauert je nach Songlänge nur ein paar Sekunden."}
               </p>
             </div>
           )}

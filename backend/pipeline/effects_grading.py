@@ -27,6 +27,10 @@ COLOR_PRESETS: dict[str, dict[str, float]] = {
     "warm_gold": {"contrast": 1.08, "saturation": 1.2, "brightness": 0.01, "gamma_r": 1.08, "gamma_b": 0.92},
     "cold_urban": {"contrast": 1.12, "saturation": 0.88, "brightness": -0.01, "gamma_r": 0.94, "gamma_b": 1.1},
     "high_contrast_mono": {"contrast": 1.35, "saturation": 0.0, "brightness": 0.0, "gamma_r": 1.0, "gamma_b": 1.0},
+    # Fuer die Editing-Presets (presets.py):
+    "vhs_faded": {"contrast": 1.02, "saturation": 0.72, "brightness": 0.02, "gamma_r": 1.03, "gamma_b": 0.97},
+    "dreamy_soft": {"contrast": 0.92, "saturation": 1.15, "brightness": 0.05, "gamma_r": 1.02, "gamma_b": 1.02},
+    "punchy_trap": {"contrast": 1.25, "saturation": 1.12, "brightness": -0.01, "gamma_r": 1.0, "gamma_b": 1.03},
 }
 
 
@@ -102,8 +106,10 @@ def _probe_dimensions(video_path: str | Path) -> tuple[int, int]:
          "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(video_path)],
         check=True, capture_output=True, text=True,
     )
-    width_str, height_str = result.stdout.strip().split("x")
-    return int(width_str), int(height_str)
+    # ffprobe haengt je nach Version/Datei ein ueberzaehliges Trennzeichen an
+    # ("1080x1920x") - daher tolerant parsen statt strikt entpacken.
+    parts = [p for p in result.stdout.strip().split("x") if p]
+    return int(parts[0]), int(parts[1])
 
 
 def render_with_beat_effects(
@@ -112,11 +118,17 @@ def render_with_beat_effects(
     out_path: str | Path,
     color_preset: Optional[str] = None,
     effects: Optional[BeatEffectConfig] = None,
+    extra_filters: Optional[list[str]] = None,
     crf: int = 19,
 ) -> Path:
     """Wendet Farbpreset (optional) und beat-synchrone Effekte (optional) auf ein
     Einzelclip-Video an. `beat_times` muss bereits im Zeitrahmen dieses Videos
-    liegen (siehe beat_detect.py)."""
+    liegen (siehe beat_detect.py).
+
+    `extra_filters`: fertige ffmpeg-Filterstrings (z.B. "vignette=PI/4.5",
+    "noise=alls=10:allf=t+u"), die als Finish NACH Farbpreset und
+    Beat-Effekten angehaengt werden - fuer Vignette/Korn/Schaerfe etc.
+    """
     video_path = Path(video_path)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,6 +179,9 @@ def render_with_beat_effects(
         sendcmd_lines += _kick_lines("rgbsplit", "rh", "0", str(shift_px), beat_times, kick_dur)
         sendcmd_lines += _kick_lines("rgbsplit", "bh", "0", str(-shift_px), beat_times, kick_dur)
         filters.append("rgbashift@rgbsplit")
+
+    if extra_filters:
+        filters.extend(extra_filters)
 
     if sendcmd_lines:
         sendcmd_script = out_path.parent / f"{out_path.stem}_cmds.txt"

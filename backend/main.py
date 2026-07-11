@@ -19,10 +19,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend import db, storage
+from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.hook_detect import detect_hook
+from backend.pipeline.presets import PRESETS, apply_preset, preset_catalog, preset_is_noop
 from backend.pipeline.render_sync import render_synced_video
+from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
 from backend.pipeline.sync_offset import compute_offset
+from backend.pipeline.transcribe import transcribe
+from backend.pipeline.vocal_separation import separate_vocals
+
+# Whisper-Modell fuer die automatischen Untertitel im Web-Flow. "small" ist
+# der Kompromiss aus Qualitaet und Tempo auf CPU (~460 MB einmaliger
+# Download). Das beste Modell ("large-v3", ~3 GB, deutlich langsamer) bleibt
+# ueber die Gradio-Oberflaeche waehlbar.
+AUTO_SUBTITLE_MODEL = "small"
 
 app = FastAPI(title="HOOKCUT")
 
@@ -59,6 +70,15 @@ def create_project(name: str = Form(...), song: UploadFile = File(...)):
     return {"project_id": project_id}
 
 
+@app.get("/projects")
+def list_projects():
+    """Alle Projekte inkl. ihrer Takes - Datenquelle fuer das Dashboard."""
+    return [
+        {**project, "takes": db.list_takes(project["id"])}
+        for project in db.list_projects()
+    ]
+
+
 @app.post("/projects/{project_id}/takes")
 def create_take(project_id: str, video: UploadFile = File(...), original_audio_mode: str = Form("mute")):
     project = db.get_project(project_id)
@@ -75,9 +95,17 @@ def create_take(project_id: str, video: UploadFile = File(...), original_audio_m
     return {"take_id": take_id}
 
 
-def _run_sync_job(project_id: str, take_id: str) -> None:
-    """Laeuft im Hintergrund (FastAPI BackgroundTasks). Aktualisiert den
-    Take-Status in der DB; das Frontend pollt GET .../takes/{take_id}."""
+def _run_sync_job(
+    project_id: str,
+    take_id: str,
+    preset: str = "clean",
+    subtitles: bool = False,
+    language: str = "de",
+) -> None:
+    """Laeuft im Hintergrund (FastAPI BackgroundTasks). Status-Stufen:
+    processing -> effects -> subtitles -> done, damit das Frontend den
+    Fortschritt anzeigen kann. Effekt- und Untertitel-Stufe werden nur
+    durchlaufen, wenn sie tatsaechlich etwas tun."""
     project = db.get_project(project_id)
     take = db.get_take(take_id)
     if not project or not take:
@@ -92,6 +120,41 @@ def _run_sync_job(project_id: str, take_id: str) -> None:
             take["video_path"], project["song_path"], result.offset_ms, output_path,
             original_audio_mode=take["original_audio_mode"],
         )
+
+        # Beats/Untertitel arbeiten auf der Audiospur des FERTIGEN Videos -
+        # deren Zeitstempel liegen damit automatisch im richtigen Zeitrahmen.
+        output_audio: Path | None = None
+
+        def _get_output_audio() -> Path:
+            nonlocal output_audio
+            if output_audio is None:
+                output_audio = output_path.parent / "output_audio.wav"
+                extract_audio(output_path, output_audio)
+            return output_audio
+
+        if preset and not preset_is_noop(preset):
+            db.update_take(take_id, status="effects")
+            beats = detect_beats(_get_output_audio()).beat_times_sec
+            fx_path = output_path.parent / "output_fx.mp4"
+            apply_preset(output_path, beats, fx_path, preset)
+            fx_path.replace(output_path)
+
+        if subtitles:
+            db.update_take(take_id, status="subtitles")
+            words = transcribe(
+                _get_output_audio(), language=language, model_size=AUTO_SUBTITLE_MODEL,
+            )
+            if words:  # Instrumental/keine erkannten Woerter -> still ueberspringen
+                lines = group_words_into_lines(words)
+                ass_path = output_path.parent / "subtitles.ass"
+                write_ass(lines, ass_path, karaoke=True)
+                sub_path = output_path.parent / "output_sub.mp4"
+                burn_subtitles(output_path, ass_path, sub_path)
+                sub_path.replace(output_path)
+
+        if output_audio is not None:
+            output_audio.unlink(missing_ok=True)
+
         db.update_take(
             take_id, status="done", offset_ms=result.offset_ms,
             confidence=result.confidence, output_path=str(output_path), error=None,
@@ -100,15 +163,34 @@ def _run_sync_job(project_id: str, take_id: str) -> None:
         db.update_take(take_id, status="error", error=str(e))
 
 
+@app.get("/presets")
+def list_presets():
+    """Verfuegbare Editing-Presets fuer die Preset-Auswahl im Frontend."""
+    return preset_catalog()
+
+
 @app.post("/projects/{project_id}/takes/{take_id}/sync")
-def sync_take(project_id: str, take_id: str, background_tasks: BackgroundTasks):
+def sync_take(
+    project_id: str,
+    take_id: str,
+    background_tasks: BackgroundTasks,
+    preset: str = Form("clean"),
+    subtitles: bool = Form(False),
+    language: str = Form("de"),
+):
     project = db.get_project(project_id)
     take = db.get_take(take_id)
     if not project or not take or take["project_id"] != project_id:
         raise HTTPException(404, "Projekt oder Take nicht gefunden")
+    if preset not in PRESETS:
+        raise HTTPException(400, f"Unbekanntes Preset: {preset}")
+    if language not in ("de", "en"):
+        raise HTTPException(400, "language muss 'de' oder 'en' sein")
 
-    db.update_take(take_id, status="processing", error=None)
-    background_tasks.add_task(_run_sync_job, project_id, take_id)
+    db.update_take(take_id, status="processing", error=None,
+                   preset=preset, subtitles=int(subtitles))
+    background_tasks.add_task(_run_sync_job, project_id, take_id,
+                              preset=preset, subtitles=subtitles, language=language)
     return {"status": "processing", "take_id": take_id}
 
 
@@ -130,18 +212,25 @@ def list_takes(project_id: str):
 def _run_hook_job(job_id: str) -> None:
     """Laeuft im Hintergrund. Status-Stufen: separating -> analyzing -> done,
     damit das Frontend den Fortschritt anzeigen kann. Die Vocal-Separation
-    ist optional - schlaegt sie fehl, wird ohne Vocal-Features bewertet."""
+    ist optional - schlaegt sie fehl (demucs fehlt, Modell-Download
+    blockiert), liefert separate_vocals None und es wird ohne
+    Vocal-Features bewertet."""
     job = db.get_hook_job(job_id)
     if not job:
         return
     try:
+        db.update_hook_job(job_id, status="separating")
+        vocals_path = separate_vocals(job["song_path"])
+
         db.update_hook_job(job_id, status="analyzing")
-        result = detect_hook(job["song_path"])
+        result = detect_hook(job["song_path"], vocals_path=vocals_path)
 
         payload = {
             "best": asdict(result.best),
             "alternatives": [asdict(c) for c in result.alternatives],
-            "used_vocals": False,
+            # vocal_score None trotz Stem = Stem war praktisch stumm
+            # (Instrumental) und wurde von detect_hook ignoriert.
+            "used_vocals": result.best.vocal_score is not None,
         }
         db.update_hook_job(job_id, status="done", result_json=json.dumps(payload), error=None)
     except Exception as e:
@@ -156,9 +245,31 @@ def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...)
     _save_upload(song, song_dest)
     db.set_hook_job_song_path(job_id, str(song_dest))
 
-    db.update_hook_job(job_id, status="analyzing")
+    # Status bleibt "pending", bis der Hintergrund-Job startet und selbst
+    # seine Stufen (separating -> analyzing -> done) setzt.
     background_tasks.add_task(_run_hook_job, job_id)
-    return {"job_id": job_id, "status": "analyzing"}
+    return {"job_id": job_id, "status": "pending"}
+
+
+@app.get("/hooks")
+def list_hook_jobs(limit: int = 10):
+    """Letzte Hook-Analysen (neueste zuerst) - Datenquelle fuer das Dashboard.
+
+    Pro Job wird nur der beste Kandidat mitgeliefert; die volle Kandidaten-
+    liste gibt es weiterhin ueber GET /hooks/{job_id}.
+    """
+    jobs = []
+    for job in db.list_hook_jobs(limit=limit):
+        best = None
+        if job["result_json"]:
+            best = json.loads(job["result_json"])["best"]
+        jobs.append({
+            "job_id": job["id"],
+            "status": job["status"],
+            "created_at": job["created_at"],
+            "best": best,
+        })
+    return jobs
 
 
 @app.get("/hooks/{job_id}")

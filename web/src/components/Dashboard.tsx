@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Plus,
   Music2,
@@ -6,17 +7,62 @@ import {
   Zap,
   UploadCloud,
   Sparkles,
-  Play,
+  Download,
   Copy,
-  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import {
-  stats,
-  recentProjects,
-  hookSuggestions,
-  statusMeta,
-} from "../data/mock";
+  listProjects,
+  listRecentHooks,
+  downloadUrl,
+  type ProjectSummary,
+  type HookJobSummary,
+  type Take,
+} from "../api";
+
+type ProjectStatus = "done" | "processing" | "draft" | "error";
+
+const statusMeta: Record<ProjectStatus, { label: string; className: string }> = {
+  done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
+  processing: { label: "Processing", className: "bg-amber-500/15 text-amber-400" },
+  draft: { label: "Draft", className: "bg-ink-700 text-muted" },
+  error: { label: "Fehler", className: "bg-red-500/15 text-red-400" },
+};
+
+/** Projektstatus aus den Takes ableiten: läuft etwas? Ist etwas fertig? */
+function projectStatus(takes: Take[]): ProjectStatus {
+  if (takes.some((t) => t.status === "processing" || t.status === "pending")) return "processing";
+  if (takes.some((t) => t.status === "done")) return "done";
+  if (takes.length > 0 && takes.every((t) => t.status === "error")) return "error";
+  return "draft";
+}
+
+function latestDoneTake(takes: Take[]): Take | undefined {
+  return [...takes].reverse().find((t) => t.status === "done" && t.output_path);
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+}
+
+function formatTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Wie viele Einträge sind jünger als 7 Tage? Für die Delta-Zeile der Stat-Karten. */
+function countThisWeek(items: { created_at: string }[]): number {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return items.filter((i) => new Date(i.created_at).getTime() > weekAgo).length;
+}
+
+interface Stat {
+  label: string;
+  value: string;
+  delta: string;
+  icon: string;
+}
 
 const statIcons: Record<string, LucideIcon> = {
   music: Music2,
@@ -25,7 +71,7 @@ const statIcons: Record<string, LucideIcon> = {
   zap: Zap,
 };
 
-function StatCard({ label, value, delta, icon }: (typeof stats)[number]) {
+function StatCard({ label, value, delta, icon }: Stat) {
   const Icon = statIcons[icon];
   return (
     <div className="bg-ink-850 border border-ink-700 rounded-2xl p-5">
@@ -48,13 +94,68 @@ export default function Dashboard({
   onOpenUpload: () => void;
   onOpenHook: () => void;
 }) {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [hooks, setHooks] = useState<HookJobSummary[]>([]);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listProjects(), listRecentHooks()])
+      .then(([p, h]) => {
+        if (cancelled) return;
+        setProjects(p);
+        setHooks(h);
+      })
+      .catch((e) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allTakes = projects.flatMap((p) => p.takes);
+  const doneTakes = allTakes.filter((t) => t.status === "done");
+  const doneHooks = hooks.filter((h) => h.status === "done" && h.best);
+  const bestScore = doneHooks.reduce(
+    (max, h) => Math.max(max, h.best?.viral_score ?? 0),
+    0,
+  );
+
+  const stats: Stat[] = [
+    {
+      label: "Projekte",
+      value: String(projects.length),
+      delta: `+${countThisWeek(projects)} diese Woche`,
+      icon: "music",
+    },
+    {
+      label: "Fertige Reels",
+      value: String(doneTakes.length),
+      delta: `+${countThisWeek(doneTakes)} diese Woche`,
+      icon: "video",
+    },
+    {
+      label: "Hook-Analysen",
+      value: String(hooks.length),
+      delta: `+${countThisWeek(hooks)} diese Woche`,
+      icon: "headphones",
+    },
+    {
+      label: "Bester Viral-Score",
+      value: bestScore > 0 ? String(Math.round(bestScore)) : "–",
+      delta: bestScore > 0 ? "von 100 Punkten" : "noch keine Analyse",
+      icon: "zap",
+    },
+  ];
+
   return (
     <main className="flex-1 min-w-0 px-8 py-7">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted mt-1">Willkommen zurück, YngLyric</p>
+          <p className="text-muted mt-1">Willkommen zurück</p>
         </div>
         <button
           onClick={onOpenUpload}
@@ -64,6 +165,12 @@ export default function Dashboard({
           Neues Projekt
         </button>
       </div>
+
+      {loadError && (
+        <div className="mt-5 bg-red-500/10 border border-red-500/40 text-red-400 text-sm rounded-xl px-4 py-3">
+          {loadError}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-7">
@@ -145,40 +252,49 @@ export default function Dashboard({
         <div className="xl:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold">Zuletzt bearbeitet</h2>
-            <a
-              href="#"
-              className="flex items-center gap-1 text-sm text-brand-400 hover:text-brand-500"
-            >
-              Alle anzeigen <ChevronRight size={16} />
-            </a>
           </div>
           <div className="space-y-2">
-            {recentProjects.map((p) => {
-              const meta = statusMeta[p.status];
+            {projects.length === 0 && !loadError && (
+              <div className="bg-ink-850 border border-ink-700 rounded-xl px-4 py-8 text-center text-sm text-muted">
+                Noch keine Projekte — starte mit „Neues Projekt".
+              </div>
+            )}
+            {projects.map((p, i) => {
+              const status = projectStatus(p.takes);
+              const meta = statusMeta[status];
+              const done = latestDoneTake(p.takes);
               return (
                 <div
                   key={p.id}
                   className="flex items-center gap-4 bg-ink-850 border border-ink-700 rounded-xl px-4 py-3.5 hover:bg-ink-800 transition-colors"
                 >
-                  <span className="text-sm text-ink-600 w-4 shrink-0">{p.id}</span>
+                  <span className="text-sm text-ink-600 w-4 shrink-0">{i + 1}</span>
                   <div className="w-9 h-9 rounded-lg bg-ink-800 flex items-center justify-center shrink-0">
                     <Music2 size={16} className="text-muted" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{p.title}</p>
-                    <p className="text-xs text-muted">{p.date}</p>
+                    <p className="font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-muted">{formatDate(p.created_at)}</p>
                   </div>
                   <span
                     className={`text-xs font-medium px-2.5 py-1 rounded-md ${meta.className}`}
                   >
                     {meta.label}
                   </span>
-                  <span className="text-sm text-muted w-10 text-right shrink-0">
-                    {p.duration}
+                  <span className="text-sm text-muted w-16 text-right shrink-0">
+                    {p.takes.length} Take{p.takes.length !== 1 ? "s" : ""}
                   </span>
-                  <button className="w-8 h-8 rounded-lg hover:bg-ink-700 flex items-center justify-center text-muted hover:text-white transition-colors shrink-0">
-                    <Play size={16} />
-                  </button>
+                  {done ? (
+                    <a
+                      href={downloadUrl(p.id, done.id)}
+                      title="Fertiges Video herunterladen"
+                      className="w-8 h-8 rounded-lg hover:bg-ink-700 flex items-center justify-center text-muted hover:text-white transition-colors shrink-0"
+                    >
+                      <Download size={16} />
+                    </a>
+                  ) : (
+                    <span className="w-8 shrink-0" />
+                  )}
                 </div>
               );
             })}
@@ -192,41 +308,52 @@ export default function Dashboard({
               <Zap size={18} className="text-brand-400" />
               Viral Hook Detector
             </span>
-            <a
-              href="#"
-              className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-500"
-            >
-              Details <ChevronRight size={14} />
-            </a>
           </div>
           <p className="text-xs text-muted mt-3 leading-relaxed">
-            KI analysiert deinen Song und findet automatisch die besten
-            Hook-Stellen mit höchstem Viralitätsfaktor.
+            Deine letzten Analysen. Die KI findet automatisch die Song-Stelle
+            mit dem höchsten Hook-Potenzial.
           </p>
           <div className="space-y-2 mt-4">
-            {hookSuggestions.map((h) => (
-              <div
-                key={h.timestamp}
-                className="flex items-center gap-3 bg-ink-800 rounded-xl px-3 py-2.5"
-              >
-                <span className="text-xs text-muted w-8 shrink-0">
-                  {h.timestamp}
-                </span>
-                <span className="text-sm font-bold text-brand-400 w-7 shrink-0">
-                  {h.score}
-                </span>
-                <p className="text-sm flex-1 min-w-0">{h.line}</p>
-                <button className="text-muted hover:text-white shrink-0">
-                  <Copy size={15} />
-                </button>
+            {doneHooks.length === 0 && (
+              <div className="bg-ink-800 rounded-xl px-3 py-4 text-center text-xs text-muted">
+                Noch keine Hook-Analysen.
               </div>
-            ))}
+            )}
+            {doneHooks.map((h) => {
+              const range = `${formatTime(h.best!.start_sec)}–${formatTime(h.best!.end_sec)}`;
+              return (
+                <div
+                  key={h.job_id}
+                  className="flex items-center gap-3 bg-ink-800 rounded-xl px-3 py-2.5"
+                >
+                  <span className="text-xs text-muted w-8 shrink-0">
+                    {formatTime(h.best!.start_sec)}
+                  </span>
+                  <span className="text-sm font-bold text-brand-400 w-7 shrink-0">
+                    {Math.round(h.best!.viral_score)}
+                  </span>
+                  <p className="text-sm flex-1 min-w-0">
+                    Hook bei {range}
+                    <span className="block text-xs text-muted">
+                      {formatDate(h.created_at)}
+                    </span>
+                  </p>
+                  <button
+                    title="Zeitbereich kopieren"
+                    onClick={() => navigator.clipboard.writeText(range)}
+                    className="text-muted hover:text-white shrink-0"
+                  >
+                    <Copy size={15} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
           <button
             onClick={onOpenHook}
             className="w-full mt-4 bg-brand-500/12 hover:bg-brand-500/20 text-brand-400 font-semibold text-sm py-3 rounded-xl transition-colors"
           >
-            Hook extrahieren
+            Neuen Song analysieren
           </button>
         </div>
       </div>

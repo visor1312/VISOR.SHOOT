@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS takes (
     offset_ms REAL,
     confidence REAL,
     original_audio_mode TEXT NOT NULL DEFAULT 'mute',
+    preset TEXT,
+    subtitles INTEGER,
     output_path TEXT,
     error TEXT,
     created_at TEXT NOT NULL
@@ -55,6 +57,14 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with _connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        # Mini-Migration fuer bestehende DBs: CREATE IF NOT EXISTS ergaenzt
+        # keine Spalten. ALTER TABLE wirft bei schon vorhandener Spalte einen
+        # OperationalError - der ist dann erwartbar und wird ignoriert.
+        for column_def in ("preset TEXT", "subtitles INTEGER"):
+            try:
+                conn.execute(f"ALTER TABLE takes ADD COLUMN {column_def}")
+            except sqlite3.OperationalError:
+                pass
 
 
 @contextmanager
@@ -108,7 +118,8 @@ def set_take_video_path(take_id: str, video_path: str, db_path: str | Path = DEF
 def update_take(take_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
     if not fields:
         return
-    allowed = {"status", "offset_ms", "confidence", "output_path", "error", "original_audio_mode"}
+    allowed = {"status", "offset_ms", "confidence", "output_path", "error",
+               "original_audio_mode", "preset", "subtitles"}
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"Unbekannte Felder: {unknown}")
@@ -166,5 +177,19 @@ def list_takes(project_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[d
     with _connect(db_path) as conn:
         rows = conn.execute(
             "SELECT * FROM takes WHERE project_id = ? ORDER BY created_at", (project_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_projects(db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    with _connect(db_path) as conn:
+        rows = conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_hook_jobs(limit: int = 10, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM hook_jobs ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
