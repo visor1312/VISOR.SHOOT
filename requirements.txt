@@ -9,6 +9,11 @@ gradio==6.20.0
 pytest==9.1.1
 faster-whisper==1.2.1
 
+# Hook-Detector 2.0: Vocal-Separation (Meta Demucs, MIT-Lizenz). Laedt beim
+# ersten Lauf automatisch das htdemucs-Modell (~80 MB) herunter. Optional -
+# ohne demucs faellt die Hook-Erkennung auf den reinen Librosa-Pfad zurueck.
+demucs==4.0.1
+
 # Optional (Phase 3, nur fuer Upscaling): siehe README, Abschnitt "Upscaling"
 # fuer den genauen Installationsbefehl (basicsr braucht --no-build-isolation).
 # torch==2.13.0

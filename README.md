@@ -136,7 +136,8 @@ python -m backend.pipeline.upscale out_fx.mp4 out_upscaled.mp4 --scale 2   # opt
 # Phase 3 (Multi-Take-Schnitt, config.json mit takes/song_path/beat_times_sec):
 python -m backend.pipeline.multitake_cut config.json multitake_cut.mp4 --beat-interval 2 --order-mode fixed
 
-# Hook-Erkennung (nur die Songdatei noetig, kein Video):
+# Hook-Erkennung (nur die Songdatei noetig, kein Video). Nutzt automatisch
+# Demucs-Vocal-Separation, falls installiert; --no-vocals ueberspringt sie:
 python -m backend.pipeline.hook_detect song.wav --target-duration 20 --json
 ```
 
@@ -251,13 +252,12 @@ heruntergeladen (ca. 64 MB). Verarbeitung erfolgt Frame fuer Frame (Video
 wird dafuer temporaer in Einzelbilder zerlegt und danach wieder
 zusammengesetzt, Originalton bleibt erhalten).
 
-## Wie die Hook-Erkennung funktioniert
+## Wie die Hook-Erkennung funktioniert (Hook-Score 2.0)
 
 Loest ein Problem, das VOR dem Filmen auftritt: viele Indie-Artists wissen
 nicht, welche 15-30 Sekunden ihres eigenen Songs am ehesten als Social-Media-
-Hook funktionieren. `hook_detect.py` nutzt eine Standard-MIR-Technik
-("Chorus-Detection via Self-Similarity"), aufgebaut auf bereits vorhandenen
-Bausteinen:
+Hook funktionieren. `hook_detect.py` kombiniert eine Standard-MIR-Technik
+("Chorus-Detection via Self-Similarity") mit Vocal-Analyse:
 
 1. `detect_beats()` aus `beat_detect.py` liefert Taktschlaege, daraus werden
    Takt-Grenzen abgeleitet (4 Beats = 1 Takt, 4/4 angenommen).
@@ -270,18 +270,39 @@ Bausteinen:
    eindeutigsten wiederholt.
 4. Zusaetzlich wird die relative Lautstaerke (RMS) jedes Fensters ggue. dem
    Songdurchschnitt berechnet - Refrains sind meist energiereicher als
-   Strophen. Wiederholung UND Energie zusammen ergeben den Score.
+   Strophen.
+5. **Vocal-Analyse (2.0, optional):** `vocal_separation.py` trennt mit
+   [Demucs](https://github.com/facebookresearch/demucs) (Meta, MIT-Lizenz)
+   die Vocals vom Beat. Aus dem Vocal-Stem werden pro Fenster Vocal-Praesenz
+   (RMS) und Flow-Dichte (Onset-Staerke) berechnet - ein Rap-Hook hat
+   praesente, rhythmisch artikulierte Vocals, was aus dem Gesamtmix nicht
+   ablesbar ist. Das Ergebnis wird pro Song gecacht (`<song>.vocals.wav`),
+   weil die Trennung auf CPU 1-3 Minuten dauert. Ist demucs nicht
+   installiert oder der Modell-Download nicht moeglich, laeuft alles ohne
+   Vocal-Features weiter (rein librosa-basiert).
+6. **Position:** Fenster in den ersten 10% des Songs werden mild abgewertet -
+   Intros wiederholen sich oft, sind aber selten der Hook.
 
-Ergebnis: ein Top-Vorschlag plus 2-3 Alternativen, jeweils mit Zeitbereich,
-Wiederholungs- und Energie-Score - Transparenz-Prinzip wie bei `confidence`
-in `sync_offset.py`.
+Wiederholung x Energie x Vocals x Position ergeben das interne Ranking;
+fuers UI wird daraus zusaetzlich ein **Viral-Score (0-100)** kombiniert.
+
+Ergebnis: ein Top-Vorschlag plus 2-3 Alternativen, jeweils mit Zeitbereich
+und allen Teil-Scores - Transparenz-Prinzip wie bei `confidence` in
+`sync_offset.py`.
+
+Im React-Dashboard: Karte "Viral Hook Detector" -> Song hochladen -> die
+Analyse laeuft als Hintergrund-Job (`POST /hooks/analyze`, Polling ueber
+`GET /hooks/{job_id}`), jeder Kandidat hat eine anhoerbare MP3-Vorschau
+(`GET /hooks/{job_id}/preview/{index}`).
 
 **Wichtige Einschraenkung, mit echtem Songmaterial gefunden:** Bei Rap/Hip-Hop
 laeuft der Beat oft durchgehend unter Strophe UND Refrain weiter (anders als
 z.B. Pop, wo sich oft die Akkorde aendern) - die chroma-basierte Erkennung
 ist dadurch weniger trennscharf als bei Genres mit klarem harmonischem
-Strophe/Refrain-Kontrast. Score-Werte immer mit anhoeren/gegenpruefen, nicht
-blind vertrauen (gleiches Prinzip wie bei der Sync-Konfidenz).
+Strophe/Refrain-Kontrast. Genau deshalb gibt es die Vocal-Analyse (Punkt 5):
+sie unterscheidet Stellen, die harmonisch identisch klingen, anhand der
+Vocals. Score-Werte trotzdem immer mit anhoeren/gegenpruefen, nicht blind
+vertrauen (gleiches Prinzip wie bei der Sync-Konfidenz).
 
 Fuer bereits gefilmte Takes: Da der erkannte Hook-Bereich ausserhalb dessen
 liegen kann, was tatsaechlich gefilmt wurde (das Video deckt ja nur einen
@@ -331,6 +352,16 @@ baut direkt auf `render_sync.py` auf) → Batch/Multi-Version-Generator
 Landingpage (Pre-Save-Links, Social-Links im Look des Videos - erster
 Schritt Richtung Distribution/Business-Seite, aber neuer Baustein
 ausserhalb der Video-Pipeline mit eigenen Hosting-Ueberlegungen).
+
+Hook-Erkennung, moegliche Pro-Ausbaustufe: das MIT-lizenzierte
+Struktur-Modell [mir-aidj/all-in-one](https://github.com/mir-aidj/all-in-one)
+labelt Songabschnitte direkt als chorus/verse/bridge (beste bekannte
+Open-Source-Qualitaet), braucht aber schwere Dependencies (NATTEN muss auf
+Windows aus dem Quellcode gebaut werden, Modelle kommen von HuggingFace) -
+als optionales Cloud-/Server-Backend sinnvoll, nicht als lokale
+Pflicht-Dependency. Ebenfalls geprueft und verworfen: dennisvdang/
+chorus-detection (Lizenz unklar), pychorus (technisch identisch zu unserem
+librosa-Ansatz).
 
 ## Nächste Schritte
 

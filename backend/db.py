@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS takes (
     error TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS hook_jobs (
+    id TEXT PRIMARY KEY,
+    song_path TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -117,6 +126,39 @@ def get_project(project_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optio
 def get_take(take_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
     with _connect(db_path) as conn:
         row = conn.execute("SELECT * FROM takes WHERE id = ?", (take_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def create_hook_job(song_path: str, db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    job_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO hook_jobs (id, song_path, status, created_at) VALUES (?, ?, 'pending', ?)",
+            (job_id, song_path, _now()),
+        )
+    return job_id
+
+
+def set_hook_job_song_path(job_id: str, song_path: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("UPDATE hook_jobs SET song_path = ? WHERE id = ?", (song_path, job_id))
+
+
+def update_hook_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
+    if not fields:
+        return
+    allowed = {"status", "result_json", "error"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"Unbekannte Felder: {unknown}")
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _connect(db_path) as conn:
+        conn.execute(f"UPDATE hook_jobs SET {set_clause} WHERE id = ?", (*fields.values(), job_id))
+
+
+def get_hook_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM hook_jobs WHERE id = ?", (job_id,)).fetchone()
         return dict(row) if row else None
 
 

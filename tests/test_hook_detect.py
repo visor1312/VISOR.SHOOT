@@ -11,7 +11,13 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from backend.pipeline.hook_detect import detect_hook
+from backend.pipeline import vocal_separation
+from backend.pipeline.hook_detect import (
+    INTRO_PENALTY,
+    _position_prior,
+    _viral_score,
+    detect_hook,
+)
 
 
 def _section(duration_sec: float, sr: int, chord_freqs: list[float], amplitude: float, seed: int) -> np.ndarray:
@@ -109,3 +115,96 @@ def test_detect_hook_raises_on_too_short_song(tmp_path):
     sf.write(str(path), audio, sr)
     with pytest.raises(ValueError):
         detect_hook(path)
+
+
+# ---------------------------------------------------------------------------
+# Hook-Score 2.0
+
+
+def test_position_prior_penalizes_song_start():
+    assert _position_prior(0.0, 100.0) == pytest.approx(INTRO_PENALTY)
+    assert _position_prior(5.0, 100.0) < 1.0       # noch in den ersten 10%
+    assert _position_prior(10.0, 100.0) == pytest.approx(1.0)
+    assert _position_prior(50.0, 100.0) == pytest.approx(1.0)
+
+
+def test_viral_score_bounds_and_vocal_weighting():
+    assert 0.0 <= _viral_score(0.0, 0.0, None) <= 100.0
+    assert _viral_score(1.0, 1.5, 1.5) == pytest.approx(100.0)
+    # Ausreisser-Energie wird gedeckelt, sprengt die Skala nicht.
+    assert _viral_score(1.0, 99.0, None) <= 100.0
+    # Starke Vocals heben den Score gegenueber schwachen Vocals.
+    assert _viral_score(0.8, 1.0, 1.4) > _viral_score(0.8, 1.0, 0.4)
+
+
+def test_detect_hook_without_vocals_has_no_vocal_score(structured_song):
+    song_path, _, _ = structured_song
+    result = detect_hook(song_path, target_duration_sec=8.0, min_duration=6.0, max_duration=10.0)
+    for c in [result.best] + result.alternatives:
+        assert c.vocal_score is None
+        assert 0.0 <= c.viral_score <= 100.0
+
+
+def test_detect_hook_with_vocal_stem(structured_song, tmp_path):
+    """Vocal-Stem, der nur in den B-Abschnitten (1 und 3) "singt": die
+    Vocal-Scores der B-Kandidaten muessen ueber dem Songdurchschnitt liegen."""
+    song_path, section_dur, total_dur = structured_song
+    sr = 22050
+    n = int(total_dur * sr)
+    t = np.arange(n) / sr
+    # Pulsierender Ton (8 Hz-Tremolo als "Silben") nur waehrend B.
+    vocal = np.sin(2 * np.pi * 440.0 * t) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 8.0 * t)))
+    section = (t // section_dur).astype(int)
+    vocal *= np.isin(section, [1, 3]).astype(float) * 0.6
+    vocals_path = tmp_path / "vocals.wav"
+    sf.write(str(vocals_path), vocal, sr)
+
+    result = detect_hook(song_path, target_duration_sec=8.0, min_duration=6.0,
+                         max_duration=10.0, vocals_path=vocals_path)
+    best = result.best
+    midpoint_section = _section_index((best.start_sec + best.end_sec) / 2, section_dur)
+    assert midpoint_section in (1, 3)
+    assert best.vocal_score is not None and best.vocal_score > 1.0
+
+
+def test_detect_hook_ignores_silent_vocal_stem(structured_song, tmp_path):
+    """Praktisch stummer Vocal-Stem (Instrumental) darf den Score nicht verzerren."""
+    song_path, _, total_dur = structured_song
+    sr = 22050
+    silence = np.zeros(int(total_dur * sr))
+    vocals_path = tmp_path / "silent_vocals.wav"
+    sf.write(str(vocals_path), silence, sr)
+
+    result = detect_hook(song_path, target_duration_sec=8.0, min_duration=6.0,
+                         max_duration=10.0, vocals_path=vocals_path)
+    assert result.best.vocal_score is None
+
+
+# ---------------------------------------------------------------------------
+# vocal_separation: Cache + Fallback (ohne echten Demucs-Lauf)
+
+
+def test_separate_vocals_returns_cache_without_demucs(tmp_path, monkeypatch):
+    song = tmp_path / "song.wav"
+    song.write_bytes(b"egal")
+    cached = tmp_path / "song.vocals.wav"
+    cached.write_bytes(b"stem")
+
+    def boom(*a, **kw):  # darf gar nicht erst aufgerufen werden
+        raise AssertionError("Demucs-Subprocess trotz Cache gestartet")
+
+    monkeypatch.setattr(vocal_separation.subprocess, "run", boom)
+    assert vocal_separation.separate_vocals(song) == cached
+
+
+def test_separate_vocals_returns_none_on_failure(tmp_path, monkeypatch):
+    song = tmp_path / "song.wav"
+    song.write_bytes(b"egal")
+
+    class Failed:
+        returncode = 1
+        stdout = ""
+        stderr = "download blocked"
+
+    monkeypatch.setattr(vocal_separation.subprocess, "run", lambda *a, **kw: Failed())
+    assert vocal_separation.separate_vocals(song) is None

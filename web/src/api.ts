@@ -75,6 +75,66 @@ export function downloadUrl(projectId: string, takeId: string): string {
   return `${BASE}/projects/${projectId}/takes/${takeId}/download`;
 }
 
+// ---------------------------------------------------------------------------
+// Viral Hook Detector
+
+export type HookStatus = "pending" | "separating" | "analyzing" | "done" | "error";
+
+export interface HookCandidate {
+  start_sec: number;
+  end_sec: number;
+  repetition_score: number;
+  energy_score: number;
+  vocal_score: number | null;
+  viral_score: number;
+}
+
+export interface HookJob {
+  job_id: string;
+  status: HookStatus;
+  error: string | null;
+  result: {
+    best: HookCandidate;
+    alternatives: HookCandidate[];
+    used_vocals: boolean;
+  } | null;
+}
+
+export async function analyzeHook(song: File): Promise<string> {
+  const form = new FormData();
+  form.append("song", song);
+  const res = await fetch(`${BASE}/hooks/analyze`, { method: "POST", body: form });
+  const data = await jsonOrThrow<{ job_id: string }>(res);
+  return data.job_id;
+}
+
+export async function getHookJob(jobId: string): Promise<HookJob> {
+  const res = await fetch(`${BASE}/hooks/${jobId}`);
+  return jsonOrThrow<HookJob>(res);
+}
+
+export function hookPreviewUrl(jobId: string, index: number): string {
+  return `${BASE}/hooks/${jobId}/preview/${index}`;
+}
+
+/** Pollt den Analyse-Status bis 'done' oder 'error' (oder Timeout). */
+export async function waitForHook(
+  jobId: string,
+  onUpdate?: (job: HookJob) => void,
+  { intervalMs = 2000, timeoutMs = 30 * 60 * 1000 } = {},
+): Promise<HookJob> {
+  const start = Date.now();
+  for (;;) {
+    const job = await getHookJob(jobId);
+    onUpdate?.(job);
+    if (job.status === "done" || job.status === "error") return job;
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("Zeitüberschreitung bei der Hook-Analyse.");
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
 /** Pollt den Take-Status bis 'done' oder 'error' (oder Timeout). */
 export async function waitForSync(
   projectId: string,

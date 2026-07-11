@@ -41,7 +41,13 @@ function StatCard({ label, value, delta, icon }: (typeof stats)[number]) {
   );
 }
 
-export default function Dashboard({ onOpenUpload }: { onOpenUpload: () => void }) {
+export default function Dashboard({
+  onOpenUpload,
+  onOpenHook,
+}: {
+  onOpenUpload: () => void;
+  onOpenHook: () => void;
+}) {
   return (
     <main className="flex-1 min-w-0 px-8 py-7">
       {/* Header */}
@@ -103,7 +109,10 @@ export default function Dashboard({ onOpenUpload }: { onOpenUpload: () => void }
             Lade deinen Song hoch und das System findet automatisch die beste
             Hook-Stelle mit dem höchsten Viralitätsfaktor.
           </p>
-          <button className="mt-5 bg-ink-800 hover:bg-ink-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-colors">
+          <button
+            onClick={onOpenHook}
+            className="mt-5 bg-ink-800 hover:bg-ink-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-colors"
+          >
             Song analysieren
           </button>
         </div>
@@ -206,7 +215,10 @@ export default function Dashboard({ onOpenUpload }: { onOpenUpload: () => void }
               </div>
             ))}
           </div>
-          <button className="w-full mt-4 bg-brand-500/12 hover:bg-brand-500/20 text-brand-400 font-semibold text-sm py-3 rounded-xl transition-colors">
+          <button
+            onClick={onOpenHook}
+            className="w-full mt-4 bg-brand-500/12 hover:bg-brand-500/20 text-brand-400 font-semibold text-sm py-3 rounded-xl transition-colors"
+          >
             Hook extrahieren
           </button>
         </div>

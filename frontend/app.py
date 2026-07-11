@@ -27,6 +27,7 @@ from backend.pipeline.hook_detect import HookResult, detect_hook
 from backend.pipeline.multitake_cut import TakeInfo, compute_multitake_plan, render_multitake_cut
 from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
 from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
+from backend.pipeline.vocal_separation import separate_vocals
 from backend.pipeline.sync_offset import LOW_CONFIDENCE_THRESHOLD, compute_offset
 from backend.pipeline.transcribe import DEFAULT_MODEL_SIZE, MODEL_SIZES, Word, transcribe
 from backend.pipeline.upscale import upscale_video
@@ -192,25 +193,27 @@ def _best_source_path(entry: dict[str, Any]) -> str:
     return entry.get("effects_output_path") or entry.get("final_output_path") or entry["output_path"]
 
 
+def _format_hook_candidate(c) -> str:
+    extra = f", Vocals: {c.vocal_score:.2f}x" if c.vocal_score is not None else ""
+    return (
+        f"{c.start_sec:.1f}s - {c.end_sec:.1f}s (Viral-Score: {c.viral_score:.0f}/100, "
+        f"Wiederholung: {c.repetition_score:.2f}, Energie: {c.energy_score:.2f}x{extra})"
+    )
+
+
 def _format_hook_result(result: HookResult) -> str:
-    b = result.best
-    lines = [
-        f"**Bester Vorschlag: {b.start_sec:.1f}s - {b.end_sec:.1f}s** "
-        f"(Wiederholung: {b.repetition_score:.2f}, Energie: {b.energy_score:.2f}x Songdurchschnitt)"
-    ]
+    lines = [f"**Bester Vorschlag: {_format_hook_candidate(result.best)}**"]
     for i, alt in enumerate(result.alternatives, 1):
-        lines.append(
-            f"Alternative {i}: {alt.start_sec:.1f}s - {alt.end_sec:.1f}s "
-            f"(Wiederholung: {alt.repetition_score:.2f}, Energie: {alt.energy_score:.2f}x)"
-        )
+        lines.append(f"Alternative {i}: {_format_hook_candidate(alt)}")
     return "\n\n".join(lines)
 
 
 def find_hook_handler(song_file: str | None) -> tuple[str, str | None]:
     if not song_file:
         raise gr.Error("Bitte zuerst eine Songdatei hochladen.")
+    vocals = separate_vocals(song_file)  # None, wenn Demucs nicht verfuegbar
     try:
-        result = detect_hook(song_file)
+        result = detect_hook(song_file, vocals_path=vocals)
     except ValueError as e:
         raise gr.Error(str(e))
 

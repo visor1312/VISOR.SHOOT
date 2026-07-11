@@ -1,4 +1,4 @@
-"""FastAPI-Endpunkte fuer HOOKCUT (Phase 1: Sync).
+"""FastAPI-Endpunkte fuer HOOKCUT (Sync + Viral Hook Detector).
 
 Duenne Schicht ueber db.py und den pipeline/-Modulen. Das Gradio-Frontend
 (frontend/app.py) ruft fuer die MVP-Oberflaeche dieselben pipeline-Funktionen
@@ -8,7 +8,10 @@ existiert fuer programmatischen/skriptbaren Zugriff.
 """
 from __future__ import annotations
 
+import json
 import shutil
+import subprocess
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
@@ -17,8 +20,10 @@ from fastapi.responses import FileResponse
 
 from backend import db, storage
 from backend.pipeline.extract_audio import extract_audio
+from backend.pipeline.hook_detect import detect_hook
 from backend.pipeline.render_sync import render_synced_video
 from backend.pipeline.sync_offset import compute_offset
+from backend.pipeline.vocal_separation import separate_vocals
 
 app = FastAPI(title="HOOKCUT")
 
@@ -121,6 +126,79 @@ def list_takes(project_id: str):
     if not db.get_project(project_id):
         raise HTTPException(404, "Projekt nicht gefunden")
     return db.list_takes(project_id)
+
+
+def _run_hook_job(job_id: str) -> None:
+    """Laeuft im Hintergrund. Status-Stufen: separating -> analyzing -> done,
+    damit das Frontend den Fortschritt anzeigen kann. Die Vocal-Separation
+    ist optional - schlaegt sie fehl, wird ohne Vocal-Features bewertet."""
+    job = db.get_hook_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_hook_job(job_id, status="separating")
+        vocals = separate_vocals(job["song_path"])
+
+        db.update_hook_job(job_id, status="analyzing")
+        result = detect_hook(job["song_path"], vocals_path=vocals)
+
+        payload = {
+            "best": asdict(result.best),
+            "alternatives": [asdict(c) for c in result.alternatives],
+            "used_vocals": vocals is not None,
+        }
+        db.update_hook_job(job_id, status="done", result_json=json.dumps(payload), error=None)
+    except Exception as e:
+        db.update_hook_job(job_id, status="error", error=str(e))
+
+
+@app.post("/hooks/analyze")
+def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...)):
+    suffix = Path(song.filename or "song.wav").suffix or ".wav"
+    job_id = db.create_hook_job(song_path="")
+    song_dest = storage.hook_song_path(job_id, suffix)
+    _save_upload(song, song_dest)
+    db.set_hook_job_song_path(job_id, str(song_dest))
+
+    db.update_hook_job(job_id, status="separating")
+    background_tasks.add_task(_run_hook_job, job_id)
+    return {"job_id": job_id, "status": "separating"}
+
+
+@app.get("/hooks/{job_id}")
+def get_hook_job(job_id: str):
+    job = db.get_hook_job(job_id)
+    if not job:
+        raise HTTPException(404, "Hook-Analyse nicht gefunden")
+    result = json.loads(job["result_json"]) if job["result_json"] else None
+    return {"job_id": job["id"], "status": job["status"], "error": job["error"], "result": result}
+
+
+@app.get("/hooks/{job_id}/preview/{index}")
+def hook_preview(job_id: str, index: int):
+    """MP3-Ausschnitt eines Kandidaten (0 = bester, 1.. = Alternativen)."""
+    job = db.get_hook_job(job_id)
+    if not job or not job["result_json"]:
+        raise HTTPException(404, "Hook-Analyse nicht gefunden oder noch nicht fertig")
+    result = json.loads(job["result_json"])
+    candidates = [result["best"], *result["alternatives"]]
+    if not 0 <= index < len(candidates):
+        raise HTTPException(404, "Kandidat existiert nicht")
+
+    preview = storage.hook_preview_path(job_id, index)
+    if not preview.exists():
+        c = candidates[index]
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(c["start_sec"]), "-to", str(c["end_sec"]),
+            "-i", job["song_path"],
+            "-vn", "-codec:a", "libmp3lame", "-q:a", "4",
+            str(preview),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise HTTPException(500, f"Preview-Schnitt fehlgeschlagen: {proc.stderr[-300:]}")
+    return FileResponse(preview, media_type="audio/mpeg", filename=f"hook_{index}.mp3")
 
 
 @app.get("/projects/{project_id}/takes/{take_id}/download")
