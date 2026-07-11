@@ -252,12 +252,12 @@ heruntergeladen (ca. 64 MB). Verarbeitung erfolgt Frame fuer Frame (Video
 wird dafuer temporaer in Einzelbilder zerlegt und danach wieder
 zusammengesetzt, Originalton bleibt erhalten).
 
-## Wie die Hook-Erkennung funktioniert (Hook-Score 2.0)
+## Wie die Hook-Erkennung funktioniert
 
 Loest ein Problem, das VOR dem Filmen auftritt: viele Indie-Artists wissen
 nicht, welche 15-30 Sekunden ihres eigenen Songs am ehesten als Social-Media-
-Hook funktionieren. `hook_detect.py` kombiniert eine Standard-MIR-Technik
-("Chorus-Detection via Self-Similarity") mit Vocal-Analyse:
+Hook funktionieren. `hook_detect.py` nutzt eine Standard-MIR-Technik
+("Chorus-Detection via Self-Similarity"):
 
 1. `detect_beats()` aus `beat_detect.py` liefert Taktschlaege, daraus werden
    Takt-Grenzen abgeleitet (4 Beats = 1 Takt, 4/4 angenommen).
@@ -267,28 +267,34 @@ Hook funktionieren. `hook_detect.py` kombiniert eine Standard-MIR-Technik
    Kandidatenfenster (Laenge ~ Zieldauer, an Taktgrenzen ausgerichtet) die
    beste Uebereinstimmung mit einer ANDEREN, nicht ueberlappenden Stelle im
    Song - der Refrain ist typischerweise der Abschnitt, der sich am
-   eindeutigsten wiederholt.
+   eindeutigsten wiederholt. **Die Wiederholung ist das mit Abstand
+   wichtigste Signal fuer einen Hook.**
 4. Zusaetzlich wird die relative Lautstaerke (RMS) jedes Fensters ggue. dem
    Songdurchschnitt berechnet - Refrains sind meist energiereicher als
    Strophen.
-5. **Vocal-Analyse (2.0, optional):** `vocal_separation.py` trennt mit
-   [Demucs](https://github.com/facebookresearch/demucs) (Meta, MIT-Lizenz)
-   die Vocals vom Beat. Aus dem Vocal-Stem werden pro Fenster Vocal-Praesenz
-   (RMS) und Flow-Dichte (Onset-Staerke) berechnet - ein Rap-Hook hat
-   praesente, rhythmisch artikulierte Vocals, was aus dem Gesamtmix nicht
-   ablesbar ist. Das Ergebnis wird pro Song gecacht (`<song>.vocals.wav`),
-   weil die Trennung auf CPU 1-3 Minuten dauert. Ist demucs nicht
-   installiert oder der Modell-Download nicht moeglich, laeuft alles ohne
-   Vocal-Features weiter (rein librosa-basiert).
-6. **Position:** Fenster in den ersten 10% des Songs werden mild abgewertet -
+5. **Position:** Fenster in den ersten 10% des Songs werden mild abgewertet -
    Intros wiederholen sich oft, sind aber selten der Hook.
 
-Wiederholung x Energie x Vocals x Position ergeben das interne Ranking;
-fuers UI wird daraus zusaetzlich ein **Viral-Score (0-100)** kombiniert.
+Wiederholung x Energie x Position ergeben das Ranking; fuers UI wird daraus
+zusaetzlich ein **Viral-Score (0-100)** abgeleitet.
 
-Ergebnis: ein Top-Vorschlag plus 2-3 Alternativen, jeweils mit Zeitbereich
-und allen Teil-Scores - Transparenz-Prinzip wie bei `confidence` in
-`sync_offset.py`.
+Ergebnis: ein Top-Vorschlag plus Alternativen, jeweils mit Zeitbereich und
+Teil-Scores - Transparenz-Prinzip wie bei `confidence` in `sync_offset.py`.
+
+### Verworfener Ansatz: Vocal-Menge (gelernte Lektion)
+
+Ein Zwischenstand ("Hook-Score 2.0") hat via [Demucs](https://github.com/facebookresearch/demucs)
+(`vocal_separation.py`, bleibt fuer kuenftige Experimente im Repo) die Vocals
+vom Beat getrennt und **Vocal-Praesenz + Flow-Dichte** ins Ranking multipliziert
+- unter der Annahme "viel Gesang = Hook". Beim ersten Test an echtem Rap-
+Material war das **nachweislich schlechter**: Bei Rap wird in den STROPHEN am
+dichtesten/schnellsten gerappt, nicht im Hook - die Vocal-Menge zog die
+Auswahl also systematisch zu den Strophen. Daher steuern Vocal-Features das
+Ranking **nicht mehr** (`vocal_score` wird bei uebergebenem Stem nur noch
+informativ berechnet). Der konzeptionell richtige Vocal-Ansatz waere die
+*Wiederholung der Vocal-Linie* (Hook-Text/Melodie wiederholt sich, Strophen-
+Text nicht) - ein moegliches kuenftiges Feature, das aber sauber an echtem
+Material validiert werden muss, bevor es das Ranking beeinflusst.
 
 Im React-Dashboard: Karte "Viral Hook Detector" -> Song hochladen -> die
 Analyse laeuft als Hintergrund-Job (`POST /hooks/analyze`, Polling ueber
@@ -299,10 +305,8 @@ Analyse laeuft als Hintergrund-Job (`POST /hooks/analyze`, Polling ueber
 laeuft der Beat oft durchgehend unter Strophe UND Refrain weiter (anders als
 z.B. Pop, wo sich oft die Akkorde aendern) - die chroma-basierte Erkennung
 ist dadurch weniger trennscharf als bei Genres mit klarem harmonischem
-Strophe/Refrain-Kontrast. Genau deshalb gibt es die Vocal-Analyse (Punkt 5):
-sie unterscheidet Stellen, die harmonisch identisch klingen, anhand der
-Vocals. Score-Werte trotzdem immer mit anhoeren/gegenpruefen, nicht blind
-vertrauen (gleiches Prinzip wie bei der Sync-Konfidenz).
+Strophe/Refrain-Kontrast. Score-Werte immer mit anhoeren/gegenpruefen, nicht
+blind vertrauen (gleiches Prinzip wie bei der Sync-Konfidenz).
 
 Fuer bereits gefilmte Takes: Da der erkannte Hook-Bereich ausserhalb dessen
 liegen kann, was tatsaechlich gefilmt wurde (das Video deckt ja nur einen

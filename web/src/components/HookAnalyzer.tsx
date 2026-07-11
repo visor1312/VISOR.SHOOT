@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Zap, Music2, Loader2, AlertCircle, Mic2 } from "lucide-react";
+import { X, Zap, Music2, Loader2, AlertCircle } from "lucide-react";
 import {
   analyzeHook,
   waitForHook,
@@ -17,7 +17,6 @@ interface Props {
 const RUNNING_LABEL: Record<string, string> = {
   upload: "Song wird hochgeladen…",
   pending: "In der Warteschlange…",
-  separating: "Vocals werden vom Beat getrennt (KI)…",
   analyzing: "Song-Struktur wird analysiert…",
 };
 
@@ -112,7 +111,7 @@ export default function HookAnalyzer({ onClose }: Props) {
                 {RUNNING_LABEL[statusLabel] ?? "Wird verarbeitet…"}
               </p>
               <p className="text-sm text-muted mt-1">
-                Die Vocal-Trennung kann einige Minuten dauern (einmalig pro Song).
+                Dauert je nach Songlänge nur ein paar Sekunden.
               </p>
             </div>
           )}
@@ -122,21 +121,6 @@ export default function HookAnalyzer({ onClose }: Props) {
               <div className="flex items-center justify-between">
                 <span className="font-medium text-brand-400">
                   {candidates.length} Hook-Stelle{candidates.length !== 1 ? "n" : ""} gefunden
-                </span>
-                <span
-                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md ${
-                    job.result.used_vocals
-                      ? "bg-brand-500/15 text-brand-400"
-                      : "bg-ink-700 text-muted"
-                  }`}
-                  title={
-                    job.result.used_vocals
-                      ? "Vocals wurden separat analysiert (Demucs)"
-                      : "Vocal-Analyse nicht verfügbar — bewertet über den Gesamtmix"
-                  }
-                >
-                  <Mic2 size={13} />
-                  {job.result.used_vocals ? "Mit Vocal-Analyse" : "Ohne Vocal-Analyse"}
                 </span>
               </div>
 

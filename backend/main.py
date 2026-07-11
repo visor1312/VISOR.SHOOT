@@ -23,7 +23,6 @@ from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.hook_detect import detect_hook
 from backend.pipeline.render_sync import render_synced_video
 from backend.pipeline.sync_offset import compute_offset
-from backend.pipeline.vocal_separation import separate_vocals
 
 app = FastAPI(title="HOOKCUT")
 
@@ -136,16 +135,13 @@ def _run_hook_job(job_id: str) -> None:
     if not job:
         return
     try:
-        db.update_hook_job(job_id, status="separating")
-        vocals = separate_vocals(job["song_path"])
-
         db.update_hook_job(job_id, status="analyzing")
-        result = detect_hook(job["song_path"], vocals_path=vocals)
+        result = detect_hook(job["song_path"])
 
         payload = {
             "best": asdict(result.best),
             "alternatives": [asdict(c) for c in result.alternatives],
-            "used_vocals": vocals is not None,
+            "used_vocals": False,
         }
         db.update_hook_job(job_id, status="done", result_json=json.dumps(payload), error=None)
     except Exception as e:
@@ -160,9 +156,9 @@ def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...)
     _save_upload(song, song_dest)
     db.set_hook_job_song_path(job_id, str(song_dest))
 
-    db.update_hook_job(job_id, status="separating")
+    db.update_hook_job(job_id, status="analyzing")
     background_tasks.add_task(_run_hook_job, job_id)
-    return {"job_id": job_id, "status": "separating"}
+    return {"job_id": job_id, "status": "analyzing"}
 
 
 @app.get("/hooks/{job_id}")

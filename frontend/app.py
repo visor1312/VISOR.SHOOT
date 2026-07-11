@@ -27,7 +27,6 @@ from backend.pipeline.hook_detect import HookResult, detect_hook
 from backend.pipeline.multitake_cut import TakeInfo, compute_multitake_plan, render_multitake_cut
 from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
 from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
-from backend.pipeline.vocal_separation import separate_vocals
 from backend.pipeline.sync_offset import LOW_CONFIDENCE_THRESHOLD, compute_offset
 from backend.pipeline.transcribe import DEFAULT_MODEL_SIZE, MODEL_SIZES, Word, transcribe
 from backend.pipeline.upscale import upscale_video
@@ -211,9 +210,8 @@ def _format_hook_result(result: HookResult) -> str:
 def find_hook_handler(song_file: str | None) -> tuple[str, str | None]:
     if not song_file:
         raise gr.Error("Bitte zuerst eine Songdatei hochladen.")
-    vocals = separate_vocals(song_file)  # None, wenn Demucs nicht verfuegbar
     try:
-        result = detect_hook(song_file, vocals_path=vocals)
+        result = detect_hook(song_file)
     except ValueError as e:
         raise gr.Error(str(e))
 

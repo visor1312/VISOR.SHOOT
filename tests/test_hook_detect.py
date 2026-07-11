@@ -146,8 +146,10 @@ def test_detect_hook_without_vocals_has_no_vocal_score(structured_song):
 
 
 def test_detect_hook_with_vocal_stem(structured_song, tmp_path):
-    """Vocal-Stem, der nur in den B-Abschnitten (1 und 3) "singt": die
-    Vocal-Scores der B-Kandidaten muessen ueber dem Songdurchschnitt liegen."""
+    """Wird ein Vocal-Stem uebergeben, wird der informative vocal_score pro
+    Kandidat berechnet (er steuert das Ranking NICHT, siehe Kommentar in
+    detect_hook). Hier "singt" der Stem nur in den B-Abschnitten (1 und 3),
+    also muss der vocal_score des B-Gewinners ueber dem Songschnitt liegen."""
     song_path, section_dur, total_dur = structured_song
     sr = 22050
     n = int(total_dur * sr)

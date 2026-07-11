@@ -234,9 +234,14 @@ def detect_hook(
         _position_prior(float(bar_bounds[i]), song_duration_sec) for i in range(n_windows)
     ])
 
+    # Ranking rein aus Wiederholung x Energie x Position. Vocal-Features
+    # werden (falls ein Stem uebergeben wird) nur informativ pro Kandidat
+    # abgelegt, aber bewusst NICHT ins Ranking multipliziert: Bei Rap
+    # korreliert die MENGE an Vocals (Praesenz, Flow-Dichte) mit den
+    # Strophen (dort wird am dichtesten gerappt), nicht mit dem Hook - das
+    # verschlechtert die Auswahl nachweislich. Der Hook zeigt sich am
+    # zuverlaessigsten ueber die Wiederholung.
     combined = scores * energy_scores * priors
-    if vocal_scores is not None:
-        combined = combined * vocal_scores
 
     order = np.argsort(combined)[::-1]
     candidates: list[HookCandidate] = []
