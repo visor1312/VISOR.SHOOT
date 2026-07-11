@@ -16,9 +16,9 @@ start "HOOKCUT Frontend" cmd /k "%~dp0_frontend.bat"
 
 echo.
 echo Backend und Frontend werden gestartet...
-echo Browser oeffnet gleich automatisch (http://127.0.0.1:5173).
+echo Browser oeffnet gleich automatisch (http://localhost:5173).
 echo Zum Beenden einfach die beiden neuen Fenster schliessen.
 echo.
 
 timeout /t 8 >nul
-start "" http://127.0.0.1:5173
+start "" http://localhost:5173
