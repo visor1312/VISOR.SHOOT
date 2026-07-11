@@ -19,6 +19,42 @@ export interface Take {
   created_at: string;
 }
 
+// Uebersetzt technische Netzwerkfehler in Meldungen, mit denen auch
+// Nicht-Techniker etwas anfangen koennen (Zielgruppe: Musiker, keine Devs).
+const HINT_RESTART =
+  "Bitte beide Server-Fenster schliessen und start-hookcut.bat neu starten, " +
+  "dann die Seite neu laden.";
+
+async function requestOrExplain(input: string, init?: RequestInit): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(input, init);
+  } catch {
+    // "Failed to fetch": nicht mal der Frontend-Server (Port 5173) war
+    // erreichbar - HOOKCUT laeuft nicht (mehr) oder wurde neu gestartet.
+    throw new Error(
+      "Keine Verbindung zu HOOKCUT. Laufen die beiden Server-Fenster noch? " +
+        HINT_RESTART,
+    );
+  }
+  if (res.status === 502 || res.status === 504) {
+    // Vite-Proxy erreicht das Backend (Port 8000) nicht.
+    throw new Error(
+      "Das Backend (Fenster \"HOOKCUT Backend\") ist nicht erreichbar. " +
+        HINT_RESTART,
+    );
+  }
+  if (res.status === 404) {
+    // Haeufigster Grund: Backend laeuft noch mit altem Code-Stand
+    // (nach git pull ist ein Neustart noetig, es gibt kein Auto-Reload).
+    throw new Error(
+      "Das Backend kennt diese Funktion noch nicht - vermutlich laeuft es " +
+        "mit einem alten Stand. " + HINT_RESTART,
+    );
+  }
+  return res;
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = res.statusText;
@@ -37,7 +73,7 @@ export async function createProject(name: string, song: File): Promise<string> {
   const form = new FormData();
   form.append("name", name);
   form.append("song", song);
-  const res = await fetch(`${BASE}/projects`, { method: "POST", body: form });
+  const res = await requestOrExplain(`${BASE}/projects`, { method: "POST", body: form });
   const data = await jsonOrThrow<{ project_id: string }>(res);
   return data.project_id;
 }
@@ -50,7 +86,7 @@ export async function createTake(
   const form = new FormData();
   form.append("video", video);
   form.append("original_audio_mode", originalAudioMode);
-  const res = await fetch(`${BASE}/projects/${projectId}/takes`, {
+  const res = await requestOrExplain(`${BASE}/projects/${projectId}/takes`, {
     method: "POST",
     body: form,
   });
@@ -59,7 +95,7 @@ export async function createTake(
 }
 
 export async function startSync(projectId: string, takeId: string): Promise<void> {
-  const res = await fetch(
+  const res = await requestOrExplain(
     `${BASE}/projects/${projectId}/takes/${takeId}/sync`,
     { method: "POST" },
   );
@@ -67,7 +103,7 @@ export async function startSync(projectId: string, takeId: string): Promise<void
 }
 
 export async function getTake(projectId: string, takeId: string): Promise<Take> {
-  const res = await fetch(`${BASE}/projects/${projectId}/takes/${takeId}`);
+  const res = await requestOrExplain(`${BASE}/projects/${projectId}/takes/${takeId}`);
   return jsonOrThrow<Take>(res);
 }
 
@@ -103,13 +139,13 @@ export interface HookJob {
 export async function analyzeHook(song: File): Promise<string> {
   const form = new FormData();
   form.append("song", song);
-  const res = await fetch(`${BASE}/hooks/analyze`, { method: "POST", body: form });
+  const res = await requestOrExplain(`${BASE}/hooks/analyze`, { method: "POST", body: form });
   const data = await jsonOrThrow<{ job_id: string }>(res);
   return data.job_id;
 }
 
 export async function getHookJob(jobId: string): Promise<HookJob> {
-  const res = await fetch(`${BASE}/hooks/${jobId}`);
+  const res = await requestOrExplain(`${BASE}/hooks/${jobId}`);
   return jsonOrThrow<HookJob>(res);
 }
 
