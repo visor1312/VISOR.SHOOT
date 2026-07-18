@@ -368,6 +368,138 @@ def get_editor_analyze(job_id: str):
     return {"job_id": job["id"], "status": job["status"], "error": job["error"], "result": result}
 
 
+@app.get("/styles")
+def list_styles():
+    from backend.pipeline.styles import style_catalog
+    return {"styles": style_catalog()}
+
+
+def _run_edit_analyze(job_id: str) -> None:
+    """Schritt 1: ganzes Video gegen Song synchronisieren (nur Zahlen)."""
+    job = db.get_edit_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_edit_job(job_id, status="syncing")
+        audio = storage.edit_job_dir(job_id) / "video_audio.wav"
+        extract_audio(job["video_path"], audio)
+        offset = compute_offset(job["song_path"], audio)
+        db.update_edit_job(job_id, status="synced",
+                           offset_ms=offset.offset_ms, confidence=offset.confidence)
+    except Exception as e:
+        db.update_edit_job(job_id, status="error", error=str(e))
+
+
+@app.post("/edit/analyze")
+def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...),
+                 song: UploadFile = File(...), with_subtitles: str = Form("false")):
+    v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
+    s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
+    want_subs = with_subtitles.lower() in ("true", "1", "yes", "on")
+    job_id = db.create_edit_job(video_path="", song_path="", with_subtitles=want_subs)
+    v_dest = _save_upload(video, storage.edit_video_path(job_id, v_suffix))
+    s_dest = _save_upload(song, storage.edit_song_path(job_id, s_suffix))
+    db.update_edit_job(job_id, video_path=str(v_dest), song_path=str(s_dest), status="syncing")
+    background_tasks.add_task(_run_edit_analyze, job_id)
+    return {"job_id": job_id, "status": "syncing"}
+
+
+def _run_edit_hook(job_id: str) -> None:
+    """Schritt 2 (optional): viralsten Hook suchen + auf Video zuschneiden."""
+    from backend.pipeline.render_pipeline import _choose_hook
+    job = db.get_edit_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_edit_job(job_id, status="hooking")
+        result = detect_hook(job["song_path"])
+        video_dur = _probe_duration_sec(job["video_path"])
+        chosen = _choose_hook((job["offset_ms"] or 0) / 1000.0, video_dur, result.best, result.alternatives)
+        if chosen:
+            db.update_edit_job(job_id, status="hooked", hook_start=chosen[0], hook_end=chosen[1])
+        else:
+            db.update_edit_job(job_id, status="hooked", hook_start=None, hook_end=None)
+    except Exception as e:
+        db.update_edit_job(job_id, status="error", error=str(e))
+
+
+@app.post("/edit/{job_id}/hook")
+def edit_hook(job_id: str, background_tasks: BackgroundTasks):
+    job = db.get_edit_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job nicht gefunden")
+    db.update_edit_job(job_id, status="hooking")
+    background_tasks.add_task(_run_edit_hook, job_id)
+    return {"job_id": job_id, "status": "hooking"}
+
+
+def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
+    """Schritt 3: Style anwenden + unsichtbar via FreeCut rendern."""
+    from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
+    from backend.pipeline.render_pipeline import run_headless_render
+    job = db.get_edit_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_edit_job(job_id, status="rendering", style=style_key)
+        ws = storage.edit_job_dir(job_id) / "ws"
+        hook_start = job["hook_start"] if use_hook else None
+        hook_end = job["hook_end"] if use_hook else None
+
+        cues = None
+        if job["with_subtitles"]:
+            words = transcribe(job["song_path"], model_size=AUTO_SUBTITLE_MODEL)
+            lines = group_words_into_lines(words)
+            cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
+
+        info = build_workspace(
+            ws, job["video_path"], job["song_path"],
+            offset_ms=job["offset_ms"] or 0.0,
+            hook_start_sec=hook_start, hook_end_sec=hook_end,
+            style_key=style_key, subtitle_cues=cues,
+        )
+        out = storage.edit_output_path(job_id)
+        editor_dir = Path(__file__).resolve().parent.parent / "editor"
+        run_headless_render(editor_dir, info["render_args"], out)
+        db.update_edit_job(job_id, status="done", output_path=str(out))
+    except Exception as e:
+        db.update_edit_job(job_id, status="error", error=str(e))
+
+
+@app.post("/edit/{job_id}/render")
+def edit_render(job_id: str, background_tasks: BackgroundTasks,
+                style: str = Form(...), use_hook: str = Form("false")):
+    job = db.get_edit_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job nicht gefunden")
+    db.update_edit_job(job_id, status="rendering")
+    background_tasks.add_task(_run_edit_render, job_id, style, use_hook.lower() in ("true", "1", "yes", "on"))
+    return {"job_id": job_id, "status": "rendering"}
+
+
+@app.get("/edit/{job_id}")
+def get_edit(job_id: str):
+    job = db.get_edit_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job nicht gefunden")
+    return {
+        "job_id": job["id"], "status": job["status"], "error": job["error"],
+        "with_subtitles": bool(job["with_subtitles"]), "style": job["style"],
+        "offset_ms": job["offset_ms"], "confidence": job["confidence"],
+        "hook": {"start_sec": job["hook_start"], "end_sec": job["hook_end"]}
+        if job["hook_start"] is not None else None,
+        "has_output": bool(job["output_path"]),
+    }
+
+
+@app.get("/edit/{job_id}/download")
+def download_edit(job_id: str):
+    job = db.get_edit_job(job_id)
+    if not job or not job["output_path"]:
+        raise HTTPException(404, "Noch kein fertiges Video")
+    return FileResponse(job["output_path"], media_type="video/mp4", filename="hookcut_reel.mp4")
+
+
 @app.get("/projects/{project_id}/takes/{take_id}/download")
 def download_take(project_id: str, take_id: str):
     take = db.get_take(take_id)

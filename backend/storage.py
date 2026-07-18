@@ -57,3 +57,19 @@ def analyze_video_path(job_id: str, suffix: str) -> Path:
 
 def analyze_song_path(job_id: str, suffix: str) -> Path:
     return analyze_job_dir(job_id) / f"song{suffix}"
+
+
+def edit_job_dir(job_id: str) -> Path:
+    return PROJECTS_ROOT / "edit" / job_id
+
+
+def edit_video_path(job_id: str, suffix: str) -> Path:
+    return edit_job_dir(job_id) / f"video{suffix}"
+
+
+def edit_song_path(job_id: str, suffix: str) -> Path:
+    return edit_job_dir(job_id) / f"song{suffix}"
+
+
+def edit_output_path(job_id: str) -> Path:
+    return edit_job_dir(job_id) / "final.mp4"

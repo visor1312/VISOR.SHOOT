@@ -55,6 +55,22 @@ CREATE TABLE IF NOT EXISTS analyze_jobs (
     error TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS edit_jobs (
+    id TEXT PRIMARY KEY,
+    video_path TEXT NOT NULL,
+    song_path TEXT NOT NULL,
+    with_subtitles INTEGER NOT NULL DEFAULT 0,
+    style TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    offset_ms REAL,
+    confidence REAL,
+    hook_start REAL,
+    hook_end REAL,
+    output_path TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -216,6 +232,37 @@ def update_analyze_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fie
 def get_analyze_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
     with _connect(db_path) as conn:
         row = conn.execute("SELECT * FROM analyze_jobs WHERE id = ?", (job_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def create_edit_job(video_path: str, song_path: str, with_subtitles: bool,
+                    db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    job_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO edit_jobs (id, video_path, song_path, with_subtitles, status, created_at) "
+            "VALUES (?, ?, ?, ?, 'pending', ?)",
+            (job_id, video_path, song_path, 1 if with_subtitles else 0, _now()),
+        )
+    return job_id
+
+
+def update_edit_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
+    if not fields:
+        return
+    allowed = {"video_path", "song_path", "style", "status", "offset_ms", "confidence",
+               "hook_start", "hook_end", "output_path", "error"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"Unbekannte Felder: {unknown}")
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _connect(db_path) as conn:
+        conn.execute(f"UPDATE edit_jobs SET {set_clause} WHERE id = ?", (*fields.values(), job_id))
+
+
+def get_edit_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM edit_jobs WHERE id = ?", (job_id,)).fetchone()
         return dict(row) if row else None
 
 
