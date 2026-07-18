@@ -63,13 +63,13 @@ function ProjectsIndex() {
   const [projectNameFromFile, setProjectNameFromFile] = useState<string | null>(null)
   const [destinationDir, setDestinationDir] = useState<FileSystemDirectoryHandle | null>(null)
   const [destinationName, setDestinationName] = useState<string | null>(null)
-  const [useProjectsFolder, setUseProjectsFolder] = useState(true) // Create FreeCutProjects subfolder
+  const [useProjectsFolder, setUseProjectsFolder] = useState(true) // Create HookcutProjects subfolder
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
 
-  const PROJECTS_FOLDER_NAME = 'FreeCutProjects'
+  const PROJECTS_FOLDER_NAME = 'HookcutProjects'
 
   // Extract project name from bundle filename
   // Handles both "myproject.freecut.zip" and browser-renamed "myproject.freecut (1).zip"
@@ -171,7 +171,7 @@ function ProjectsIndex() {
     setImportProgress({ percent: 0, stage: 'validating' })
 
     try {
-      // If useProjectsFolder is enabled, create/get the FreeCutProjects subfolder first
+      // If useProjectsFolder is enabled, create/get the HookcutProjects subfolder first
       let finalDestination = destinationDir
       if (useProjectsFolder) {
         try {
@@ -179,7 +179,7 @@ function ProjectsIndex() {
             create: true,
           })
         } catch (err) {
-          logger.error('Failed to create FreeCutProjects folder:', err)
+          logger.error('Failed to create HookcutProjects folder:', err)
           throw new Error(t('projects.import.createFolderFailed', { folder: PROJECTS_FOLDER_NAME }))
         }
       }
@@ -482,7 +482,7 @@ function ProjectsIndex() {
                   )}
                 </Button>
 
-                {/* FreeCutProjects subfolder option */}
+                {/* HookcutProjects subfolder option */}
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"

@@ -27,8 +27,12 @@ Der Browser-Tab sollte jetzt **HOOKCUT** heißen.
 > auf einen anderen Port legen, z.B. `npm run dev -- --port 5199`.
 
 ## Umbau-Etappen (Stand: großer Umbau läuft)
-1. ✅ Fork übernommen, Browser-Tab/PWA auf HOOKCUT gebrandet (dieser Stand)
-2. ⏳ Sichtbares In-App-Branding (Header, Startseite, Logo)
+1. ✅ Fork übernommen, Browser-Tab/PWA auf HOOKCUT gebrandet
+2. ✅ Sichtbares In-App-Branding: Logo-Schriftzug, alle 9 Sprachdateien,
+   Handbuch-Seiten, Dialog-Meldungen, Projekte-Ordnername (`HookcutProjects`).
+   Bewusst NICHT angefasst: die ©-FreeCut-Lizenzzeile (Pflicht-Attribution),
+   FreeCuts eigene Changelog-Historie, interne Bezeichner/Speicher-Schlüssel
+   (`freecut-language` u.a. — sonst verlieren Nutzer Einstellungen)
 3. ⏳ HOOKCUT-Analyse-Panel im Editor (Auto-Sync + Hook-Erkennung)
 4. ⏳ Alte schwache Editier-Bausteine (effects_grading, Untertitel-Einbrennen)
    ablösen — der Editor übernimmt das jetzt besser

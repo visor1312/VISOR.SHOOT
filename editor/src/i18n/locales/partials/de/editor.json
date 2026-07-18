@@ -136,7 +136,7 @@
     "projectUpgradeDialog": {
       "title": "Projekt vor dem Öffnen aktualisieren",
       "versionMismatch": "<strong>{{projectName}}</strong> wurde mit dem Projektschema v{{storedSchemaVersion}} gespeichert, aber dieser Build erwartet v{{currentSchemaVersion}}.",
-      "explanation": "FreeCut kann es vor dem Laden des Editors aktualisieren. Zuerst wird eine Sicherung des Zustands vor der Aktualisierung erstellt, damit du die alten Daten wiederherstellen kannst, falls etwas nicht stimmt.",
+      "explanation": "HOOKCUT kann es vor dem Laden des Editors aktualisieren. Zuerst wird eine Sicherung des Zustands vor der Aktualisierung erstellt, damit du die alten Daten wiederherstellen kannst, falls etwas nicht stimmt.",
       "backupCopy": "Sicherungskopie: <strong>{{backupName}}</strong>",
       "creatingBackup": "Sicherung wird erstellt...",
       "confirm": "Sicherung erstellen & aktualisieren"
@@ -439,7 +439,7 @@
       "clip": "Clip",
       "size": "Größe",
       "frameRate": "Bildrate",
-      "fpsRoundedHint": "FreeCut passt importiertes Video an die nächstgelegene unterstützte Projekt-Bildrate an. Dieser Clip würde {{fps}} fps verwenden.",
+      "fpsRoundedHint": "HOOKCUT passt importiertes Video an die nächstgelegene unterstützte Projekt-Bildrate an. Dieser Clip würde {{fps}} fps verwenden.",
       "keepCurrent": "Aktuelle behalten",
       "fpsOnly": "Nur FPS",
       "sizeOnly": "Nur Größe",
@@ -448,14 +448,14 @@
       "matchSize": "Größe anpassen"
     },
     "editor": {
-      "appLabel": "FreeCut Videoeditor",
+      "appLabel": "HOOKCUT Videoeditor",
       "upgrading": "Projekt wird aktualisiert…",
       "backupCreated": "Sicherung vor der Aktualisierung erstellt",
       "backupFailed": "Sicherung vor der Aktualisierung konnte nicht erstellt werden",
       "tryAgain": "Bitte erneut versuchen.",
       "projectSaved": "Projekt gespeichert",
       "projectSaveFailed": "Projekt konnte nicht gespeichert werden",
-      "projectBundle": "FreeCut-Projektpaket"
+      "projectBundle": "HOOKCUT-Projektpaket"
     },
     "audioMeters": {
       "meters": "Pegelanzeigen",
