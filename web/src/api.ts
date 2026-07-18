@@ -247,3 +247,87 @@ export async function waitForSync(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
 }
+
+// ---------------------------------------------------------------------------
+// All-in-One-Assistent (Reel erstellen): Sync -> Hook? -> Style-Render
+
+export interface Style {
+  key: string;
+  name: string;
+  description: string;
+}
+
+export type EditStatus =
+  | "pending" | "syncing" | "synced" | "hooking" | "hooked"
+  | "rendering" | "done" | "error";
+
+export interface EditJob {
+  job_id: string;
+  status: EditStatus;
+  error: string | null;
+  with_subtitles: boolean;
+  style: string | null;
+  offset_ms: number | null;
+  confidence: number | null;
+  hook: { start_sec: number; end_sec: number } | null;
+  has_output: boolean;
+}
+
+export async function getStyles(): Promise<Style[]> {
+  const res = await requestOrExplain(`${BASE}/styles`);
+  const data = await jsonOrThrow<{ styles: Style[] }>(res);
+  return data.styles;
+}
+
+export async function editAnalyze(
+  video: File,
+  song: File,
+  withSubtitles: boolean,
+): Promise<string> {
+  const form = new FormData();
+  form.append("video", video);
+  form.append("song", song);
+  form.append("with_subtitles", withSubtitles ? "true" : "false");
+  const res = await requestOrExplain(`${BASE}/edit/analyze`, { method: "POST", body: form });
+  const data = await jsonOrThrow<{ job_id: string }>(res);
+  return data.job_id;
+}
+
+export async function editHook(jobId: string): Promise<void> {
+  const res = await requestOrExplain(`${BASE}/edit/${jobId}/hook`, { method: "POST" });
+  await jsonOrThrow(res);
+}
+
+export async function editRender(jobId: string, style: string, useHook: boolean): Promise<void> {
+  const form = new FormData();
+  form.append("style", style);
+  form.append("use_hook", useHook ? "true" : "false");
+  const res = await requestOrExplain(`${BASE}/edit/${jobId}/render`, { method: "POST", body: form });
+  await jsonOrThrow(res);
+}
+
+export async function getEditJob(jobId: string): Promise<EditJob> {
+  const res = await requestOrExplain(`${BASE}/edit/${jobId}`);
+  return jsonOrThrow<EditJob>(res);
+}
+
+export function editDownloadUrl(jobId: string): string {
+  return `${BASE}/edit/${jobId}/download`;
+}
+
+/** Pollt, bis der Job einen der Zielzustaende erreicht (oder Fehler/Timeout). */
+export async function waitForEdit(
+  jobId: string,
+  until: EditStatus[],
+  onUpdate?: (job: EditJob) => void,
+  { intervalMs = 2000, timeoutMs = 30 * 60 * 1000 } = {},
+): Promise<EditJob> {
+  const start = Date.now();
+  for (;;) {
+    const job = await getEditJob(jobId);
+    onUpdate?.(job);
+    if (job.status === "error" || until.includes(job.status)) return job;
+    if (Date.now() - start > timeoutMs) throw new Error("Zeitüberschreitung.");
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}

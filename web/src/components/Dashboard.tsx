@@ -88,11 +88,11 @@ function StatCard({ label, value, delta, icon }: Stat) {
 }
 
 export default function Dashboard({
-  onOpenUpload,
   onOpenHook,
+  onOpenWizard,
 }: {
-  onOpenUpload: () => void;
   onOpenHook: () => void;
+  onOpenWizard: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [hooks, setHooks] = useState<HookJobSummary[]>([]);
@@ -158,11 +158,11 @@ export default function Dashboard({
           <p className="text-muted mt-1">Willkommen zurück</p>
         </div>
         <button
-          onClick={onOpenUpload}
+          onClick={onOpenWizard}
           className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
         >
           <Plus size={18} />
-          Neues Projekt
+          Reel erstellen
         </button>
       </div>
 
@@ -192,17 +192,17 @@ export default function Dashboard({
             </span>
           </div>
           <h3 className="text-lg font-semibold text-brand-400 mt-5">
-            Video + Song Upload
+            Reel erstellen (All-in-One)
           </h3>
           <p className="text-sm text-muted mt-2 leading-relaxed">
-            Lade dein Rap-Video und deinen produzierten Song hoch. Das System
-            legt den Song automatisch perfekt synchron über dein Video.
+            Video + Song hochladen → synchronisieren → optional viralsten Teil
+            finden → Style wählen. Fertiges 9:16-Reel per Knopfdruck.
           </p>
           <button
-            onClick={onOpenUpload}
+            onClick={onOpenWizard}
             className="mt-5 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
           >
-            Jetzt hochladen
+            Los geht's
           </button>
         </div>
 
