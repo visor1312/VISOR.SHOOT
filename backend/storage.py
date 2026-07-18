@@ -45,3 +45,15 @@ def hook_song_path(job_id: str, suffix: str) -> Path:
 
 def hook_preview_path(job_id: str, index: int) -> Path:
     return hook_job_dir(job_id) / f"preview_{index}.mp3"
+
+
+def analyze_job_dir(job_id: str) -> Path:
+    return PROJECTS_ROOT / "analyze" / job_id
+
+
+def analyze_video_path(job_id: str, suffix: str) -> Path:
+    return analyze_job_dir(job_id) / f"video{suffix}"
+
+
+def analyze_song_path(job_id: str, suffix: str) -> Path:
+    return analyze_job_dir(job_id) / f"song{suffix}"

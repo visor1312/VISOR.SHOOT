@@ -33,6 +33,13 @@ Der Browser-Tab sollte jetzt **HOOKCUT** heißen.
    Bewusst NICHT angefasst: die ©-FreeCut-Lizenzzeile (Pflicht-Attribution),
    FreeCuts eigene Changelog-Historie, interne Bezeichner/Speicher-Schlüssel
    (`freecut-language` u.a. — sonst verlieren Nutzer Einstellungen)
-3. ⏳ HOOKCUT-Analyse-Panel im Editor (Auto-Sync + Hook-Erkennung)
+3. ✅ HOOKCUT-Analyse im Editor: Toolbar-Button „⚡ HOOKCUT" →
+   `src/features/editor/components/hookcut-dialog.tsx`. Waehlt Video + Song
+   aus der Media-Library, schickt sie an die lokale Python-Analyse
+   (`http://127.0.0.1:8000/editor/analyze`, startet via `start-editor.bat`
+   im Repo-Root mit) und legt das Ergebnis fertig synchron + auf den Hook
+   getrimmt auf zwei neue Spuren (Video stumm, Song an).
+   TODO: deutsche Strings sind hartkodiert — i18n-Ausbau in alle 9 Sprachen
+   steht noch aus.
 4. ⏳ Alte schwache Editier-Bausteine (effects_grading, Untertitel-Einbrennen)
    ablösen — der Editor übernimmt das jetzt besser

@@ -23,7 +23,7 @@ from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.hook_detect import detect_hook
 from backend.pipeline.presets import PRESETS, apply_preset, preset_catalog, preset_is_noop
-from backend.pipeline.render_sync import render_synced_video
+from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
 from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
 from backend.pipeline.sync_offset import compute_offset
 from backend.pipeline.transcribe import transcribe
@@ -306,6 +306,66 @@ def hook_preview(job_id: str, index: int):
         if proc.returncode != 0:
             raise HTTPException(500, f"Preview-Schnitt fehlgeschlagen: {proc.stderr[-300:]}")
     return FileResponse(preview, media_type="audio/mpeg", filename=f"hook_{index}.mp3")
+
+
+def _run_analyze_job(job_id: str) -> None:
+    """Editor-Analyse (Etappe 3): NUR Zahlen, KEIN Rendern.
+
+    Der HOOKCUT-Editor (editor/, FreeCut-Fork) uebernimmt Schnitt und Export
+    selbst im Browser - er braucht von uns nur Sync-Versatz, Hook-Fenster und
+    Dauern, um die Timeline vorzubereiten.
+    """
+    job = db.get_analyze_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_analyze_job(job_id, status="analyzing")
+
+        video_audio = storage.analyze_job_dir(job_id) / "video_audio.wav"
+        extract_audio(job["video_path"], video_audio)
+        offset = compute_offset(job["song_path"], video_audio)
+        hook = detect_hook(job["song_path"])
+
+        payload = {
+            "offset_ms": offset.offset_ms,
+            "confidence": offset.confidence,
+            "video_duration_sec": _probe_duration_sec(job["video_path"]),
+            "song_duration_sec": _probe_duration_sec(job["song_path"]),
+            "hook": {
+                "best": asdict(hook.best),
+                "alternatives": [asdict(c) for c in hook.alternatives],
+            },
+        }
+        db.update_analyze_job(job_id, status="done", result_json=json.dumps(payload), error=None)
+    except Exception as e:
+        db.update_analyze_job(job_id, status="error", error=str(e))
+
+
+@app.post("/editor/analyze")
+def editor_analyze(
+    background_tasks: BackgroundTasks,
+    video: UploadFile = File(...),
+    song: UploadFile = File(...),
+):
+    video_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
+    song_suffix = Path(song.filename or "song.wav").suffix or ".wav"
+    job_id = db.create_analyze_job(video_path="", song_path="")
+    video_dest = _save_upload(video, storage.analyze_video_path(job_id, video_suffix))
+    song_dest = _save_upload(song, storage.analyze_song_path(job_id, song_suffix))
+    db.set_analyze_job_paths(job_id, str(video_dest), str(song_dest))
+
+    db.update_analyze_job(job_id, status="analyzing")
+    background_tasks.add_task(_run_analyze_job, job_id)
+    return {"job_id": job_id, "status": "analyzing"}
+
+
+@app.get("/editor/analyze/{job_id}")
+def get_editor_analyze(job_id: str):
+    job = db.get_analyze_job(job_id)
+    if not job:
+        raise HTTPException(404, "Analyse nicht gefunden")
+    result = json.loads(job["result_json"]) if job["result_json"] else None
+    return {"job_id": job["id"], "status": job["status"], "error": job["error"], "result": result}
 
 
 @app.get("/projects/{project_id}/takes/{take_id}/download")

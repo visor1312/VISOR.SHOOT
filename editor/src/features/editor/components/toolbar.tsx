@@ -15,6 +15,7 @@ import {
   Settings,
   Sparkles,
   Video,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DiscordIcon } from '@/components/brand/discord-icon'
@@ -29,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { LocalInferenceStatusPill } from './local-inference-status-pill'
 import { ProjectDebugPanel } from './project-debug-panel'
+import { HookcutDialog } from './hookcut-dialog'
 import { SettingsDialog } from './settings-dialog'
 import { ShortcutsDialog } from './shortcuts-dialog'
 import { UnsavedChangesDialog } from './unsaved-changes-dialog'
@@ -85,6 +87,7 @@ export const Toolbar = memo(function Toolbar({
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showHookcutDialog, setShowHookcutDialog] = useState(false)
   const [showWhatsNewDialog, setShowWhatsNewDialog] = useState(false)
   const [hasUnseenWhatsNew, setHasUnseenWhatsNew] = useState(false)
   const [isSaveAnimating, setIsSaveAnimating] = useState(false)
@@ -215,7 +218,24 @@ export const Toolbar = memo(function Toolbar({
 
       <WhatsNewDialog open={showWhatsNewDialog} onOpenChange={setShowWhatsNewDialog} />
 
+      <HookcutDialog
+        open={showHookcutDialog}
+        onOpenChange={setShowHookcutDialog}
+        project={{ width: project.width, height: project.height, fps: project.fps }}
+      />
+
       <div className="flex items-center gap-1.5">
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 gap-1.5 px-2.5"
+          onClick={() => setShowHookcutDialog(true)}
+          data-tooltip="Auto-Sync + Hook-Erkennung"
+        >
+          <Zap className="h-3.5 w-3.5" />
+          HOOKCUT
+        </Button>
+
         {import.meta.env.DEV && import.meta.env.VITE_SHOW_DEBUG_PANEL !== 'false' && (
           <DebugPopover projectId={projectId} />
         )}

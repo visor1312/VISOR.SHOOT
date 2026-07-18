@@ -9,7 +9,10 @@ export type {
   TimelineState,
   TranscriptSearchMatch,
 } from '@/features/timeline/contracts/editor'
+export type { MediaTimelinePlacement } from '@/features/timeline/contracts/editor'
 export {
+  addItems,
+  buildMediaTimelineItems,
   applyAnimationPreset,
   applyMotionPresetKeyframes,
   applyMotionModifierToItems,

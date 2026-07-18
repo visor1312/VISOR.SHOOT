@@ -36,7 +36,11 @@ export { createOverlayLayerTrack } from '../utils/new-track-zone-media'
 export { createClassicTrack, getTrackKind } from '../utils/classic-tracks'
 export { getDefaultActiveTrackId } from '../utils/default-active-track'
 export { resolveEffectiveTrackStates } from '../utils/group-utils'
-export { linkItems } from '../stores/actions/item-actions'
+export { addItems, linkItems } from '../stores/actions/item-actions'
+export {
+  buildMediaTimelineItems,
+  type MediaTimelinePlacement,
+} from '../utils/media-timeline-item-builder'
 export { applyAnimationPreset } from '../stores/actions/preset-actions'
 export { applyMotionPresetKeyframes } from '../stores/actions/keyframe-actions'
 export type { MotionPresetClear } from '../stores/actions/keyframe-actions'

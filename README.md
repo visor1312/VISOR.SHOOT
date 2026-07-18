@@ -41,6 +41,21 @@ pip install --no-build-isolation basicsr realesrgan
 
 ## Nutzung
 
+### HOOKCUT-Editor (neuer Produkt-Kern, `editor/`)
+
+Vollwertiger Browser-Video-Editor (Fork von [FreeCut](https://github.com/walterlow/freecut),
+MIT — Timeline, ~60 GPU-Effekte, Übergänge, Untertitel mit manueller
+Korrektur, 9:16-Export) plus unser Alleinstellungsmerkmal als Toolbar-Button
+**„⚡ HOOKCUT"**: Video + Song aus der Media-Library wählen → die lokale
+Python-Analyse berechnet Sync-Versatz + beste Hook-Stelle → ein Klick legt
+beides fertig synchron und auf den Hook getrimmt auf zwei neue Spuren
+(Video stumm, Song an). Danach normal im Editor verfeinern und exportieren.
+
+Start: `start-editor.bat` doppelklicken (startet Analyse-Backend auf Port
+8000 + Editor auf Port 5173, öffnet Chrome). Einmalig vorher: im Ordner
+`editor/` ein `npm install`. **Nur Chrome/Edge** (WebGPU). Details:
+`editor/HOOKCUT-FORK.md`.
+
 ### React-Dashboard (primäre Oberfläche, `web/`)
 
 Das designte HOOKCUT-Dashboard (React + Vite + Tailwind, Dark-Theme) liegt
