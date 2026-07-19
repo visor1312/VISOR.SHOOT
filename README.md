@@ -75,6 +75,16 @@ Hook-Analysen-Panel — alles echte Daten aus dem Backend), Upload-Workflow
 (Projekt + Take anlegen, synchronisieren, herunterladen) und Viral Hook
 Detector (inkl. Vocal-Separation, sofern `demucs` installiert ist).
 
+Herzstück ist der **„Reel erstellen"-Assistent**: Video + Song hochladen
+(optional mit Untertiteln und eingefügtem Songtext), Auto-Sync, optional den
+viralsten Teil suchen lassen, Look per Knopfdruck wählen — dazu die Checkbox
+**„Beat-Effekte"**: ein Glitch-Puls (Welle + Farbsaum + Glow, FreeCuts
+Trigger-Wave mit AudioPulse) zuckt auf jedem erkannten Taktschlag, laute
+Schläge stärker als leise (`backend/pipeline/beat_pulse.py` erkennt die
+Beats im gewählten Song-Fenster und liefert sie als Puls-Liste an den
+unsichtbaren FreeCut-Render). Findet die Beat-Erkennung nichts (z.B. sehr
+percussion-arme Musik), wird ohne Puls gerendert statt abzubrechen.
+
 Der Upload-Workflow bietet zusätzlich:
 
 - **12 Editing-Presets** (`backend/pipeline/presets.py`, GET `/presets`):

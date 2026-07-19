@@ -300,10 +300,16 @@ export async function editHook(jobId: string): Promise<void> {
   await jsonOrThrow(res);
 }
 
-export async function editRender(jobId: string, style: string, useHook: boolean): Promise<void> {
+export async function editRender(
+  jobId: string,
+  style: string,
+  useHook: boolean,
+  beatEffects = false,
+): Promise<void> {
   const form = new FormData();
   form.append("style", style);
   form.append("use_hook", useHook ? "true" : "false");
+  form.append("beat_effects", beatEffects ? "true" : "false");
   const res = await requestOrExplain(`${BASE}/edit/${jobId}/render`, { method: "POST", body: form });
   await jsonOrThrow(res);
 }

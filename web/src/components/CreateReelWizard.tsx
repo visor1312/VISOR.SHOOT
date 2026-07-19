@@ -19,6 +19,7 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
   const [jobId, setJobId] = useState("");
   const [job, setJob] = useState<EditJob | null>(null);
   const [useHook, setUseHook] = useState(false);
+  const [beatEffects, setBeatEffects] = useState(false);
   const [styles, setStyles] = useState<Style[]>([]);
   const [err, setErr] = useState("");
 
@@ -60,7 +61,7 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
   async function render(styleKey: string) {
     setPhase("rendering");
     try {
-      await editRender(jobId, styleKey, useHook);
+      await editRender(jobId, styleKey, useHook, beatEffects);
       const j = await waitForEdit(jobId, ["done"], undefined, { timeoutMs: 30 * 60 * 1000 });
       if (j.status === "error") return fail(j.error ?? "Rendern fehlgeschlagen.");
       setJob(j);
@@ -152,6 +153,15 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
                   Kein passender Hook im gefilmten Bereich – ganzes Video wird verwendet.
                 </p>
               )}
+              <label className="flex items-center gap-3 cursor-pointer select-none border border-ink-700 bg-ink-800 rounded-xl px-4 py-3">
+                <input type="checkbox" checked={beatEffects} onChange={(e) => setBeatEffects(e.target.checked)}
+                  className="w-4 h-4 accent-brand-500" />
+                <Zap size={16} className="text-brand-400 shrink-0" />
+                <span className="text-sm">
+                  <span className="font-medium">Beat-Effekte</span>{" "}
+                  <span className="text-muted">– Glitch-Puls im Takt der Musik</span>
+                </span>
+              </label>
               <p className="text-sm text-muted">Wähle einen Look – wird per Knopfdruck erzeugt:</p>
               <div className="grid grid-cols-2 gap-3">
                 {styles.map((s) => (

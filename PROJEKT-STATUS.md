@@ -18,7 +18,8 @@ einfach halten, `.bat`-Dateien zum Doppelklicken bereitstellen.
 2. Auto-Sync des ganzen Videos (FFT-Onset-Korrelation)
 3. Optional: "Viralsten Teil suchen?" (Hook-Erkennung, Chroma-Self-Similarity)
 4. Style per Knopfdruck (10 Styles: clean/vibrant/cinematic/warm/vhs/crt/
-   hype/film/neon/noir)
+   hype/film/neon/noir) + optional Beat-Effekte (Checkbox: Glitch-Puls im
+   Takt der Musik, siehe unten)
 5. Unsichtbarer Hintergrund-Render → fertiges Reel (Vorschau + Download)
 
 ## Architektur (3 Teile)
@@ -29,7 +30,8 @@ web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
 backend/  Python FastAPI (Port 8000) + pipeline/-Module:
           sync_offset (Onset-Korrelation), hook_detect, transcribe
           (faster-whisper large-v3 auf Demucs-Vocal-Stem), lyrics_align
-          (Nutzertext = Wahrheit, KI nur Timing), styles, freecut_workspace
+          (Nutzertext = Wahrheit, KI nur Timing), styles, beat_pulse
+          (Beats -> AudioPulse-Frames), freecut_workspace
           (baut FreeCut-Projekt), render_pipeline
 editor/   Fork von FreeCut (MIT, © FreeCut — LICENSE MUSS bleiben).
           Browser-Video-Editor, als HOOKCUT gebrandet. Wird als UNSICHTBARE
@@ -68,6 +70,12 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
    — Param-Keys IMMER aus editor/src/infrastructure/gpu-effects/effects/*.ts
    verifizieren, nie raten. Untertitel = ein SubtitleSegmentItem mit cues[].
    Cover-Transform (transform.width/height) macht Video formatfüllend.
+   Beat-Effekte: `audioPulse` am Effekt-Eintrag eines gpu-trigger-wave
+   (sparsame beats[{frame,amplitude}] + Envelope-Params, prozedural pro Frame
+   ausgewertet — Format aus editor/src/features/keyframes/utils/
+   trigger-wave-motion-layer.ts, createAudioPulseModulation). Alternativ gibt
+   es generische `timeline.keyframes` (property
+   `effect:<gpuType>:<effectId>:<paramKey>`), fuer den Puls aber nicht noetig.
 5. **Windows-Nutzer-Realität:** PowerShell blockt npm.ps1 (→ CMD oder
    npm.cmd), `Als Pfad kopieren` liefert Anführungszeichen mit, localhost ≠
    127.0.0.1 (Vite bindet localhost). Fehlermeldungen in api.ts sind bewusst
@@ -79,8 +87,11 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 
 ## Zustand / Qualität
 
-- 70+ pytest-Tests grün (tests/). Web-Build grün. Sync + Hook mit echten
+- 80+ pytest-Tests grün (tests/). Web-Build grün. Sync + Hook mit echten
   Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
+- Beat-Effekte (beat_pulse.py + audioPulse in freecut_workspace.py) sind
+  implementiert und getestet, aber noch NICHT vom Nutzer im echten Render
+  bestätigt (Sandbox kann kein Chrome-Rendern).
 - Vom Nutzer end-to-end bestätigt: Sync, Hook-Flow, Styles-Render,
   9:16-Cover, Untertitel unten + exakte Lyrics.
 - Legacy, funktioniert aber: Gradio-UI (frontend/app.py), alte ffmpeg-
@@ -89,8 +100,9 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-1. **Beat-synchrone Effekte** (Glitch auf den Beat; beat_detect liefert die
-   Zeiten schon; FreeCut kann Keyframes + AudioPulse) — als Nächstes geplant.
+1. **Beat-Effekte beim Nutzer end-to-end bestätigen** (Backend + Tests grün,
+   Chrome-Render geht nur beim Nutzer). Danach ggf. Intensität/Stride
+   feinjustieren (beat_pulse.py hat stride=2/4 schon, UI bewusst nur Toggle).
 2. Style-Intensitäten nach Nutzer-Feedback feinjustieren.
 3. Hosting/"online verfügbar" (vertagt): Empfehlung Hybrid — billige
    Python-Analyse-API + Browser-Render beim Nutzer.

@@ -110,6 +110,83 @@ def test_subtitles_become_segment_with_relative_cues(media, tmp_path):
     assert sub["cues"][0]["text"] == "Zeile eins"
 
 
+@pytest.fixture(scope="module")
+def beat_song(tmp_path_factory) -> Path:
+    """6s Klick-Track (120 BPM) als Song, damit Beats erkennbar sind."""
+    sr = 22050
+    rng = np.random.default_rng(7)
+    audio = rng.normal(scale=0.05, size=int(6 * sr))
+    decay_env = np.exp(-np.linspace(0, 15, int(0.1 * sr)))
+    t = 0.5
+    while t < 5.9:
+        start = int(t * sr)
+        audio[start:start + len(decay_env)] += decay_env
+        t += 0.5
+    audio = audio / np.max(np.abs(audio)) * 0.9
+    out = tmp_path_factory.mktemp("wsbeats") / "beat_song.wav"
+    sf.write(str(out), audio, sr)
+    return out
+
+
+# Params aus editor/src/infrastructure/gpu-effects verifiziert (index.test.ts).
+TRIGGER_WAVE_PARAM_KEYS = {
+    "strength", "radius", "frequency", "decay", "phase", "speed",
+    "centerX", "centerY", "chroma", "scanlineMix", "glowColor",
+}
+
+
+def test_beat_effects_add_trigger_wave_with_audio_pulse(media, beat_song, tmp_path):
+    video, _song = media
+    ws = tmp_path / "ws"
+    build_workspace(ws, video, beat_song, offset_ms=0.0, style_key="hype",
+                    beat_effects=True)
+    project = _load_project(ws)
+    v = next(i for i in project["timeline"]["items"] if i["type"] == "video")
+
+    wave = next(e for e in v["effects"]
+                if e["effect"]["gpuEffectType"] == "gpu-trigger-wave")
+    # Style-Effekte bleiben davor erhalten, Pulse-Effekt kommt obendrauf.
+    assert [e["effect"]["gpuEffectType"] for e in v["effects"][:-1]] \
+        == [gpu for gpu, _ in get_style("hype").effects]
+    assert set(wave["effect"]["params"].keys()) == TRIGGER_WAVE_PARAM_KEYS
+    assert wave["effect"]["params"]["strength"] == 0  # Ruhe-Zustand: unsichtbar
+
+    pulse = wave["audioPulse"]
+    assert pulse["enabled"] is True
+    assert pulse["beats"], "Klick-Track muss Beats liefern"
+    max_frame = v["durationInFrames"] - 1
+    for b in pulse["beats"]:
+        assert 0 <= b["frame"] <= max_frame
+        assert 0.0 <= b["amplitude"] <= 1.0
+    assert 2 <= pulse["durationFrames"] <= max_frame
+    assert pulse["strength"] > 0 and pulse["chroma"] > 0
+    assert pulse["glowColorBase"] == 0x2E6B8C
+
+
+def test_beat_effects_with_silent_song_add_nothing(media, tmp_path):
+    video, song = media  # song = Stille -> keine Beats
+    ws = tmp_path / "ws"
+    build_workspace(ws, video, song, offset_ms=0.0, style_key="clean",
+                    beat_effects=True)
+    project = _load_project(ws)
+    v = next(i for i in project["timeline"]["items"] if i["type"] == "video")
+    assert all(e["effect"]["gpuEffectType"] != "gpu-trigger-wave" for e in v["effects"])
+
+
+def test_beat_effects_respect_hook_window(media, beat_song, tmp_path):
+    video, _song = media
+    ws = tmp_path / "ws"
+    # Hook 2..5s: Beats ausserhalb des Fensters duerfen nicht auftauchen.
+    build_workspace(ws, video, beat_song, offset_ms=1000.0,
+                    hook_start_sec=2.0, hook_end_sec=5.0, beat_effects=True)
+    project = _load_project(ws)
+    v = next(i for i in project["timeline"]["items"] if i["type"] == "video")
+    wave = next(e for e in v["effects"]
+                if e["effect"]["gpuEffectType"] == "gpu-trigger-wave")
+    assert v["durationInFrames"] == 90
+    assert all(0 <= b["frame"] <= 89 for b in wave["audioPulse"]["beats"])
+
+
 def test_all_styles_have_valid_effect_shape():
     for style in STYLES.values():
         for gpu_type, params in style.effects:

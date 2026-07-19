@@ -96,6 +96,44 @@ def _item_effects(style: Style) -> list[dict]:
     ]
 
 
+# Beat-Effekt: gpu-trigger-wave mit AudioPulse-Modulation. Parameter-Keys und
+# Envelope-Formeln 1:1 aus dem Editor uebernommen (createTriggerWaveMotionLayerEffects
+# bzw. createAudioPulseModulation in
+# editor/src/features/keyframes/utils/trigger-wave-motion-layer.ts) - der
+# Export-Pfad wertet audioPulse prozedural pro Frame aus, keine Keyframes noetig.
+_TRIGGER_WAVE_GLOW = "#2e6b8c"
+_TRIGGER_WAVE_GLOW_PACKED = 0x2E6B8C
+
+
+def _beat_pulse_effect(pulses, duration_frames: int, fps: float, intensity: float) -> dict:
+    max_frame = max(2, duration_frames - 1)
+    intensity = min(max(intensity, 0.0), 2.0)
+    return {
+        "id": _fid(), "enabled": True,
+        "effect": {
+            "type": "gpu-effect", "gpuEffectType": "gpu-trigger-wave",
+            "params": {
+                "strength": 0, "radius": 1, "frequency": 24, "decay": 0.06,
+                "phase": 0, "speed": 0, "centerX": 0.5, "centerY": 0.5,
+                "chroma": 0.006 * intensity, "scanlineMix": 0.22,
+                "glowColor": _TRIGGER_WAVE_GLOW,
+            },
+        },
+        "audioPulse": {
+            "enabled": True,
+            "beats": [
+                {"frame": min(max(p.frame, 0), max_frame),
+                 "amplitude": min(max(p.amplitude, 0.0), 1.0)}
+                for p in pulses
+            ],
+            "durationFrames": min(max(round(fps * 0.36), 2), max_frame),
+            "strength": 0.03 + 0.055 * intensity,
+            "chroma": 0.003 + 0.016 * intensity,
+            "glowColorBase": _TRIGGER_WAVE_GLOW_PACKED,
+        },
+    }
+
+
 def build_workspace(
     workspace_dir: str | Path,
     video_path: str | Path,
@@ -106,6 +144,8 @@ def build_workspace(
     hook_end_sec: float | None = None,
     style_key: str = "clean",
     subtitle_cues: list[SubtitleCue] | None = None,
+    beat_effects: bool = False,
+    beat_intensity: float = 1.0,
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
@@ -165,6 +205,19 @@ def build_workspace(
         "volume": -60, "embeddedAudioMuted": True,
         "effects": _item_effects(style),
     }
+    if beat_effects:
+        # Beats kommen aus dem SONG im Render-Fenster (win_start..win_end ist
+        # Song-Zeit; Clip-Frame 0 == win_start, daher direkt kompatibel).
+        # Ein fehlgeschlagenes Beat-Tracking darf den Render nicht abbrechen -
+        # dann faellt das Reel einfach auf den reinen Style zurueck.
+        try:
+            from backend.pipeline.beat_pulse import beat_pulses_for_window
+            pulses = beat_pulses_for_window(song_path, win_start, win_end, fps)
+        except Exception:
+            pulses = []
+        if pulses:
+            video_item["effects"].append(
+                _beat_pulse_effect(pulses, duration_frames, fps, beat_intensity))
     # Formatfuellend ins 9:16 (Cover): so skalieren, dass der Rahmen komplett
     # gefuellt ist, Ueberstand wird vom Canvas beschnitten. Ohne das wuerde ein
     # Querformat-Video mit schwarzen Raendern erscheinen.
@@ -258,11 +311,14 @@ def _main() -> None:
     p.add_argument("--hook-start", type=float, default=None)
     p.add_argument("--hook-end", type=float, default=None)
     p.add_argument("--style", default="clean")
+    p.add_argument("--beat-effects", action="store_true",
+                   help="Glitch-Puls auf jedem erkannten Taktschlag")
     args = p.parse_args()
     info = build_workspace(
         args.workspace, args.video, args.song,
         offset_ms=args.offset_ms, hook_start_sec=args.hook_start,
         hook_end_sec=args.hook_end, style_key=args.style,
+        beat_effects=args.beat_effects,
     )
     print(json.dumps(info, indent=2))
     print("\nRender-Kommando (im Ordner editor/ ausfuehren):")

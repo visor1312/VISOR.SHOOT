@@ -440,7 +440,7 @@ def edit_hook(job_id: str, background_tasks: BackgroundTasks):
     return {"job_id": job_id, "status": "hooking"}
 
 
-def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
+def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: bool) -> None:
     """Schritt 3: Style anwenden + unsichtbar via FreeCut rendern."""
     from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
     from backend.pipeline.render_pipeline import run_headless_render
@@ -478,6 +478,7 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
             offset_ms=job["offset_ms"] or 0.0,
             hook_start_sec=hook_start, hook_end_sec=hook_end,
             style_key=style_key, subtitle_cues=cues,
+            beat_effects=beat_effects,
         )
         out = storage.edit_output_path(job_id)
         editor_dir = Path(__file__).resolve().parent.parent / "editor"
@@ -489,12 +490,15 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
 
 @app.post("/edit/{job_id}/render")
 def edit_render(job_id: str, background_tasks: BackgroundTasks,
-                style: str = Form(...), use_hook: str = Form("false")):
+                style: str = Form(...), use_hook: str = Form("false"),
+                beat_effects: str = Form("false")):
     job = db.get_edit_job(job_id)
     if not job:
         raise HTTPException(404, "Job nicht gefunden")
     db.update_edit_job(job_id, status="rendering")
-    background_tasks.add_task(_run_edit_render, job_id, style, use_hook.lower() in ("true", "1", "yes", "on"))
+    background_tasks.add_task(_run_edit_render, job_id, style,
+                              use_hook.lower() in ("true", "1", "yes", "on"),
+                              beat_effects.lower() in ("true", "1", "yes", "on"))
     return {"job_id": job_id, "status": "rendering"}
 
 

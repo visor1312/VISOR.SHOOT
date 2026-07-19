@@ -45,6 +45,7 @@ def prepare_render(
     *,
     style_key: str = "clean",
     find_hook: bool = False,
+    beat_effects: bool = False,
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
@@ -70,6 +71,7 @@ def prepare_render(
         offset_ms=offset.offset_ms,
         hook_start_sec=hook_start, hook_end_sec=hook_end,
         style_key=style_key, width=width, height=height, fps=fps,
+        beat_effects=beat_effects,
     )
     info["offset_ms"] = offset.offset_ms
     info["confidence"] = offset.confidence
@@ -99,13 +101,16 @@ def _main() -> None:
     p.add_argument("workspace")
     p.add_argument("--style", default="vibrant")
     p.add_argument("--find-hook", action="store_true")
+    p.add_argument("--beat-effects", action="store_true",
+                   help="Glitch-Puls auf jedem erkannten Taktschlag")
     p.add_argument("--render", action="store_true", help="Direkt via editor/headless rendern")
     p.add_argument("--editor-dir", default=str(Path(__file__).resolve().parents[2] / "editor"))
     p.add_argument("--out", default="hookcut_test.mp4")
     args = p.parse_args()
 
     info = prepare_render(args.video, args.song, args.workspace,
-                          style_key=args.style, find_hook=args.find_hook)
+                          style_key=args.style, find_hook=args.find_hook,
+                          beat_effects=args.beat_effects)
     print(json.dumps({k: v for k, v in info.items() if k != "render_args"}, indent=2))
 
     if args.render:
@@ -116,10 +121,6 @@ def _main() -> None:
     else:
         print("\n>>> Jetzt rendern (im Ordner editor/):")
         print("  node headless/render.mjs " + " ".join(info["render_args"]) + " --build --out ../hookcut_test.mp4")
-
-
-if __name__ == "__main__":
-    _main()
 
 
 if __name__ == "__main__":
