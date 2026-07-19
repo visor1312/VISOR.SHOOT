@@ -34,6 +34,11 @@ from backend.pipeline.vocal_separation import separate_vocals
 # Download). Das beste Modell ("large-v3", ~3 GB, deutlich langsamer) bleibt
 # ueber die Gradio-Oberflaeche waehlbar.
 AUTO_SUBTITLE_MODEL = "small"
+# Fuer den All-in-One-Assistenten: bestes Whisper-Modell auf der ISOLIERTEN
+# Gesangsspur (Demucs) - das war die Ursache der schlechten Untertitel: der
+# Beat im Gesamtmix ruiniert die Erkennung. "large-v3" ist gross (~3 GB,
+# einmaliger Download) und langsam, aber genau, was bei Untertiteln zaehlt.
+AUTO_SUBTITLE_MODEL_BEST = "large-v3"
 
 app = FastAPI(title="HOOKCUT")
 
@@ -448,7 +453,12 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
 
         cues = None
         if job["with_subtitles"]:
-            words = transcribe(job["song_path"], model_size=AUTO_SUBTITLE_MODEL)
+            # Auf der isolierten Gesangsspur transkribieren (falls Demucs da) -
+            # ohne Beat wird die Erkennung drastisch genauer. Deutsch erzwungen.
+            db.update_edit_job(job_id, status="transcribing")
+            vocals = separate_vocals(job["song_path"])
+            transcribe_src = str(vocals) if vocals else job["song_path"]
+            words = transcribe(transcribe_src, language="de", model_size=AUTO_SUBTITLE_MODEL_BEST)
             lines = group_words_into_lines(words)
             cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
 

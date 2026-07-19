@@ -259,7 +259,7 @@ export interface Style {
 
 export type EditStatus =
   | "pending" | "syncing" | "synced" | "hooking" | "hooked"
-  | "rendering" | "done" | "error";
+  | "transcribing" | "rendering" | "done" | "error";
 
 export interface EditJob {
   job_id: string;

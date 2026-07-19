@@ -165,6 +165,16 @@ def build_workspace(
         "volume": -60, "embeddedAudioMuted": True,
         "effects": _item_effects(style),
     }
+    # Formatfuellend ins 9:16 (Cover): so skalieren, dass der Rahmen komplett
+    # gefuellt ist, Ueberstand wird vom Canvas beschnitten. Ohne das wuerde ein
+    # Querformat-Video mit schwarzen Raendern erscheinen.
+    sw, sh = video_meta["width"], video_meta["height"]
+    if sw > 0 and sh > 0:
+        cover = max(width / sw, height / sh)
+        video_item["transform"] = {
+            "x": 0, "y": 0,
+            "width": round(sw * cover), "height": round(sh * cover),
+        }
     song_item = {
         "id": _fid(), "type": "audio", "trackId": audio_track_id,
         "from": 0, "durationInFrames": duration_frames, "label": song_path.name,
@@ -220,7 +230,8 @@ def build_workspace(
         "project_id": project_id,
         "workspace_dir": str(workspace_dir),
         "render_args": ["--workspace", str(workspace_dir), "--project", project_id,
-                        "--resolution", f"{width}x{height}", "--fps", str(fps)],
+                        "--resolution", f"{width}x{height}", "--fps", str(fps),
+                        "--quality", "ultra"],
     }
 
 
