@@ -463,6 +463,13 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
             words = transcribe(transcribe_src, language="de",
                                model_size=AUTO_SUBTITLE_MODEL_BEST,
                                initial_prompt=job["lyrics"] or None)
+            if job["lyrics"]:
+                # Nutzertext = Wahrheit: exakt seine Woerter anzeigen, Timing
+                # aus der Erkennung uebernehmen (lyrics_align).
+                from backend.pipeline.lyrics_align import align_lyrics_to_words
+                aligned = align_lyrics_to_words(job["lyrics"], words)
+                if aligned:
+                    words = aligned
             lines = group_words_into_lines(words)
             cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
 
