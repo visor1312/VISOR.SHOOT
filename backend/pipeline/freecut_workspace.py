@@ -199,11 +199,24 @@ def build_workspace(
         if rel:
             tracks.append({"id": subtitle_track_id, "name": "V2", "kind": "video", "height": 60,
                            "locked": False, "visible": True, "muted": True, "solo": False, "order": -1})
+            # Schoener Social-Media-Caption-Style: fett, weiss, dicke schwarze
+            # Kontur (auf jedem Hintergrund lesbar), zentriert, unten mit Abstand
+            # (Safe-Area fuer die TikTok/Reels-Bedienelemente).
+            font_size = round(height * 0.045)          # ~4.5% der Bildhoehe
             items.append({
                 "id": _fid(), "type": "subtitle", "trackId": subtitle_track_id,
                 "from": 0, "durationInFrames": duration_frames, "label": "Untertitel",
                 "source": {"type": "transcript", "mediaId": song_id, "clipId": song_item["id"]},
-                "cues": rel, "color": "#ffffff",
+                "cues": rel,
+                "color": "#ffffff",
+                "fontSize": font_size,
+                "fontWeight": "bold",
+                "textAlign": "center",
+                "verticalAlign": "bottom",
+                "textPadding": round(height * 0.10),   # hebt die Zeile vom unteren Rand ab
+                "lineHeight": 1.1,
+                "stroke": {"width": max(4, round(font_size * 0.12)), "color": "#000000"},
+                "textShadow": {"offsetX": 0, "offsetY": 3, "blur": 10, "color": "#000000"},
             })
 
     project = {

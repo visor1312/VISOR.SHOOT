@@ -50,6 +50,12 @@ def transcribe(
     model = _get_model(model_size, device, compute_type)
     segments, _info = model.transcribe(
         str(audio_path), language=language, word_timestamps=True, vad_filter=True,
+        # Genauigkeits-Feintuning fuer Songtexte:
+        # - beam_size 5: gruendlichere Suche als das Default-Greedy
+        # - condition_on_previous_text False: verhindert, dass sich ein Fehler
+        #   (oder Wiederholungs-Loops bei Musik) durch den Text fortpflanzt
+        beam_size=5,
+        condition_on_previous_text=False,
     )
 
     words: list[Word] = []
