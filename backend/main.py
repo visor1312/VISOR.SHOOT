@@ -397,11 +397,13 @@ def _run_edit_analyze(job_id: str) -> None:
 
 @app.post("/edit/analyze")
 def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...),
-                 song: UploadFile = File(...), with_subtitles: str = Form("false")):
+                 song: UploadFile = File(...), with_subtitles: str = Form("false"),
+                 lyrics: str = Form("")):
     v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
     want_subs = with_subtitles.lower() in ("true", "1", "yes", "on")
-    job_id = db.create_edit_job(video_path="", song_path="", with_subtitles=want_subs)
+    job_id = db.create_edit_job(video_path="", song_path="", with_subtitles=want_subs,
+                                lyrics=lyrics.strip() or None)
     v_dest = _save_upload(video, storage.edit_video_path(job_id, v_suffix))
     s_dest = _save_upload(song, storage.edit_song_path(job_id, s_suffix))
     db.update_edit_job(job_id, video_path=str(v_dest), song_path=str(s_dest), status="syncing")
@@ -458,7 +460,9 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool) -> None:
             db.update_edit_job(job_id, status="transcribing")
             vocals = separate_vocals(job["song_path"])
             transcribe_src = str(vocals) if vocals else job["song_path"]
-            words = transcribe(transcribe_src, language="de", model_size=AUTO_SUBTITLE_MODEL_BEST)
+            words = transcribe(transcribe_src, language="de",
+                               model_size=AUTO_SUBTITLE_MODEL_BEST,
+                               initial_prompt=job["lyrics"] or None)
             lines = group_words_into_lines(words)
             cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
 

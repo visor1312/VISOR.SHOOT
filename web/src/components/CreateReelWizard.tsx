@@ -14,6 +14,7 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
   const [video, setVideo] = useState<File | null>(null);
   const [song, setSong] = useState<File | null>(null);
   const [subtitles, setSubtitles] = useState(false);
+  const [lyrics, setLyrics] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
   const [jobId, setJobId] = useState("");
   const [job, setJob] = useState<EditJob | null>(null);
@@ -34,7 +35,7 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
     if (!video || !song) return;
     setPhase("syncing");
     try {
-      const id = await editAnalyze(video, song, subtitles);
+      const id = await editAnalyze(video, song, subtitles, subtitles ? lyrics : "");
       setJobId(id);
       const j = await waitForEdit(id, ["synced"]);
       if (j.status === "error") return fail(j.error ?? "Sync fehlgeschlagen.");
@@ -89,6 +90,20 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
                   className="w-4 h-4 accent-brand-500" />
                 <span className="text-sm">Untertitel automatisch einblenden</span>
               </label>
+              {subtitles && (
+                <div className="space-y-1.5">
+                  <span className="text-sm text-muted">
+                    Songtext einfügen (optional) – macht die Untertitel exakt
+                  </span>
+                  <textarea
+                    value={lyrics}
+                    onChange={(e) => setLyrics(e.target.value)}
+                    rows={4}
+                    placeholder="Songtext hier einfügen… (leer lassen = automatische Erkennung)"
+                    className="w-full text-sm bg-ink-900 border border-ink-700 focus:border-brand-500 rounded-xl px-3 py-2 outline-none resize-none"
+                  />
+                </div>
+              )}
               <button disabled={!video || !song} onClick={start}
                 className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-ink-950 font-semibold py-3 rounded-xl transition-colors">
                 Los geht's

@@ -40,6 +40,7 @@ def transcribe(
     model_size: str = DEFAULT_MODEL_SIZE,
     device: str = "cpu",
     compute_type: str = "int8",
+    initial_prompt: str | None = None,
 ) -> list[Word]:
     """Transkribiert eine Audio-/Videodatei mit Wort-Zeitstempeln.
 
@@ -56,6 +57,9 @@ def transcribe(
         #   (oder Wiederholungs-Loops bei Musik) durch den Text fortpflanzt
         beam_size=5,
         condition_on_previous_text=False,
+        # Bekannter Songtext als starke Vorlage: Whisper bevorzugt dann die
+        # tatsaechlichen Woerter/Schreibweisen (Profi-Ansatz fuer exakte Lyrics).
+        initial_prompt=initial_prompt,
     )
 
     words: list[Word] = []

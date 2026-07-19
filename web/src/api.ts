@@ -283,11 +283,13 @@ export async function editAnalyze(
   video: File,
   song: File,
   withSubtitles: boolean,
+  lyrics = "",
 ): Promise<string> {
   const form = new FormData();
   form.append("video", video);
   form.append("song", song);
   form.append("with_subtitles", withSubtitles ? "true" : "false");
+  form.append("lyrics", lyrics);
   const res = await requestOrExplain(`${BASE}/edit/analyze`, { method: "POST", body: form });
   const data = await jsonOrThrow<{ job_id: string }>(res);
   return data.job_id;

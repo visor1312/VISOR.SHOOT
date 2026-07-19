@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS edit_jobs (
     video_path TEXT NOT NULL,
     song_path TEXT NOT NULL,
     with_subtitles INTEGER NOT NULL DEFAULT 0,
+    lyrics TEXT,
     style TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
     offset_ms REAL,
@@ -91,6 +92,10 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 conn.execute(f"ALTER TABLE takes ADD COLUMN {column_def}")
             except sqlite3.OperationalError:
                 pass
+        try:
+            conn.execute("ALTER TABLE edit_jobs ADD COLUMN lyrics TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 @contextmanager
@@ -236,13 +241,13 @@ def get_analyze_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optio
 
 
 def create_edit_job(video_path: str, song_path: str, with_subtitles: bool,
-                    db_path: str | Path = DEFAULT_DB_PATH) -> str:
+                    lyrics: str | None = None, db_path: str | Path = DEFAULT_DB_PATH) -> str:
     job_id = str(uuid.uuid4())
     with _connect(db_path) as conn:
         conn.execute(
-            "INSERT INTO edit_jobs (id, video_path, song_path, with_subtitles, status, created_at) "
-            "VALUES (?, ?, ?, ?, 'pending', ?)",
-            (job_id, video_path, song_path, 1 if with_subtitles else 0, _now()),
+            "INSERT INTO edit_jobs (id, video_path, song_path, with_subtitles, lyrics, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+            (job_id, video_path, song_path, 1 if with_subtitles else 0, lyrics or None, _now()),
         )
     return job_id
 
