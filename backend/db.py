@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS edit_jobs (
     hook_start REAL,
     hook_end REAL,
     output_path TEXT,
+    platforms TEXT,
+    outputs_json TEXT,
     error TEXT,
     created_at TEXT NOT NULL
 );
@@ -92,10 +94,11 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 conn.execute(f"ALTER TABLE takes ADD COLUMN {column_def}")
             except sqlite3.OperationalError:
                 pass
-        try:
-            conn.execute("ALTER TABLE edit_jobs ADD COLUMN lyrics TEXT")
-        except sqlite3.OperationalError:
-            pass
+        for column_def in ("lyrics TEXT", "platforms TEXT", "outputs_json TEXT"):
+            try:
+                conn.execute(f"ALTER TABLE edit_jobs ADD COLUMN {column_def}")
+            except sqlite3.OperationalError:
+                pass
 
 
 @contextmanager
@@ -256,7 +259,7 @@ def update_edit_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields
     if not fields:
         return
     allowed = {"video_path", "song_path", "style", "status", "offset_ms", "confidence",
-               "hook_start", "hook_end", "output_path", "error"}
+               "hook_start", "hook_end", "output_path", "platforms", "outputs_json", "error"}
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"Unbekannte Felder: {unknown}")

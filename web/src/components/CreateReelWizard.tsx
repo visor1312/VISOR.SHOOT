@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import {
   editAnalyze, editHook, editRender, waitForEdit, editDownloadUrl, getStyles,
-  type Style, type EditJob,
+  getPlatforms, type Style, type Platform, type EditJob,
 } from "../api";
 
 type Phase =
@@ -21,11 +21,24 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
   const [useHook, setUseHook] = useState(false);
   const [beatEffects, setBeatEffects] = useState(false);
   const [styles, setStyles] = useState<Style[]>([]);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [platformKeys, setPlatformKeys] = useState<string[]>(["reel"]);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     getStyles().then(setStyles).catch(() => setStyles([]));
+    getPlatforms().then(setPlatforms).catch(() => setPlatforms([]));
   }, []);
+
+  function togglePlatform(key: string) {
+    setPlatformKeys((prev) => {
+      if (prev.includes(key)) {
+        // Mindestens ein Format muss gewaehlt bleiben.
+        return prev.length > 1 ? prev.filter((k) => k !== key) : prev;
+      }
+      return [...prev, key];
+    });
+  }
 
   function fail(e: unknown) {
     setErr(e instanceof Error ? e.message : String(e));
@@ -61,8 +74,9 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
   async function render(styleKey: string) {
     setPhase("rendering");
     try {
-      await editRender(jobId, styleKey, useHook, beatEffects);
-      const j = await waitForEdit(jobId, ["done"], undefined, { timeoutMs: 30 * 60 * 1000 });
+      await editRender(jobId, styleKey, useHook, beatEffects, platformKeys);
+      const j = await waitForEdit(jobId, ["done"], setJob,
+        { timeoutMs: 60 * 60 * 1000 });
       if (j.status === "error") return fail(j.error ?? "Rendern fehlgeschlagen.");
       setJob(j);
       setPhase("done");
@@ -153,6 +167,26 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
                   Kein passender Hook im gefilmten Bereich – ganzes Video wird verwendet.
                 </p>
               )}
+              {platforms.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-sm text-muted">Formate – gerne mehrere, jedes wird einzeln gerendert:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {platforms.map((p) => {
+                      const active = platformKeys.includes(p.key);
+                      return (
+                        <button key={p.key} onClick={() => togglePlatform(p.key)} title={p.description}
+                          className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
+                            active
+                              ? "border-brand-500 bg-brand-500/15 text-white"
+                              : "border-ink-700 bg-ink-800 text-muted hover:border-ink-500"
+                          }`}>
+                          {p.name} <span className="opacity-60">{p.width}×{p.height}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <label className="flex items-center gap-3 cursor-pointer select-none border border-ink-700 bg-ink-800 rounded-xl px-4 py-3">
                 <input type="checkbox" checked={beatEffects} onChange={(e) => setBeatEffects(e.target.checked)}
                   className="w-4 h-4 accent-brand-500" />
@@ -175,9 +209,16 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {phase === "rendering" && (
-            <Busy text="Dein Reel wird erstellt…" hint="Video schneiden, Effekte, Export – das dauert ein paar Minuten." />
-          )}
+          {phase === "rendering" && (() => {
+            const total = job?.outputs?.length ?? platformKeys.length;
+            const ready = job?.outputs?.filter((o) => o.ready).length ?? 0;
+            return (
+              <Busy text="Dein Reel wird erstellt…"
+                hint={total > 1
+                  ? `Format ${Math.min(ready + 1, total)} von ${total} – jedes Format wird einzeln gerendert.`
+                  : "Video schneiden, Effekte, Export – das dauert ein paar Minuten."} />
+            );
+          })()}
 
           {phase === "done" && job?.has_output && (
             <div className="space-y-4">
@@ -185,10 +226,21 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
                 <Check size={20} /> <span className="font-medium">Fertig!</span>
               </div>
               <video src={editDownloadUrl(jobId)} controls className="w-full rounded-xl bg-black max-h-[55vh]" />
-              <a href={editDownloadUrl(jobId)} download
-                className="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold py-3 rounded-xl">
-                <Download size={18} /> Reel herunterladen
-              </a>
+              {job.outputs && job.outputs.length > 1 ? (
+                <div className="space-y-2">
+                  {job.outputs.filter((o) => o.ready).map((o) => (
+                    <a key={o.platform} href={editDownloadUrl(jobId, o.platform)} download
+                      className="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold py-2.5 rounded-xl">
+                      <Download size={16} /> {o.name} ({o.width}×{o.height})
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <a href={editDownloadUrl(jobId)} download
+                  className="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold py-3 rounded-xl">
+                  <Download size={18} /> Reel herunterladen
+                </a>
+              )}
             </div>
           )}
 

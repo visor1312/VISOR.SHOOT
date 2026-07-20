@@ -19,8 +19,10 @@ einfach halten, `.bat`-Dateien zum Doppelklicken bereitstellen.
 3. Optional: "Viralsten Teil suchen?" (Hook-Erkennung, Chroma-Self-Similarity)
 4. Style per Knopfdruck (10 Styles: clean/vibrant/cinematic/warm/vhs/crt/
    hype/film/neon/noir) + optional Beat-Effekte (Checkbox: Glitch-Puls im
-   Takt der Musik, siehe unten)
-5. Unsichtbarer Hintergrund-Render → fertiges Reel (Vorschau + Download)
+   Takt der Musik, siehe unten) + Zielformate anhaken (Multi-Plattform:
+   reel 9:16 / feed 4:5 / square 1:1 / wide 16:9, pipeline/platforms.py)
+5. Unsichtbarer Hintergrund-Render pro Format → fertiges Reel (Vorschau +
+   Download je Format; outputs_json in edit_jobs haelt den Fortschritt)
 
 ## Architektur (3 Teile)
 
@@ -112,8 +114,9 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 3. Hosting/"online verfügbar" (vertagt): Empfehlung Hybrid — billige
    Python-Analyse-API + Browser-Render beim Nutzer.
 4. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
-5. Roadmap-Ideen: Multi-Plattform-Presets, all-in-one-Strukturmodell als
-   Pro-Backend (NATTEN/HF-Blocker beachten), Wort-Karaoke-Highlight.
+5. Roadmap-Ideen: Batch/Multi-Version-Generator, all-in-one-Strukturmodell
+   als Pro-Backend (NATTEN/HF-Blocker beachten), Wort-Karaoke-Highlight.
+   (Multi-Plattform-Presets sind umgesetzt, warten auf Nutzer-Test.)
 
 ## Stil der Zusammenarbeit mit dem Besitzer
 

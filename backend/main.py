@@ -440,16 +440,20 @@ def edit_hook(job_id: str, background_tasks: BackgroundTasks):
     return {"job_id": job_id, "status": "hooking"}
 
 
-def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: bool) -> None:
-    """Schritt 3: Style anwenden + unsichtbar via FreeCut rendern."""
+def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: bool,
+                     platform_keys: str) -> None:
+    """Schritt 3: Style anwenden + unsichtbar via FreeCut rendern -
+    einmal pro gewaehltem Zielformat (Multi-Plattform-Export)."""
     from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
+    from backend.pipeline.platforms import parse_platform_keys
     from backend.pipeline.render_pipeline import run_headless_render
     job = db.get_edit_job(job_id)
     if not job:
         return
     try:
-        db.update_edit_job(job_id, status="rendering", style=style_key)
-        ws = storage.edit_job_dir(job_id) / "ws"
+        platforms = parse_platform_keys(platform_keys)
+        db.update_edit_job(job_id, status="rendering", style=style_key,
+                           platforms=",".join(p.key for p in platforms))
         hook_start = job["hook_start"] if use_hook else None
         hook_end = job["hook_end"] if use_hook else None
 
@@ -473,17 +477,30 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: 
             lines = group_words_into_lines(words)
             cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
 
-        info = build_workspace(
-            ws, job["video_path"], job["song_path"],
-            offset_ms=job["offset_ms"] or 0.0,
-            hook_start_sec=hook_start, hook_end_sec=hook_end,
-            style_key=style_key, subtitle_cues=cues,
-            beat_effects=beat_effects,
-        )
-        out = storage.edit_output_path(job_id)
+        # Analyse (Sync/Hook/Untertitel) gilt fuer alle Formate - nur der
+        # Workspace-Bau + Render laeuft pro Plattform. Nach jedem fertigen
+        # Format wird outputs_json aktualisiert, damit das UI den Fortschritt
+        # zeigen und Fertiges schon anbieten kann.
+        db.update_edit_job(job_id, status="rendering")
         editor_dir = Path(__file__).resolve().parent.parent / "editor"
-        run_headless_render(editor_dir, info["render_args"], out)
-        db.update_edit_job(job_id, status="done", output_path=str(out))
+        outputs: dict[str, str] = {}
+        for p in platforms:
+            ws = storage.edit_job_dir(job_id) / "ws" / p.key
+            info = build_workspace(
+                ws, job["video_path"], job["song_path"],
+                offset_ms=job["offset_ms"] or 0.0,
+                hook_start_sec=hook_start, hook_end_sec=hook_end,
+                style_key=style_key, subtitle_cues=cues,
+                beat_effects=beat_effects,
+                width=p.width, height=p.height,
+            )
+            out = storage.edit_output_path(job_id, p.key)
+            run_headless_render(editor_dir, info["render_args"], out)
+            outputs[p.key] = str(out)
+            db.update_edit_job(job_id, outputs_json=json.dumps(outputs))
+        db.update_edit_job(job_id, status="done",
+                           output_path=outputs[platforms[0].key],
+                           outputs_json=json.dumps(outputs))
     except Exception as e:
         db.update_edit_job(job_id, status="error", error=str(e))
 
@@ -491,22 +508,39 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: 
 @app.post("/edit/{job_id}/render")
 def edit_render(job_id: str, background_tasks: BackgroundTasks,
                 style: str = Form(...), use_hook: str = Form("false"),
-                beat_effects: str = Form("false")):
+                beat_effects: str = Form("false"), platforms: str = Form("reel")):
     job = db.get_edit_job(job_id)
     if not job:
         raise HTTPException(404, "Job nicht gefunden")
     db.update_edit_job(job_id, status="rendering")
     background_tasks.add_task(_run_edit_render, job_id, style,
                               use_hook.lower() in ("true", "1", "yes", "on"),
-                              beat_effects.lower() in ("true", "1", "yes", "on"))
+                              beat_effects.lower() in ("true", "1", "yes", "on"),
+                              platforms)
     return {"job_id": job_id, "status": "rendering"}
+
+
+@app.get("/platforms")
+def list_platforms():
+    from backend.pipeline.platforms import platform_catalog
+    return {"platforms": platform_catalog()}
 
 
 @app.get("/edit/{job_id}")
 def get_edit(job_id: str):
+    from backend.pipeline.platforms import get_platform
     job = db.get_edit_job(job_id)
     if not job:
         raise HTTPException(404, "Job nicht gefunden")
+    done_outputs = json.loads(job["outputs_json"]) if job["outputs_json"] else {}
+    outputs = None
+    if job["platforms"]:
+        outputs = []
+        for key in job["platforms"].split(","):
+            p = get_platform(key)
+            outputs.append({"platform": p.key, "name": p.name,
+                            "width": p.width, "height": p.height,
+                            "ready": p.key in done_outputs})
     return {
         "job_id": job["id"], "status": job["status"], "error": job["error"],
         "with_subtitles": bool(job["with_subtitles"]), "style": job["style"],
@@ -514,13 +548,23 @@ def get_edit(job_id: str):
         "hook": {"start_sec": job["hook_start"], "end_sec": job["hook_end"]}
         if job["hook_start"] is not None else None,
         "has_output": bool(job["output_path"]),
+        "outputs": outputs,
     }
 
 
 @app.get("/edit/{job_id}/download")
-def download_edit(job_id: str):
+def download_edit(job_id: str, platform: str | None = None):
     job = db.get_edit_job(job_id)
-    if not job or not job["output_path"]:
+    if not job:
+        raise HTTPException(404, "Job nicht gefunden")
+    if platform:
+        outputs = json.loads(job["outputs_json"]) if job["outputs_json"] else {}
+        path = outputs.get(platform)
+        if not path:
+            raise HTTPException(404, "Dieses Format ist noch nicht fertig")
+        return FileResponse(path, media_type="video/mp4",
+                            filename=f"hookcut_{platform}.mp4")
+    if not job["output_path"]:
         raise HTTPException(404, "Noch kein fertiges Video")
     return FileResponse(job["output_path"], media_type="video/mp4", filename="hookcut_reel.mp4")
 

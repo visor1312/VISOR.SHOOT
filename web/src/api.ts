@@ -257,6 +257,22 @@ export interface Style {
   description: string;
 }
 
+export interface Platform {
+  key: string;
+  name: string;
+  description: string;
+  width: number;
+  height: number;
+}
+
+export interface EditOutput {
+  platform: string;
+  name: string;
+  width: number;
+  height: number;
+  ready: boolean;
+}
+
 export type EditStatus =
   | "pending" | "syncing" | "synced" | "hooking" | "hooked"
   | "transcribing" | "rendering" | "done" | "error";
@@ -271,12 +287,19 @@ export interface EditJob {
   confidence: number | null;
   hook: { start_sec: number; end_sec: number } | null;
   has_output: boolean;
+  outputs: EditOutput[] | null;
 }
 
 export async function getStyles(): Promise<Style[]> {
   const res = await requestOrExplain(`${BASE}/styles`);
   const data = await jsonOrThrow<{ styles: Style[] }>(res);
   return data.styles;
+}
+
+export async function getPlatforms(): Promise<Platform[]> {
+  const res = await requestOrExplain(`${BASE}/platforms`);
+  const data = await jsonOrThrow<{ platforms: Platform[] }>(res);
+  return data.platforms;
 }
 
 export async function editAnalyze(
@@ -305,11 +328,13 @@ export async function editRender(
   style: string,
   useHook: boolean,
   beatEffects = false,
+  platforms: string[] = ["reel"],
 ): Promise<void> {
   const form = new FormData();
   form.append("style", style);
   form.append("use_hook", useHook ? "true" : "false");
   form.append("beat_effects", beatEffects ? "true" : "false");
+  form.append("platforms", platforms.length ? platforms.join(",") : "reel");
   const res = await requestOrExplain(`${BASE}/edit/${jobId}/render`, { method: "POST", body: form });
   await jsonOrThrow(res);
 }
@@ -319,8 +344,10 @@ export async function getEditJob(jobId: string): Promise<EditJob> {
   return jsonOrThrow<EditJob>(res);
 }
 
-export function editDownloadUrl(jobId: string): string {
-  return `${BASE}/edit/${jobId}/download`;
+export function editDownloadUrl(jobId: string, platform?: string): string {
+  return platform
+    ? `${BASE}/edit/${jobId}/download?platform=${encodeURIComponent(platform)}`
+    : `${BASE}/edit/${jobId}/download`;
 }
 
 /** Pollt, bis der Job einen der Zielzustaende erreicht (oder Fehler/Timeout). */

@@ -190,6 +190,22 @@ def test_beat_effects_respect_hook_window(media, beat_song, tmp_path):
     assert all(0 <= b["frame"] <= 89 for b in wave["audioPulse"]["beats"])
 
 
+def test_alternative_format_metadata_and_cover(media, tmp_path):
+    """Multi-Plattform: 1:1-Format bekommt eigene Canvas-Groesse, das
+    1080x1920-Hochkant-Video fuellt es per Cover-Transform (Ueberstand
+    wird beschnitten)."""
+    video, song = media
+    ws = tmp_path / "ws"
+    build_workspace(ws, video, song, offset_ms=0.0, width=1080, height=1080)
+    project = _load_project(ws)
+    assert project["metadata"]["width"] == 1080
+    assert project["metadata"]["height"] == 1080
+    v = next(i for i in project["timeline"]["items"] if i["type"] == "video")
+    # cover = max(1080/1080, 1080/1920) = 1.0 -> volle Quellgroesse, hoeher als Canvas
+    assert v["transform"]["width"] == 1080
+    assert v["transform"]["height"] == 1920
+
+
 def test_all_styles_have_valid_effect_shape():
     for style in STYLES.values():
         for gpu_type, params in style.effects:

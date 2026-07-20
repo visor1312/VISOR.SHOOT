@@ -71,5 +71,8 @@ def edit_song_path(job_id: str, suffix: str) -> Path:
     return edit_job_dir(job_id) / f"song{suffix}"
 
 
-def edit_output_path(job_id: str) -> Path:
-    return edit_job_dir(job_id) / "final.mp4"
+def edit_output_path(job_id: str, platform_key: str | None = None) -> Path:
+    """Ohne platform_key: das alte Einzel-Layout (final.mp4, Bestandsjobs).
+    Mit platform_key: eine Datei pro Zielformat (final_reel.mp4, ...)."""
+    name = "final.mp4" if platform_key is None else f"final_{platform_key}.mp4"
+    return edit_job_dir(job_id) / name

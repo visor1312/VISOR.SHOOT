@@ -26,9 +26,38 @@ def test_styles_catalog(client):
         assert s["name"] and s["description"]
 
 
+def test_platforms_catalog(client):
+    platforms = client.get("/platforms").json()["platforms"]
+    keys = {p["key"] for p in platforms}
+    assert {"reel", "feed", "square", "wide"} <= keys
+    for p in platforms:
+        assert p["name"] and p["width"] > 0 and p["height"] > 0
+
+
 def test_edit_unknown_job_404(client):
     assert client.get("/edit/nope").status_code == 404
     assert client.post("/edit/nope/hook").status_code == 404
+    assert client.get("/edit/nope/download").status_code == 404
+    assert client.get("/edit/nope/download", params={"platform": "reel"}).status_code == 404
+
+
+def test_edit_outputs_listing_and_partial_download(client):
+    """Multi-Plattform: outputs[] zeigt pro Format ready-Status; ein noch
+    nicht gerendertes Format liefert beim Download 404."""
+    import json
+
+    from backend import db
+
+    jid = db.create_edit_job(video_path="", song_path="", with_subtitles=False)
+    db.update_edit_job(jid, platforms="reel,square",
+                       outputs_json=json.dumps({"reel": "/tmp/reel.mp4"}))
+    body = client.get(f"/edit/{jid}").json()
+    outs = body["outputs"]
+    assert [o["platform"] for o in outs] == ["reel", "square"]
+    assert outs[0]["ready"] is True and outs[1]["ready"] is False
+    assert outs[1]["width"] == 1080 and outs[1]["height"] == 1080
+    assert client.get(f"/edit/{jid}/download",
+                      params={"platform": "square"}).status_code == 404
 
 
 def test_edit_analyze_bad_files_errors(client):

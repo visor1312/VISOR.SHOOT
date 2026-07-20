@@ -85,6 +85,15 @@ Beats im gewählten Song-Fenster und liefert sie als Puls-Liste an den
 unsichtbaren FreeCut-Render). Findet die Beat-Erkennung nichts (z.B. sehr
 percussion-arme Musik), wird ohne Puls gerendert statt abzubrechen.
 
+Dazu **Multi-Plattform-Export**: vor der Look-Auswahl lassen sich mehrere
+Zielformate anhaken — 9:16 (TikTok/Reels/Shorts, Standard), 4:5 (Insta-Feed),
+1:1 (quadratisch) und 16:9 (YouTube). Analyse, Sync, Hook und Untertitel
+laufen einmal, danach wird jedes Format einzeln gerendert (Render-Zeit
+vervielfacht sich entsprechend; der Assistent zeigt "Format X von Y"). Das
+Video fuellt jedes Format automatisch formatfuellend (Cover-Zuschnitt),
+Untertitel-Groesse skaliert mit der Bildhoehe. Am Ende gibt es pro Format
+einen eigenen Download (`backend/pipeline/platforms.py`, GET `/platforms`).
+
 Der Upload-Workflow bietet zusätzlich:
 
 - **12 Editing-Presets** (`backend/pipeline/presets.py`, GET `/presets`):
