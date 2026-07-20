@@ -14,7 +14,7 @@ import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -69,10 +69,20 @@ def _save_upload(upload: UploadFile, dest: Path) -> Path:
     return dest
 
 
+# Ownership-Regel (gilt fuer alle Datenrouten): Listen filtern per user_id,
+# Einzel-/Download-Routen werfen bei fremden Ressourcen 404 (nicht 403) -
+# so laesst sich nicht einmal herausfinden, OB eine fremde ID existiert.
+def _own(row: dict | None, user: dict) -> dict:
+    if not row or row.get("user_id") != user["id"]:
+        raise HTTPException(404, "Nicht gefunden")
+    return row
+
+
 @app.post("/projects")
-def create_project(name: str = Form(...), song: UploadFile = File(...)):
+def create_project(name: str = Form(...), song: UploadFile = File(...),
+                   user: dict = Depends(auth.get_current_user)):
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
-    project_id = db.create_project(name=name, song_path="")  # Pfad wird gleich nachgetragen
+    project_id = db.create_project(name=name, song_path="", user_id=user["id"])
     song_dest = storage.song_path(project_id, suffix)
     _save_upload(song, song_dest)
     db.set_project_song_path(project_id, str(song_dest))
@@ -80,19 +90,18 @@ def create_project(name: str = Form(...), song: UploadFile = File(...)):
 
 
 @app.get("/projects")
-def list_projects():
-    """Alle Projekte inkl. ihrer Takes - Datenquelle fuer das Dashboard."""
+def list_projects(user: dict = Depends(auth.get_current_user)):
+    """Eigene Projekte inkl. ihrer Takes - Datenquelle fuer das Dashboard."""
     return [
         {**project, "takes": db.list_takes(project["id"])}
-        for project in db.list_projects()
+        for project in db.list_projects(user_id=user["id"])
     ]
 
 
 @app.post("/projects/{project_id}/takes")
-def create_take(project_id: str, video: UploadFile = File(...), original_audio_mode: str = Form("mute")):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(404, "Projekt nicht gefunden")
+def create_take(project_id: str, video: UploadFile = File(...), original_audio_mode: str = Form("mute"),
+                user: dict = Depends(auth.get_current_user)):
+    _own(db.get_project(project_id), user)
     if original_audio_mode not in ("mute", "background"):
         raise HTTPException(400, "original_audio_mode muss 'mute' oder 'background' sein")
 
@@ -186,10 +195,11 @@ def sync_take(
     preset: str = Form("clean"),
     subtitles: bool = Form(False),
     language: str = Form("de"),
+    user: dict = Depends(auth.get_current_user),
 ):
-    project = db.get_project(project_id)
+    _own(db.get_project(project_id), user)
     take = db.get_take(take_id)
-    if not project or not take or take["project_id"] != project_id:
+    if not take or take["project_id"] != project_id:
         raise HTTPException(404, "Projekt oder Take nicht gefunden")
     if preset not in PRESETS:
         raise HTTPException(400, f"Unbekanntes Preset: {preset}")
@@ -204,7 +214,8 @@ def sync_take(
 
 
 @app.get("/projects/{project_id}/takes/{take_id}")
-def get_take(project_id: str, take_id: str):
+def get_take(project_id: str, take_id: str, user: dict = Depends(auth.get_current_user)):
+    _own(db.get_project(project_id), user)
     take = db.get_take(take_id)
     if not take or take["project_id"] != project_id:
         raise HTTPException(404, "Take nicht gefunden")
@@ -212,9 +223,8 @@ def get_take(project_id: str, take_id: str):
 
 
 @app.get("/projects/{project_id}/takes")
-def list_takes(project_id: str):
-    if not db.get_project(project_id):
-        raise HTTPException(404, "Projekt nicht gefunden")
+def list_takes(project_id: str, user: dict = Depends(auth.get_current_user)):
+    _own(db.get_project(project_id), user)
     return db.list_takes(project_id)
 
 
@@ -247,9 +257,10 @@ def _run_hook_job(job_id: str) -> None:
 
 
 @app.post("/hooks/analyze")
-def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...)):
+def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...),
+                 user: dict = Depends(auth.get_current_user)):
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
-    job_id = db.create_hook_job(song_path="")
+    job_id = db.create_hook_job(song_path="", user_id=user["id"])
     song_dest = storage.hook_song_path(job_id, suffix)
     _save_upload(song, song_dest)
     db.set_hook_job_song_path(job_id, str(song_dest))
@@ -261,14 +272,14 @@ def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...)
 
 
 @app.get("/hooks")
-def list_hook_jobs(limit: int = 10):
-    """Letzte Hook-Analysen (neueste zuerst) - Datenquelle fuer das Dashboard.
+def list_hook_jobs(limit: int = 10, user: dict = Depends(auth.get_current_user)):
+    """Eigene Hook-Analysen (neueste zuerst) - Datenquelle fuer das Dashboard.
 
     Pro Job wird nur der beste Kandidat mitgeliefert; die volle Kandidaten-
     liste gibt es weiterhin ueber GET /hooks/{job_id}.
     """
     jobs = []
-    for job in db.list_hook_jobs(limit=limit):
+    for job in db.list_hook_jobs(limit=limit, user_id=user["id"]):
         best = None
         if job["result_json"]:
             best = json.loads(job["result_json"])["best"]
@@ -282,19 +293,17 @@ def list_hook_jobs(limit: int = 10):
 
 
 @app.get("/hooks/{job_id}")
-def get_hook_job(job_id: str):
-    job = db.get_hook_job(job_id)
-    if not job:
-        raise HTTPException(404, "Hook-Analyse nicht gefunden")
+def get_hook_job(job_id: str, user: dict = Depends(auth.get_current_user)):
+    job = _own(db.get_hook_job(job_id), user)
     result = json.loads(job["result_json"]) if job["result_json"] else None
     return {"job_id": job["id"], "status": job["status"], "error": job["error"], "result": result}
 
 
 @app.get("/hooks/{job_id}/preview/{index}")
-def hook_preview(job_id: str, index: int):
+def hook_preview(job_id: str, index: int, user: dict = Depends(auth.get_current_user)):
     """MP3-Ausschnitt eines Kandidaten (0 = bester, 1.. = Alternativen)."""
-    job = db.get_hook_job(job_id)
-    if not job or not job["result_json"]:
+    job = _own(db.get_hook_job(job_id), user)
+    if not job["result_json"]:
         raise HTTPException(404, "Hook-Analyse nicht gefunden oder noch nicht fertig")
     result = json.loads(job["result_json"])
     candidates = [result["best"], *result["alternatives"]]
@@ -355,10 +364,11 @@ def editor_analyze(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     song: UploadFile = File(...),
+    user: dict = Depends(auth.get_current_user),
 ):
     video_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     song_suffix = Path(song.filename or "song.wav").suffix or ".wav"
-    job_id = db.create_analyze_job(video_path="", song_path="")
+    job_id = db.create_analyze_job(video_path="", song_path="", user_id=user["id"])
     video_dest = _save_upload(video, storage.analyze_video_path(job_id, video_suffix))
     song_dest = _save_upload(song, storage.analyze_song_path(job_id, song_suffix))
     db.set_analyze_job_paths(job_id, str(video_dest), str(song_dest))
@@ -369,10 +379,8 @@ def editor_analyze(
 
 
 @app.get("/editor/analyze/{job_id}")
-def get_editor_analyze(job_id: str):
-    job = db.get_analyze_job(job_id)
-    if not job:
-        raise HTTPException(404, "Analyse nicht gefunden")
+def get_editor_analyze(job_id: str, user: dict = Depends(auth.get_current_user)):
+    job = _own(db.get_analyze_job(job_id), user)
     result = json.loads(job["result_json"]) if job["result_json"] else None
     return {"job_id": job["id"], "status": job["status"], "error": job["error"], "result": result}
 
@@ -402,12 +410,12 @@ def _run_edit_analyze(job_id: str) -> None:
 @app.post("/edit/analyze")
 def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...),
                  song: UploadFile = File(...), with_subtitles: str = Form("false"),
-                 lyrics: str = Form("")):
+                 lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
     v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
     want_subs = with_subtitles.lower() in ("true", "1", "yes", "on")
     job_id = db.create_edit_job(video_path="", song_path="", with_subtitles=want_subs,
-                                lyrics=lyrics.strip() or None)
+                                lyrics=lyrics.strip() or None, user_id=user["id"])
     v_dest = _save_upload(video, storage.edit_video_path(job_id, v_suffix))
     s_dest = _save_upload(song, storage.edit_song_path(job_id, s_suffix))
     db.update_edit_job(job_id, video_path=str(v_dest), song_path=str(s_dest), status="syncing")
@@ -435,10 +443,9 @@ def _run_edit_hook(job_id: str) -> None:
 
 
 @app.post("/edit/{job_id}/hook")
-def edit_hook(job_id: str, background_tasks: BackgroundTasks):
-    job = db.get_edit_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job nicht gefunden")
+def edit_hook(job_id: str, background_tasks: BackgroundTasks,
+              user: dict = Depends(auth.get_current_user)):
+    _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="hooking")
     background_tasks.add_task(_run_edit_hook, job_id)
     return {"job_id": job_id, "status": "hooking"}
@@ -512,10 +519,9 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: 
 @app.post("/edit/{job_id}/render")
 def edit_render(job_id: str, background_tasks: BackgroundTasks,
                 style: str = Form(...), use_hook: str = Form("false"),
-                beat_effects: str = Form("false"), platforms: str = Form("reel")):
-    job = db.get_edit_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job nicht gefunden")
+                beat_effects: str = Form("false"), platforms: str = Form("reel"),
+                user: dict = Depends(auth.get_current_user)):
+    _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="rendering")
     background_tasks.add_task(_run_edit_render, job_id, style,
                               use_hook.lower() in ("true", "1", "yes", "on"),
@@ -530,21 +536,37 @@ def list_platforms():
     return {"platforms": platform_catalog()}
 
 
-@app.get("/edit/{job_id}")
-def get_edit(job_id: str):
+def _edit_outputs(job: dict) -> list[dict] | None:
+    """outputs[]-Block eines Edit-Jobs (Formate + ready-Status) oder None."""
     from backend.pipeline.platforms import get_platform
-    job = db.get_edit_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job nicht gefunden")
+    if not job["platforms"]:
+        return None
     done_outputs = json.loads(job["outputs_json"]) if job["outputs_json"] else {}
-    outputs = None
-    if job["platforms"]:
-        outputs = []
-        for key in job["platforms"].split(","):
-            p = get_platform(key)
-            outputs.append({"platform": p.key, "name": p.name,
-                            "width": p.width, "height": p.height,
-                            "ready": p.key in done_outputs})
+    outputs = []
+    for key in job["platforms"].split(","):
+        p = get_platform(key)
+        outputs.append({"platform": p.key, "name": p.name,
+                        "width": p.width, "height": p.height,
+                        "ready": p.key in done_outputs})
+    return outputs
+
+
+@app.get("/edit")
+def list_edit_jobs(limit: int = 20, user: dict = Depends(auth.get_current_user)):
+    """Eigene Wizard-Reels (neueste zuerst) - Datenquelle fuer 'Meine Reels'
+    im personalisierten Dashboard."""
+    return [
+        {"job_id": job["id"], "status": job["status"], "error": job["error"],
+         "style": job["style"], "created_at": job["created_at"],
+         "has_output": bool(job["output_path"]), "outputs": _edit_outputs(job)}
+        for job in db.list_edit_jobs(user["id"], limit=limit)
+    ]
+
+
+@app.get("/edit/{job_id}")
+def get_edit(job_id: str, user: dict = Depends(auth.get_current_user)):
+    job = _own(db.get_edit_job(job_id), user)
+    outputs = _edit_outputs(job)
     return {
         "job_id": job["id"], "status": job["status"], "error": job["error"],
         "with_subtitles": bool(job["with_subtitles"]), "style": job["style"],
@@ -557,10 +579,9 @@ def get_edit(job_id: str):
 
 
 @app.get("/edit/{job_id}/download")
-def download_edit(job_id: str, platform: str | None = None):
-    job = db.get_edit_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job nicht gefunden")
+def download_edit(job_id: str, platform: str | None = None,
+                  user: dict = Depends(auth.get_current_user)):
+    job = _own(db.get_edit_job(job_id), user)
     if platform:
         outputs = json.loads(job["outputs_json"]) if job["outputs_json"] else {}
         path = outputs.get(platform)
@@ -574,7 +595,8 @@ def download_edit(job_id: str, platform: str | None = None):
 
 
 @app.get("/projects/{project_id}/takes/{take_id}/download")
-def download_take(project_id: str, take_id: str):
+def download_take(project_id: str, take_id: str, user: dict = Depends(auth.get_current_user)):
+    _own(db.get_project(project_id), user)
     take = db.get_take(take_id)
     if not take or take["project_id"] != project_id:
         raise HTTPException(404, "Take nicht gefunden")
