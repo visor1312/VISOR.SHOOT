@@ -16,6 +16,48 @@ Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)**, **Phase 3
 (Effekte, Grading, Upscaling)** und **Hook-Erkennung** (Roadmap-Ausbaustufe
 Richtung All-in-One-App fuer Indie-Musiker) sind fertig und lauffähig.
 
+## Anmeldung & Konten
+
+HOOKCUT hat ein Benutzer-System: Login, Registrierung und pro Konto ein
+eigenes Dashboard (jeder sieht nur seine eigenen Projekte, Reels und
+Hook-Analysen). Es ist bewusst schon „online-tauglich" gebaut (sichere
+Passwort-Speicherung, Sitzungen, saubere Datentrennung), läuft aber komplett
+lokal auf deinem Rechner.
+
+**Erste Einrichtung (einmalig nach dem Update):**
+
+1. `pip install -r requirements.txt` ausführen — es kommt eine neue
+   Bibliothek dazu (`bcrypt`, fürs sichere Passwort-Speichern). **Ohne diesen
+   Schritt startet das Backend nicht** (es meldet dann `No module named
+   'bcrypt'` im Backend-Fenster).
+2. `hookcut-einladung.bat` doppelklicken → es erscheint ein **Einladungscode**.
+   Registrierung geht nur mit so einem Code (du vergibst sie als Betreiber).
+3. HOOKCUT starten (`start-hookcut.bat`), die Login-Seite öffnet sich →
+   „Mit Einladungscode registrieren" → Code, E-Mail, Anzeigename und Passwort
+   eingeben. **Das erste Konto wird automatisch Admin und übernimmt alle schon
+   vorhandenen Projekte/Reels.**
+
+**Weitere Konten:** einfach je einen neuen Code mit `hookcut-einladung.bat`
+erzeugen und weitergeben.
+
+**Passwort vergessen:** Solange HOOKCUT nur lokal läuft, gibt es bewusst
+keinen „Passwort vergessen"-Link (dafür bräuchte es einen E-Mail-Versand, der
+erst mit dem späteren Online-Hosting kommt). Stattdessen am HOOKCUT-Rechner
+`hookcut-passwort-reset.bat` doppelklicken und den Anweisungen folgen.
+
+**Wichtig:** Immer über `http://localhost:5173` einloggen (so öffnet auch
+`start-hookcut.bat` den Browser), nicht über `127.0.0.1:5173` — die Anmeldung
+ist an die Adresse gebunden, über die du dich eingeloggt hast.
+
+Admin-Werkzeuge auf der Kommandozeile (optional):
+
+```bash
+python -m backend.admin create-invite [--anzahl N]   # Einladungscode(s)
+python -m backend.admin list-invites                  # Codes + Status
+python -m backend.admin list-users                    # alle Konten
+python -m backend.admin reset-password [email]        # Passwort neu setzen
+```
+
 ## Setup
 
 ```bash

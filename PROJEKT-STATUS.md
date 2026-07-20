@@ -29,7 +29,8 @@ einfach halten, `.bat`-Dateien zum Doppelklicken bereitstellen.
 ```
 web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
           → CreateReelWizard.tsx = Haupt-Flow
-backend/  Python FastAPI (Port 8000) + pipeline/-Module:
+          → AuthScreen.tsx = Login/Registrierung, App.tsx = Auth-Weiche
+backend/  Python FastAPI (Port 8000) + auth.py (Benutzer-System) + pipeline/-Module:
           sync_offset (Onset-Korrelation), hook_detect, transcribe
           (faster-whisper large-v3 auf Demucs-Vocal-Stem), lyrics_align
           (Nutzertext = Wahrheit, KI nur Timing), styles, beat_pulse
@@ -55,6 +56,36 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 - `test-render.bat` — Machbarkeitstest headless-Render (Drag&Drop-Eingabe)
 - Einmalig: `pip install -r requirements.txt`, `npm install` in `web/` UND
   `editor/`. Braucht ffmpeg, Node 22+, Chrome (WebGPU!).
+
+## Benutzer-System (Login/Registrierung, seit Juli 2026)
+
+- **backend/auth.py**: bcrypt-Passwort-Hashing (72-Byte-Grenze wird VOR
+  hashpw/checkpw validiert!), Server-Side-Sessions (Token nur als SHA-256-Hash
+  in der DB, httpOnly-Cookie `hookcut_session`, sliding 30 Tage), Login-Lockout
+  (5 Fehlversuche → 15 min, DB-Tabelle), FastAPI-Dependency `get_current_user`,
+  Router `/auth/{register,login,logout,me}`. Registrierung NUR mit
+  Einladungscode.
+- **Ownership-Regel (WICHTIG):** jede Daten-Route hat
+  `Depends(auth.get_current_user)`; Listen filtern `WHERE user_id = ?`,
+  Einzel-/Download-Routen werfen über den `_own()`-Helper **404** bei fremden
+  Ressourcen (kein 403 = kein Existenz-Orakel). Nur `/styles`, `/platforms`,
+  `/presets` sind öffentlich. Neue Daten-Route ⇒ IMMER scopen, sonst Datenleck.
+- **Erstes Konto = Admin** und übernimmt per `claim_orphan_rows` alle Altdaten
+  (user_id NULL). Danach gibt es keine besitzerlosen Zeilen mehr.
+- **DB:** neue Tabellen users/sessions/invite_codes/login_attempts + user_id
+  auf projects/hook_jobs/analyze_jobs/edit_jobs (Mini-Migration). `create_*`
+  nehmen user_id; `update_*`-Allow-Lists enthalten user_id NICHT (unveränderlich).
+- **backend/admin.py** (+ hookcut-einladung.bat / hookcut-passwort-reset.bat):
+  create-invite / list-invites / list-users / reset-password.
+- **Tests:** HOOKCUT_DB-Env zeigt auf eine Wegwerf-DB (conftest.py setzt sie
+  VOR dem ersten backend-Import) — API-Tests schreiben NIE in die echte
+  state.db. Ohne das würde der erste Test-User per Backfill die Altdaten erben.
+- **Fürs spätere Hosting:** `HOOKCUT_SECURE_COOKIES=1` setzen (Secure-Cookie
+  nur über HTTPS). CORS-Origins in main.py erweitern. E-Mail-Verifikation +
+  echter Passwort-Reset (Mail) sind dann die nächsten Bausteine.
+- **Bekannte Grenzen:** Download-Links (`<a href>`) zeigen bei abgelaufener
+  Sitzung rohes 401-JSON statt Login-Maske. Das Gradio-Legacy (frontend/app.py)
+  umgeht die HTTP-Auth (ruft die Pipeline direkt) — bleibt deprecated/lokal.
 
 ## Wichtige gelernte Lektionen (nicht wiederholen!)
 
