@@ -89,69 +89,6 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   return jsonOrThrow<ProjectSummary[]>(res);
 }
 
-export async function createProject(name: string, song: File): Promise<string> {
-  const form = new FormData();
-  form.append("name", name);
-  form.append("song", song);
-  const res = await requestOrExplain(`${BASE}/projects`, { method: "POST", body: form });
-  const data = await jsonOrThrow<{ project_id: string }>(res);
-  return data.project_id;
-}
-
-export async function createTake(
-  projectId: string,
-  video: File,
-  originalAudioMode: "mute" | "background" = "mute",
-): Promise<string> {
-  const form = new FormData();
-  form.append("video", video);
-  form.append("original_audio_mode", originalAudioMode);
-  const res = await requestOrExplain(`${BASE}/projects/${projectId}/takes`, {
-    method: "POST",
-    body: form,
-  });
-  const data = await jsonOrThrow<{ take_id: string }>(res);
-  return data.take_id;
-}
-
-export interface EditPreset {
-  id: string;
-  label: string;
-  description: string;
-}
-
-export async function listPresets(): Promise<EditPreset[]> {
-  const res = await requestOrExplain(`${BASE}/presets`);
-  return jsonOrThrow<EditPreset[]>(res);
-}
-
-export interface SyncOptions {
-  preset?: string;
-  subtitles?: boolean;
-  language?: "de" | "en";
-}
-
-export async function startSync(
-  projectId: string,
-  takeId: string,
-  { preset = "clean", subtitles = false, language = "de" }: SyncOptions = {},
-): Promise<void> {
-  const form = new FormData();
-  form.append("preset", preset);
-  form.append("subtitles", String(subtitles));
-  form.append("language", language);
-  const res = await requestOrExplain(
-    `${BASE}/projects/${projectId}/takes/${takeId}/sync`,
-    { method: "POST", body: form },
-  );
-  await jsonOrThrow(res);
-}
-
-export async function getTake(projectId: string, takeId: string): Promise<Take> {
-  const res = await requestOrExplain(`${BASE}/projects/${projectId}/takes/${takeId}`);
-  return jsonOrThrow<Take>(res);
-}
-
 export function downloadUrl(projectId: string, takeId: string): string {
   return `${BASE}/projects/${projectId}/takes/${takeId}/download`;
 }
@@ -224,25 +161,6 @@ export async function waitForHook(
     if (job.status === "done" || job.status === "error") return job;
     if (Date.now() - start > timeoutMs) {
       throw new Error("Zeitüberschreitung bei der Hook-Analyse.");
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-}
-
-/** Pollt den Take-Status bis 'done' oder 'error' (oder Timeout). */
-export async function waitForSync(
-  projectId: string,
-  takeId: string,
-  onUpdate?: (take: Take) => void,
-  { intervalMs = 2000, timeoutMs = 15 * 60 * 1000 } = {},
-): Promise<Take> {
-  const start = Date.now();
-  for (;;) {
-    const take = await getTake(projectId, takeId);
-    onUpdate?.(take);
-    if (take.status === "done" || take.status === "error") return take;
-    if (Date.now() - start > timeoutMs) {
-      throw new Error("Zeitüberschreitung beim Synchronisieren.");
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }

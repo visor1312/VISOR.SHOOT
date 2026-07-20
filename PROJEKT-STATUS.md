@@ -102,8 +102,11 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 - Vom Nutzer end-to-end bestätigt: Sync, Hook-Flow, Styles-Render,
   9:16-Cover, Untertitel unten + exakte Lyrics.
 - Legacy, funktioniert aber: Gradio-UI (frontend/app.py), alte ffmpeg-
-  Effekte (effects_grading.py — durch FreeCut-Styles überholt), UploadModal
-  im web/ (durch Wizard ersetzt, Datei existiert noch).
+  Effekte (effects_grading.py — durch FreeCut-Styles überholt, aber von
+  Gradio + Tests noch genutzt). UploadModal im web/ wurde entfernt (durch
+  Wizard ersetzt); die alten REST-Endpunkte (/projects POST, /takes, /sync,
+  /presets) bleiben fürs Gradio-Legacy + dokumentierte API bestehen, das
+  Dashboard nutzt weiterhin GET /projects + Take-Download.
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
