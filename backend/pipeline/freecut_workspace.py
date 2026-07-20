@@ -115,7 +115,12 @@ def _beat_pulse_effect(pulses, duration_frames: int, fps: float, intensity: floa
             "params": {
                 "strength": 0, "radius": 1, "frequency": 24, "decay": 0.06,
                 "phase": 0, "speed": 0, "centerX": 0.5, "centerY": 0.5,
-                "chroma": 0.006 * intensity, "scanlineMix": 0.22,
+                # scanlineMix MUSS 0 sein: im Shader ist der Scanline-Anteil
+                # NICHT an strength gekoppelt (distort.ts, triggerWaveFragment)
+                # - jeder Wert > 0 zeichnet dauerhaft flackernde Streifen,
+                # auch zwischen den Beats. Alles andere geht bei strength=0
+                # sauber auf null.
+                "chroma": 0.006 * intensity, "scanlineMix": 0,
                 "glowColor": _TRIGGER_WAVE_GLOW,
             },
         },

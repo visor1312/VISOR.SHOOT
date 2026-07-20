@@ -150,6 +150,9 @@ def test_beat_effects_add_trigger_wave_with_audio_pulse(media, beat_song, tmp_pa
         == [gpu for gpu, _ in get_style("hype").effects]
     assert set(wave["effect"]["params"].keys()) == TRIGGER_WAVE_PARAM_KEYS
     assert wave["effect"]["params"]["strength"] == 0  # Ruhe-Zustand: unsichtbar
+    # Scanlines sind im Shader NICHT an strength gekoppelt - jeder Wert > 0
+    # wuerde dauerhaft flackern (der "zuckt durchgehend"-Bug).
+    assert wave["effect"]["params"]["scanlineMix"] == 0
 
     pulse = wave["audioPulse"]
     assert pulse["enabled"] is True

@@ -21,6 +21,13 @@ import numpy as np
 
 DEFAULT_SAMPLE_RATE = 22050
 
+# Puls-Envelope im Editor dauert ~0.36s (fps * 0.36 Frames). Liegen Beats
+# dichter als das + eine kleine Ruhepause, ueberlappen sich die Pulse und der
+# Effekt flackert durchgehend statt zu "zucken". Passiert bei Rap schnell,
+# weil librosa auf Hi-Hats gern das DOPPELTE Tempo erkennt (Oktavfehler) -
+# dann wird automatisch nur jeder 2./3./... Beat genommen.
+MIN_PULSE_SPACING_SEC = 0.42
+
 
 @dataclass
 class BeatPulse:
@@ -40,7 +47,9 @@ def beat_pulses_for_window(
     """Taktschlaege im Song-Fenster [win_start_sec, win_end_sec) als Pulse.
 
     stride=2/4 nimmt nur jeden 2./4. Taktschlag (gezaehlt ab Fensterbeginn),
-    falls ein Effekt auf jedem Beat zu hektisch wirkt.
+    falls ein Effekt auf jedem Beat zu hektisch wirkt. Unabhaengig davon wird
+    automatisch ausgeduennt, wenn die erkannten Beats dichter liegen als
+    MIN_PULSE_SPACING_SEC (Doppeltempo-Oktavfehler bei Rap/Hi-Hats).
     """
     y, sr = librosa.load(str(song_path), sr=sample_rate, mono=True)
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
@@ -54,24 +63,32 @@ def beat_pulses_for_window(
     if ref <= 0:
         ref = 1.0
 
+    in_window = [(float(t), float(s)) for t, s in zip(beat_times, strengths)
+                 if win_start_sec <= t < win_end_sec]
+    if not in_window:
+        return []
+
+    # Auto-Stride: erkannten Beat-Abstand messen und so ausduennen, dass
+    # zwischen zwei Pulsen mindestens MIN_PULSE_SPACING_SEC liegt.
     stride = max(1, int(stride))
+    if len(in_window) >= 2:
+        median_interval = float(np.median(np.diff([t for t, _ in in_window])))
+        if median_interval > 0:
+            auto = int(np.ceil(MIN_PULSE_SPACING_SEC / median_interval))
+            stride = max(stride, auto)
+
     pulses: list[BeatPulse] = []
     seen_frames: set[int] = set()
-    in_window = 0
-    for t, s in zip(beat_times, strengths):
-        if t < win_start_sec or t >= win_end_sec:
+    for i, (t, s) in enumerate(in_window):
+        if i % stride != 0:
             continue
-        keep = in_window % stride == 0
-        in_window += 1
-        if not keep:
-            continue
-        frame = round((float(t) - win_start_sec) * fps)
+        frame = round((t - win_start_sec) * fps)
         if frame in seen_frames:
             continue
         seen_frames.add(frame)
         # 0.35 Sockel: auch leise Beats sollen sichtbar pulsieren, die
         # Onset-Staerke moduliert nur die Spitze.
-        amplitude = float(np.clip(0.35 + 0.65 * (float(s) / ref), 0.0, 1.0))
+        amplitude = float(np.clip(0.35 + 0.65 * (s / ref), 0.0, 1.0))
         pulses.append(BeatPulse(frame=frame, amplitude=amplitude))
     return pulses
 

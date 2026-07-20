@@ -64,6 +64,31 @@ def test_stride_thins_out_beats(click_track):
     assert [p.frame for p in halved] == [p.frame for p in every[::2]]
 
 
+def test_dense_beats_are_auto_thinned(tmp_path_factory):
+    """Doppeltempo-Fall (Rap/Hi-Hats): Beats alle 0.2s duerfen NICHT alle
+    pulsieren, sonst ueberlappen sich die Envelopes und es flackert
+    durchgehend. Auto-Stride muss auf >= MIN_PULSE_SPACING_SEC ausduennen."""
+    from backend.pipeline.beat_pulse import MIN_PULSE_SPACING_SEC
+
+    sr = 22050
+    rng = np.random.default_rng(7)
+    audio = rng.normal(scale=0.05, size=int(20 * sr))
+    decay_env = np.exp(-np.linspace(0, 15, int(0.05 * sr)))
+    t = 0.2
+    while t < 19.9:  # 300 BPM Klicks
+        start = int(t * sr)
+        audio[start:start + len(decay_env)] += decay_env
+        t += 0.2
+    audio = audio / np.max(np.abs(audio)) * 0.9
+    dense = tmp_path_factory.mktemp("dense") / "dense_clicks.wav"
+    sf.write(str(dense), audio, sr)
+
+    pulses = beat_pulses_for_window(dense, 0.0, 20.0, fps=30)
+    assert len(pulses) >= 2
+    min_gap_frames = min(np.diff([p.frame for p in pulses]))
+    assert min_gap_frames >= MIN_PULSE_SPACING_SEC * 30 * 0.9  # kleine Toleranz
+
+
 def test_silence_yields_no_pulses(tmp_path):
     sr = 22050
     silent = tmp_path / "silence.wav"

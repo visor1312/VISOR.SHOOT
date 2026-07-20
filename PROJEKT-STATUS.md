@@ -76,6 +76,11 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
    trigger-wave-motion-layer.ts, createAudioPulseModulation). Alternativ gibt
    es generische `timeline.keyframes` (property
    `effect:<gpuType>:<effectId>:<paramKey>`), fuer den Puls aber nicht noetig.
+   ACHTUNG (Nutzer-Test Juli 2026, "zuckt durchgehend"): `scanlineMix` im
+   gpu-trigger-wave-Shader ist NICHT an strength gekoppelt - jeder Wert > 0
+   flackert dauerhaft, fuer Puls-Effekte auf 0 lassen. Und: librosa erkennt
+   bei Rap (Hi-Hats) gern das doppelte Tempo -> beat_pulse.py duennt Pulse
+   automatisch auf >= 0.42s Abstand aus (MIN_PULSE_SPACING_SEC).
 5. **Windows-Nutzer-Realität:** PowerShell blockt npm.ps1 (→ CMD oder
    npm.cmd), `Als Pfad kopieren` liefert Anführungszeichen mit, localhost ≠
    127.0.0.1 (Vite bindet localhost). Fehlermeldungen in api.ts sind bewusst
