@@ -82,6 +82,14 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+# Dummy-Hash mit denselben Kosten wie ein echter: gegen ihn wird geprueft,
+# wenn die E-Mail unbekannt ist. So dauert ein Login mit unbekannter und mit
+# bekannter E-Mail gleich lang - sonst wuerde die Antwortzeit verraten, welche
+# Adressen registriert sind (Timing-Seitenkanal / User-Enumeration), trotz
+# einheitlicher Fehlermeldung.
+_DUMMY_HASH = bcrypt.hashpw(b"hookcut-timing-guard", bcrypt.gensalt(rounds=12)).decode("ascii")
+
+
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
@@ -162,7 +170,10 @@ def check_login(email: str, password: str,
             429, "Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.")
 
     user = db.get_user_by_email(email, db_path=db_path)
-    if user and verify_password(password, user["password_hash"]):
+    # bcrypt IMMER laufen lassen (gegen den Dummy-Hash, wenn es die E-Mail
+    # nicht gibt), damit die Login-Dauer nichts ueber die Existenz verraet.
+    password_ok = verify_password(password, user["password_hash"] if user else _DUMMY_HASH)
+    if user and password_ok:
         db.reset_login_failures(email, db_path=db_path)
         db.delete_expired_sessions(_iso(now), db_path=db_path)
         return user

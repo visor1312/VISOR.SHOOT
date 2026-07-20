@@ -102,6 +102,26 @@ def test_wrong_password_unified_message(auth_client):
     assert r2.json()["detail"] == r.json()["detail"]
 
 
+def test_login_runs_hash_for_unknown_email(monkeypatch):
+    """Timing-Schutz: auch bei unbekannter E-Mail wird ein bcrypt-Vergleich
+    ausgefuehrt (gegen den Dummy-Hash), damit die Antwortzeit die Existenz
+    eines Kontos nicht verraet."""
+    calls = {"n": 0}
+    real = auth.verify_password
+
+    def counting_verify(pw, h):
+        calls["n"] += 1
+        return real(pw, h)
+
+    monkeypatch.setattr(auth, "verify_password", counting_verify)
+    try:
+        auth.check_login("gibtesnicht@example.com", "irgendwas123",
+                         db_path=auth.db.DEFAULT_DB_PATH)
+    except auth.RegisterError:
+        pass
+    assert calls["n"] == 1  # bcrypt lief trotz unbekannter E-Mail
+
+
 def test_login_lockout_after_five_failures(client):
     email = _unique_email()  # Lockout zaehlt auch fuer unbekannte Adressen
     for _ in range(5):

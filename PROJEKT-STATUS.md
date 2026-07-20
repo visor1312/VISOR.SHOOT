@@ -83,6 +83,15 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 - **Fürs spätere Hosting:** `HOOKCUT_SECURE_COOKIES=1` setzen (Secure-Cookie
   nur über HTTPS). CORS-Origins in main.py erweitern. E-Mail-Verifikation +
   echter Passwort-Reset (Mail) sind dann die nächsten Bausteine.
+- **Sicherheits-Review (Juli 2026):** Timing-Seitenkanal beim Login gefixt
+  (bcrypt laeuft immer, auch bei unbekannter E-Mail → `_DUMMY_HASH`). SQL
+  durchgehend parametrisiert (die f-string-Tabellennamen kommen aus festen
+  Tupeln/Allow-Lists, nie aus Nutzereingaben). Bewusst akzeptiert fuers
+  lokale Tool (fuers Hosting im Blick behalten): Account-Lockout ist pro
+  E-Mail → jemand mit deiner E-Mail kann dich 15 min aussperren (DoS);
+  Register-„E-Mail vergeben"-409 ist ein Enumerations-Hinweis, aber durch
+  den Einladungscode-Zwang gedeckelt; TOCTOU-Rennen bei Register/Invite sind
+  lokal vernachlaessigbar.
 - **Bekannte Grenzen:** Download-Links (`<a href>`) zeigen bei abgelaufener
   Sitzung rohes 401-JSON statt Login-Maske. Das Gradio-Legacy (frontend/app.py)
   umgeht die HTTP-Auth (ruft die Pipeline direkt) — bleibt deprecated/lokal.
