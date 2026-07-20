@@ -14,13 +14,24 @@ import {
 import {
   listProjects,
   listRecentHooks,
+  listEditJobs,
   downloadUrl,
+  editDownloadUrl,
   type ProjectSummary,
   type HookJobSummary,
+  type EditJobSummary,
   type Take,
+  type User,
 } from "../api";
 
 type ProjectStatus = "done" | "processing" | "draft" | "error";
+
+/** Edit-Job-Status auf eine Ampel abbilden (fuer die "Meine Reels"-Karten). */
+function editStatusMeta(status: EditJobSummary["status"]): { label: string; className: string } {
+  if (status === "done") return { label: "Fertig", className: "bg-brand-500/15 text-brand-400" };
+  if (status === "error") return { label: "Fehler", className: "bg-red-500/15 text-red-400" };
+  return { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" };
+}
 
 const statusMeta: Record<ProjectStatus, { label: string; className: string }> = {
   done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
@@ -88,23 +99,27 @@ function StatCard({ label, value, delta, icon }: Stat) {
 }
 
 export default function Dashboard({
+  user,
   onOpenHook,
   onOpenWizard,
 }: {
+  user: User;
   onOpenHook: () => void;
   onOpenWizard: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [hooks, setHooks] = useState<HookJobSummary[]>([]);
+  const [reels, setReels] = useState<EditJobSummary[]>([]);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listProjects(), listRecentHooks()])
-      .then(([p, h]) => {
+    Promise.all([listProjects(), listRecentHooks(), listEditJobs()])
+      .then(([p, h, r]) => {
         if (cancelled) return;
         setProjects(p);
         setHooks(h);
+        setReels(r);
       })
       .catch((e) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
@@ -116,6 +131,7 @@ export default function Dashboard({
 
   const allTakes = projects.flatMap((p) => p.takes);
   const doneTakes = allTakes.filter((t) => t.status === "done");
+  const doneReels = reels.filter((r) => r.status === "done");
   const doneHooks = hooks.filter((h) => h.status === "done" && h.best);
   const bestScore = doneHooks.reduce(
     (max, h) => Math.max(max, h.best?.viral_score ?? 0),
@@ -131,8 +147,8 @@ export default function Dashboard({
     },
     {
       label: "Fertige Reels",
-      value: String(doneTakes.length),
-      delta: `+${countThisWeek(doneTakes)} diese Woche`,
+      value: String(doneTakes.length + doneReels.length),
+      delta: `+${countThisWeek(doneTakes) + countThisWeek(doneReels)} diese Woche`,
       icon: "video",
     },
     {
@@ -155,7 +171,7 @@ export default function Dashboard({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted mt-1">Willkommen zurück</p>
+          <p className="text-muted mt-1">Willkommen zurück, {user.display_name}</p>
         </div>
         <button
           onClick={onOpenWizard}
@@ -243,6 +259,52 @@ export default function Dashboard({
           <span className="mt-4 text-xs px-3 py-1.5 rounded-lg bg-ink-800 text-ink-600">
             Demnächst
           </span>
+        </div>
+      </div>
+
+      {/* Meine Reels (Wizard-Reels des angemeldeten Nutzers) */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-3">Meine Reels</h2>
+        <div className="space-y-2">
+          {reels.length === 0 && !loadError && (
+            <div className="bg-ink-850 border border-ink-700 rounded-xl px-4 py-8 text-center text-sm text-muted">
+              Noch keine Reels — erstelle dein erstes mit „Reel erstellen".
+            </div>
+          )}
+          {reels.map((r) => {
+            const meta = editStatusMeta(r.status);
+            const readyOutputs = (r.outputs ?? []).filter((o) => o.ready);
+            return (
+              <div key={r.job_id}
+                className="flex items-center gap-4 bg-ink-850 border border-ink-700 rounded-xl px-4 py-3.5">
+                <div className="w-9 h-9 rounded-lg bg-ink-800 flex items-center justify-center shrink-0">
+                  <Video size={16} className="text-muted" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">
+                    {r.style ? `Style: ${r.style}` : "Reel"}
+                  </p>
+                  <p className="text-xs text-muted">{formatDate(r.created_at)}</p>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-md ${meta.className}`}>
+                  {meta.label}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {r.status === "done" && readyOutputs.length > 0 ? (
+                    readyOutputs.map((o) => (
+                      <a key={o.platform} href={editDownloadUrl(r.job_id, o.platform)} download
+                        title={`${o.name} herunterladen (${o.width}×${o.height})`}
+                        className="text-xs px-2 py-1 rounded-lg bg-ink-800 hover:bg-ink-700 text-muted hover:text-white transition-colors flex items-center gap-1">
+                        <Download size={13} /> {o.platform}
+                      </a>
+                    ))
+                  ) : (
+                    <span className="w-8" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

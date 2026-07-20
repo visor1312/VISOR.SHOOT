@@ -31,7 +31,25 @@ const HINT_RESTART =
   "Bitte beide Server-Fenster schliessen und start-hookcut.bat neu starten, " +
   "dann die Seite neu laden.";
 
-async function requestOrExplain(input: string, init?: RequestInit): Promise<Response> {
+/** Sitzung abgelaufen/nicht angemeldet - App zeigt wieder die Login-Maske. */
+export class UnauthorizedError extends Error {}
+
+// Globaler 401-Handler: App.tsx registriert hier das Umschalten zur
+// Login-Maske, damit jede beliebige API-Funktion bei abgelaufener
+// Sitzung automatisch dorthin zurueckfuehrt.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
+async function requestOrExplain(
+  input: string,
+  init?: RequestInit,
+  // authRequest: fuer die /auth-Endpunkte selbst ist ein 401 eine normale
+  // Antwort (z.B. "Passwort falsch") und darf NICHT als abgelaufene
+  // Sitzung behandelt werden.
+  { authRequest = false } = {},
+): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(input, init);
@@ -49,6 +67,12 @@ async function requestOrExplain(input: string, init?: RequestInit): Promise<Resp
       "Das Backend (Fenster \"HOOKCUT Backend\") ist nicht erreichbar. " +
         HINT_RESTART,
     );
+  }
+  // WICHTIG: vor der 404-Heuristik pruefen - ein 401 ist "nicht angemeldet",
+  // kein "Backend zu alt".
+  if (res.status === 401 && !authRequest) {
+    onUnauthorized?.();
+    throw new UnauthorizedError("Deine Sitzung ist abgelaufen. Bitte neu anmelden.");
   }
   if (res.status === 404) {
     // Haeufigster Grund: Backend laeuft noch mit altem Code-Stand
@@ -73,6 +97,57 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     throw new Error(detail);
   }
   return res.json() as Promise<T>;
+}
+
+// ---------------------------------------------------------------------------
+// Benutzer-System (Login/Registrierung/Sitzung)
+
+export interface User {
+  id: string;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+}
+
+function jsonPost(body: unknown): RequestInit {
+  return {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+/** Eingeloggter User oder null (nicht angemeldet) - feuert NIE den 401-Handler. */
+export async function getMe(): Promise<User | null> {
+  const res = await requestOrExplain(`${BASE}/auth/me`, undefined, { authRequest: true });
+  if (res.status === 401) return null;
+  return jsonOrThrow<User>(res);
+}
+
+export async function login(email: string, password: string): Promise<User> {
+  const res = await requestOrExplain(
+    `${BASE}/auth/login`, jsonPost({ email, password }), { authRequest: true });
+  return jsonOrThrow<User>(res);
+}
+
+export async function register(
+  inviteCode: string,
+  email: string,
+  displayName: string,
+  password: string,
+): Promise<User> {
+  const res = await requestOrExplain(
+    `${BASE}/auth/register`,
+    jsonPost({ invite_code: inviteCode, email, display_name: displayName, password }),
+    { authRequest: true },
+  );
+  return jsonOrThrow<User>(res);
+}
+
+export async function logout(): Promise<void> {
+  const res = await requestOrExplain(`${BASE}/auth/logout`, { method: "POST" },
+    { authRequest: true });
+  await jsonOrThrow(res);
 }
 
 /** Projekt inkl. aller Takes, wie GET /projects es liefert. */
@@ -260,6 +335,22 @@ export async function editRender(
 export async function getEditJob(jobId: string): Promise<EditJob> {
   const res = await requestOrExplain(`${BASE}/edit/${jobId}`);
   return jsonOrThrow<EditJob>(res);
+}
+
+/** Kurzform eines Wizard-Reels, wie GET /edit sie liefert ("Meine Reels"). */
+export interface EditJobSummary {
+  job_id: string;
+  status: EditStatus;
+  error: string | null;
+  style: string | null;
+  created_at: string;
+  has_output: boolean;
+  outputs: EditOutput[] | null;
+}
+
+export async function listEditJobs(limit = 20): Promise<EditJobSummary[]> {
+  const res = await requestOrExplain(`${BASE}/edit?limit=${limit}`);
+  return jsonOrThrow<EditJobSummary[]>(res);
 }
 
 export function editDownloadUrl(jobId: string, platform?: string): string {

@@ -11,9 +11,10 @@ import {
   Users,
   DollarSign,
   Mic2,
-  Settings,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
+import type { User } from "../api";
 
 interface NavItem {
   label: string;
@@ -83,7 +84,14 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-export default function Sidebar() {
+/** Initialen aus dem Anzeigenamen (max. 2 Woerter), fuer den Avatar. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  const letters = parts.map((p) => p[0]).join("");
+  return (letters || "?").toUpperCase();
+}
+
+export default function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }) {
   return (
     <aside className="w-64 shrink-0 h-screen sticky top-0 bg-ink-900 border-r border-ink-700 flex flex-col">
       {/* Logo */}
@@ -125,12 +133,17 @@ export default function Sidebar() {
 
       {/* User */}
       <div className="flex items-center gap-3 px-4 py-4 border-t border-ink-700">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">YngLyric</p>
-          <p className="text-xs text-muted">Free Plan</p>
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0 flex items-center justify-center text-xs font-bold text-white">
+          {initials(user.display_name)}
         </div>
-        <Settings size={18} className="text-muted hover:text-white cursor-pointer" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{user.display_name}</p>
+          <p className="text-xs text-muted">{user.is_admin ? "Admin" : "Free Plan"}</p>
+        </div>
+        <button onClick={onLogout} title="Abmelden"
+          className="text-muted hover:text-white cursor-pointer p-1 -mr-1">
+          <LogOut size={18} />
+        </button>
       </div>
     </aside>
   );
