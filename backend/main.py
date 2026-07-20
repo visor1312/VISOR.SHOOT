@@ -18,7 +18,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend import db, storage
+from backend import auth, db, storage
 from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.hook_detect import detect_hook
@@ -42,15 +42,19 @@ AUTO_SUBTITLE_MODEL_BEST = "large-v3"
 
 app = FastAPI(title="HOOKCUT")
 
-# Fuer die lokale Entwicklung: das React-Dashboard (web/, Vite auf Port 5173)
-# darf das Backend direkt aufrufen. Im Dev-Server laeuft ohnehin ein /api-Proxy
-# (web/vite.config.ts), CORS ist die Absicherung fuer direkte Aufrufe.
+# Das React-Dashboard (web/, Vite auf Port 5173) spricht das Backend ueber den
+# /api-Proxy an (same-origin, web/vite.config.ts). CORS deckt nur direkte
+# Aufrufe vom Dev-Server ab - seit dem Login-System mit Session-Cookies darf
+# hier KEIN Wildcard mehr stehen (Credentials + "*" ist per Spec verboten).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 
 @app.on_event("startup")
