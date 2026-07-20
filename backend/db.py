@@ -5,6 +5,7 @@ Bewusst ohne ORM - der Schema-Umfang rechtfertigt das nicht.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -12,7 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "projects" / "state.db"
+# HOOKCUT_DB uebersteuert den DB-Pfad (wird beim Import gelesen). Genutzt von
+# den Tests (tests/conftest.py), damit API-Tests NIE in die echte state.db
+# schreiben - sonst wuerde z.B. der erste Test-User die Altdaten uebernehmen.
+DEFAULT_DB_PATH = Path(
+    os.environ.get("HOOKCUT_DB")
+    or Path(__file__).resolve().parent.parent / "projects" / "state.db"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (

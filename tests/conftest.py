@@ -1,13 +1,22 @@
 """Gemeinsame Fixtures: TestClient + eingeloggte Clients fuers Benutzer-System.
 
-Die API-Tests laufen (bestehendes Muster) gegen die echte projects/state.db -
-deshalb bekommt jeder Test-User eine einmalige E-Mail. Der httpx-Cookie-Jar
-des TestClient haelt die Session ueber Requests hinweg.
+WICHTIG: HOOKCUT_DB wird HIER gesetzt, BEVOR irgendein backend-Modul
+importiert wird - alle API-Tests laufen damit gegen eine Wegwerf-DB statt
+gegen die echte projects/state.db. (Sonst wuerde z.B. der erste Test-User
+per Backfill die Altdaten des Betreibers uebernehmen.) Einmalige E-Mails
+pro Test-User, weil die Wegwerf-DB pro pytest-Lauf geteilt wird. Der
+httpx-Cookie-Jar des TestClient haelt die Session ueber Requests hinweg.
 """
 from __future__ import annotations
 
+import os
 import secrets
+import tempfile
 import uuid
+from pathlib import Path
+
+os.environ.setdefault(
+    "HOOKCUT_DB", str(Path(tempfile.mkdtemp(prefix="hookcut-tests-")) / "state.db"))
 
 import pytest
 from fastapi.testclient import TestClient
