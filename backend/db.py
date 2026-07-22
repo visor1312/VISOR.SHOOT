@@ -421,6 +421,12 @@ def set_user_password_hash(user_id: str, password_hash: str,
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
 
 
+def set_user_display_name(user_id: str, display_name: str,
+                          db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("UPDATE users SET display_name = ? WHERE id = ?", (display_name, user_id))
+
+
 def claim_orphan_rows(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
     """Schreibt alle besitzerlosen Altdaten (user_id NULL) dem Konto zu.
     Wird genau einmal benutzt: bei der Registrierung des ERSTEN Kontos."""

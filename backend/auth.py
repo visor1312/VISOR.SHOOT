@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import bcrypt
-from fastapi import APIRouter, Cookie, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from backend import db
@@ -202,6 +202,13 @@ def get_current_user(hookcut_session: str | None = Cookie(default=None)) -> dict
     return user
 
 
+def get_admin_user(user: dict = Depends(get_current_user)) -> dict:
+    """FastAPI-Dependency: nur fuer Admin-Konten (sonst 403)."""
+    if not user["is_admin"]:
+        raise HTTPException(403, "Nur fuer Admins")
+    return user
+
+
 def _set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         key=SESSION_COOKIE, value=token,
@@ -259,3 +266,74 @@ def auth_logout(response: Response, hookcut_session: str | None = Cookie(default
 @router.get("/me")
 def auth_me(hookcut_session: str | None = Cookie(default=None)):
     return public_user(get_current_user(hookcut_session))
+
+
+class UpdateMeBody(BaseModel):
+    display_name: str
+
+
+@router.patch("/me")
+def auth_update_me(body: UpdateMeBody, user: dict = Depends(get_current_user)):
+    name = body.display_name.strip()
+    if not name:
+        raise HTTPException(422, "Bitte einen Anzeigenamen angeben.")
+    db.set_user_display_name(user["id"], name)
+    return public_user(db.get_user_by_id(user["id"]))
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+def auth_change_password(body: ChangePasswordBody, response: Response,
+                         user: dict = Depends(get_current_user)):
+    # Volle User-Row (mit Hash) laden - die Dependency liefert nur die
+    # oeffentlichen Felder ueber get_user_for_token -> get_user_by_id, das
+    # aber die ganze Row zurueckgibt; zur Sicherheit frisch holen.
+    full = db.get_user_by_id(user["id"])
+    if not full or not verify_password(body.current_password, full["password_hash"]):
+        raise HTTPException(401, "Das aktuelle Passwort ist falsch.")
+    pw_error = validate_password(body.new_password)
+    if pw_error:
+        raise HTTPException(422, pw_error)
+    db.set_user_password_hash(user["id"], hash_password(body.new_password))
+    # Alle Sitzungen abmelden (auch andere Geraete), dann fuer den aktuellen
+    # Browser eine frische Session ausstellen - man bleibt hier eingeloggt.
+    db.delete_sessions_for_user(user["id"])
+    _set_session_cookie(response, create_session(user["id"]))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin-Routen (nur fuer Admin-Konten): Einladungen & Nutzerverwaltung
+
+admin_router = APIRouter(prefix="/admin")
+
+
+def _public_invite(inv: dict) -> dict:
+    return {"code": inv["code"], "created_at": inv["created_at"],
+            "used_by_email": inv.get("used_by_email"), "used": inv["used_by"] is not None}
+
+
+@admin_router.get("/invites")
+def admin_list_invites(_: dict = Depends(get_admin_user)):
+    return [_public_invite(i) for i in db.list_invite_codes()]
+
+
+@admin_router.post("/invites")
+def admin_create_invite(admin: dict = Depends(get_admin_user)):
+    code = db.create_invite_code(secrets.token_urlsafe(9), created_by=admin["id"])
+    inv = db.get_invite_code(code)
+    return _public_invite({**inv, "used_by_email": None})
+
+
+@admin_router.get("/users")
+def admin_list_users(_: dict = Depends(get_admin_user)):
+    # Niemals den password_hash ausliefern.
+    return [
+        {"id": u["id"], "email": u["email"], "display_name": u["display_name"],
+         "is_admin": bool(u["is_admin"]), "created_at": u["created_at"]}
+        for u in db.list_users()
+    ]
