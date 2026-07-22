@@ -19,7 +19,6 @@ Design (bewusst online-tauglich, laeuft aber komplett lokal):
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -28,7 +27,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from backend import db
+from backend import config, db
 
 SESSION_COOKIE = "hookcut_session"
 SESSION_TTL = timedelta(days=30)
@@ -53,7 +52,7 @@ def _parse_iso(s: str) -> datetime:
 
 
 def _secure_cookies() -> bool:
-    return os.environ.get("HOOKCUT_SECURE_COOKIES", "0").lower() in ("1", "true", "yes", "on")
+    return config.SECURE_COOKIES
 
 
 def normalize_email(email: str) -> str:

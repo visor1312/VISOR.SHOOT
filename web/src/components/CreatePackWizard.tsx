@@ -152,7 +152,7 @@ export default function CreatePackWizard({
           <button disabled={!video || !song || busy} onClick={submit}
             className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-ink-950 font-semibold py-3 rounded-xl transition-colors">
             {busy && <Loader2 size={18} className="animate-spin" />}
-            {planned} Videos erzeugen
+            Bis zu {planned} Videos erzeugen
           </button>
         </div>
       </div>

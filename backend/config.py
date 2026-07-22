@@ -31,7 +31,7 @@ CORS_ORIGINS: list[str] = _env_list(
 )
 
 # Secure-Flag am Session-Cookie: lokal aus (kein HTTPS), beim Hosting an.
-# (auth.py liest dieselbe Variable direkt - hier nur der Vollstaendigkeit halber.)
+# Einzige Quelle - auth._secure_cookies() liest diesen Wert.
 SECURE_COOKIES: bool = _env_bool("HOOKCUT_SECURE_COOKIES", False)
 
 # Rendert dieser Prozess selbst (lokale App, In-Process-Worker)? Beim Hosting

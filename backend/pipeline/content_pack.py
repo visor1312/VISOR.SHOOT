@@ -71,8 +71,9 @@ class PackItemSpec:
 def build_item_matrix(hook_count: int, style_keys: list[str],
                       platform_keys: list[str]) -> list[PackItemSpec]:
     """Kartesische Matrix Hook x Style x Format, auf MAX_PACK_ITEMS gedeckelt.
-    Reihenfolge: pro Hook alle Styles, pro Style alle Formate - so ist das
-    Paket auch bei Kuerzung noch abwechslungsreich (nicht 1 Hook x alles)."""
+    Reihenfolge ist hook-major (bester Hook zuerst, in ALLEN Styles/Formaten,
+    dann der naechste Hook): So enthaelt ein bei MAX_PACK_ITEMS gekuerztes Paket
+    die wichtigsten Hooks vollstaendig statt von jedem Hook nur Bruchstuecke."""
     specs: list[PackItemSpec] = []
     idx = 0
     for hook_index in range(max(1, hook_count)):
