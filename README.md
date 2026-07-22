@@ -37,8 +37,17 @@ lokal auf deinem Rechner.
    eingeben. **Das erste Konto wird automatisch Admin und übernimmt alle schon
    vorhandenen Projekte/Reels.**
 
-**Weitere Konten:** einfach je einen neuen Code mit `hookcut-einladung.bat`
-erzeugen und weitergeben.
+**Weitere Konten:** am bequemsten direkt in HOOKCUT unter **Einstellungen →
+Einladungscodes → „Neuen Code erzeugen"** (nur als Admin sichtbar). Alternativ
+weiterhin per `hookcut-einladung.bat`.
+
+**Die Oberfläche hat jetzt echte Seiten** (über die Sidebar, mit eigenen
+Adressen wie `/reels`, `/einstellungen`): Dashboard, Hook Generator, Meine
+fertigen Reels, Offene Projekte und Einstellungen. Unter **Einstellungen**
+lassen sich Anzeigename und Passwort ändern; als Admin zusätzlich
+Einladungscodes erzeugen und alle Nutzer sehen — dafür ist keine
+Kommandozeile mehr nötig. Bereiche, die noch nicht gebaut sind (Analytics,
+Datenbanken …), zeigen eine ehrliche „Demnächst"-Seite statt eines toten Links.
 
 **Passwort vergessen:** Solange HOOKCUT nur lokal läuft, gibt es bewusst
 keinen „Passwort vergessen"-Link (dafür bräuchte es einen E-Mail-Versand, der

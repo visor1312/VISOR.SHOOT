@@ -28,8 +28,14 @@ einfach halten, `.bat`-Dateien zum Doppelklicken bereitstellen.
 
 ```
 web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
-          → CreateReelWizard.tsx = Haupt-Flow
+          → CreateReelWizard.tsx = Haupt-Flow (Overlay, aus AppShell geoeffnet)
           → AuthScreen.tsx = Login/Registrierung, App.tsx = Auth-Weiche
+          → react-router: main.tsx BrowserRouter, App.tsx rendert eingeloggt
+            die Routen in components/AppShell.tsx (Sidebar + <Outlet/>,
+            Kontext in components/app-context.ts: user/setUser/openWizard).
+            Seiten in pages/: DashboardPage, HookPage, ReelsPage, ProjektePage,
+            EinstellungenPage (Konto + Admin), ComingSoonPage. Neue Seite ⇒
+            Route in App.tsx + NavLink in Sidebar.tsx.
 backend/  Python FastAPI (Port 8000) + auth.py (Benutzer-System) + pipeline/-Module:
           sync_offset (Onset-Korrelation), hook_detect, transcribe
           (faster-whisper large-v3 auf Demucs-Vocal-Stem), lyrics_align
@@ -77,6 +83,12 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   nehmen user_id; `update_*`-Allow-Lists enthalten user_id NICHT (unveränderlich).
 - **backend/admin.py** (+ hookcut-einladung.bat / hookcut-passwort-reset.bat):
   create-invite / list-invites / list-users / reset-password.
+- **Konto/Admin im Browser** (Einstellungen-Seite): `PATCH /auth/me`
+  (Anzeigename), `POST /auth/change-password` (prueft altes PW, rotiert ALLE
+  Sessions, stellt fuer den aktuellen Browser eine frische aus), sowie der
+  `admin_router` (Dependency `get_admin_user`, 403 fuer Nicht-Admins):
+  `GET/POST /admin/invites`, `GET /admin/users` (nie mit password_hash).
+  Damit ist die `.bat` fuer den Alltag optional (bleibt Notfallweg).
 - **Tests:** HOOKCUT_DB-Env zeigt auf eine Wegwerf-DB (conftest.py setzt sie
   VOR dem ersten backend-Import) — API-Tests schreiben NIE in die echte
   state.db. Ohne das würde der erste Test-User per Backfill die Altdaten erben.
@@ -134,8 +146,10 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 
 ## Zustand / Qualität
 
-- 80+ pytest-Tests grün (tests/). Web-Build grün. Sync + Hook mit echten
-  Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
+- 127 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
+  echten Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
+  Auth- und Navigations-Flows zusätzlich per Playwright im echten Browser
+  (gegen den Vite-Proxy) verifiziert.
 - Beat-Effekte (beat_pulse.py + audioPulse in freecut_workspace.py) sind
   implementiert und getestet, aber noch NICHT vom Nutzer im echten Render
   bestätigt (Sandbox kann kein Chrome-Rendern).
