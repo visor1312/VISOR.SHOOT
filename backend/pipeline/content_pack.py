@@ -60,6 +60,34 @@ def select_hook_windows(offset_sec: float, video_dur: float, best, alternatives,
     return windows
 
 
+# --- Spotify Canvas -------------------------------------------------------
+# Canvas ist ein 3-8s-9:16-Loop. Wir schneiden ein duration_sec-Fenster am Hook
+# aus, das vollstaendig ins gefilmte Video passt.
+CANVAS_MIN_SEC = 3.0
+CANVAS_MAX_SEC = 8.0
+
+
+def clamp_canvas_duration(sec: float) -> float:
+    return max(CANVAS_MIN_SEC, min(CANVAS_MAX_SEC, sec))
+
+
+def canvas_window(hook_start_sec: float, offset_sec: float, video_dur: float,
+                  duration_sec: float) -> HookWindow | None:
+    """Ein `duration_sec`-Fenster (in Song-Zeit) ab dem Hook, das ins gefilmte
+    Video passt. Song-Zeit -> Video-Zeit ist v = s - offset. Gibt None zurueck,
+    wenn nicht einmal CANVAS_MIN_SEC gefilmtes Material verfuegbar ist."""
+    dur = clamp_canvas_duration(duration_sec)
+    v_start = max(0.0, hook_start_sec - offset_sec)   # Startpunkt im Video (>=0)
+    if v_start + dur > video_dur:                      # ragt hinten raus -> nach vorn schieben
+        v_start = max(0.0, video_dur - dur)
+    avail = video_dur - v_start
+    if avail < CANVAS_MIN_SEC:                          # Video zu kurz fuer einen Canvas
+        return None
+    dur = min(dur, avail)
+    song_start = v_start + offset_sec
+    return HookWindow(song_start, song_start + dur)
+
+
 @dataclass
 class PackItemSpec:
     idx: int

@@ -94,3 +94,21 @@ def pack_song_path(pack_id: str, suffix: str) -> Path:
 
 def pack_item_output_path(pack_id: str, item_idx: int) -> Path:
     return pack_dir(pack_id) / f"item_{item_idx}.mp4"
+
+
+# --- Spotify Canvas -------------------------------------------------------
+
+def canvas_dir(job_id: str) -> Path:
+    return PROJECTS_ROOT / "canvas" / job_id
+
+
+def canvas_video_path(job_id: str, suffix: str) -> Path:
+    return canvas_dir(job_id) / f"video{suffix}"
+
+
+def canvas_song_path(job_id: str, suffix: str) -> Path:
+    return canvas_dir(job_id) / f"song{suffix}"
+
+
+def canvas_output_path(job_id: str) -> Path:
+    return canvas_dir(job_id) / "canvas.mp4"

@@ -847,3 +847,110 @@ def render_result(item_id: str, video: UploadFile = File(...),
         any_ok = any(i["status"] == "done" for i in items)
         db.update_content_pack(pack["id"], status="done" if any_ok else "error")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Spotify Canvas: kurzer (3-8s) stummer 9:16-Loop, der auf Spotify das Cover
+# ersetzt (Tracks mit Canvas: bis zu 145% mehr Streams). Ein Canvas = ein
+# gestylter Video-Ausschnitt am Hook, OHNE Ton (Spotify spielt den Song selbst).
+
+def _run_canvas_job(job_id: str, use_hook: bool) -> None:
+    from backend.pipeline.content_pack import canvas_window
+    from backend.pipeline.freecut_workspace import build_workspace
+    from backend.pipeline.render_pipeline import run_headless_render
+
+    job = db.get_canvas_job(job_id)
+    if not job:
+        return
+    try:
+        db.update_canvas_job(job_id, status="analyzing")
+        audio = storage.canvas_dir(job_id) / "video_audio.wav"
+        extract_audio(job["video_path"], audio)
+        offset = compute_offset(job["song_path"], audio)
+        offset_sec = offset.offset_ms / 1000.0
+        video_dur = _probe_duration_sec(job["video_path"])
+
+        # Startpunkt im Song: bester Hook (wenn gewuenscht) sonst Videoanfang.
+        if use_hook:
+            hook_start = detect_hook(job["song_path"]).best.start_sec
+        else:
+            hook_start = offset_sec  # Song-Zeit am Video-Anfang
+        win = canvas_window(hook_start, offset_sec, video_dur, job["duration_sec"])
+        if win is None:
+            db.update_canvas_job(
+                job_id, status="error",
+                error="Das Video ist zu kurz fuer einen Canvas (mindestens 3 Sekunden noetig).")
+            return
+
+        db.update_canvas_job(job_id, status="rendering")
+        ws = storage.canvas_dir(job_id) / "ws"
+        info = build_workspace(
+            ws, job["video_path"], job["song_path"], offset_ms=offset.offset_ms,
+            hook_start_sec=win.start_sec, hook_end_sec=win.end_sec,
+            style_key=job["style"] or "clean", width=1080, height=1920,
+        )
+        editor_dir = Path(__file__).resolve().parent.parent / "editor"
+        rendered = storage.canvas_dir(job_id) / "_rendered.mp4"
+        run_headless_render(editor_dir, info["render_args"], rendered)
+
+        # Ton entfernen: ein Canvas ist stumm (Spotify spielt den Song). Isoliert
+        # per ffmpeg, ohne die getestete build_workspace anzufassen.
+        out = storage.canvas_output_path(job_id)
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(rendered), "-c", "copy", "-an", str(out)],
+            capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Ton-Entfernen fehlgeschlagen: {proc.stderr[-300:]}")
+        rendered.unlink(missing_ok=True)
+        db.update_canvas_job(job_id, status="done", output_path=str(out), error=None)
+    except Exception as e:
+        db.update_canvas_job(job_id, status="error", error=str(e))
+
+
+@app.post("/canvas")
+def create_canvas(background_tasks: BackgroundTasks, video: UploadFile = File(...),
+                  song: UploadFile = File(...), style: str = Form("clean"),
+                  duration_sec: float = Form(6.0), use_hook: str = Form("true"),
+                  user: dict = Depends(auth.get_current_user)):
+    from backend.pipeline.content_pack import clamp_canvas_duration
+    from backend.pipeline.styles import STYLES
+
+    style_key = style if style in STYLES else "clean"
+    dur = clamp_canvas_duration(duration_sec)
+    want_hook = use_hook.lower() in ("true", "1", "yes", "on")
+
+    v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
+    s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
+    job_id = db.create_canvas_job(video_path="", song_path="", style=style_key,
+                                  duration_sec=dur, user_id=user["id"])
+    v_dest = _save_upload(video, storage.canvas_video_path(job_id, v_suffix))
+    s_dest = _save_upload(song, storage.canvas_song_path(job_id, s_suffix))
+    db.update_canvas_job(job_id, video_path=str(v_dest), song_path=str(s_dest),
+                         status="analyzing")
+    background_tasks.add_task(_run_canvas_job, job_id, want_hook)
+    return {"canvas_id": job_id, "status": "analyzing", "duration_sec": dur}
+
+
+def _canvas_public(job: dict) -> dict:
+    return {"canvas_id": job["id"], "status": job["status"], "error": job["error"],
+            "style": job["style"], "duration_sec": job["duration_sec"],
+            "created_at": job["created_at"], "has_output": bool(job["output_path"])}
+
+
+@app.get("/canvas")
+def list_canvas(limit: int = 50, user: dict = Depends(auth.get_current_user)):
+    return [_canvas_public(j) for j in db.list_canvas_jobs(user["id"], limit=limit)]
+
+
+@app.get("/canvas/{job_id}")
+def get_canvas(job_id: str, user: dict = Depends(auth.get_current_user)):
+    return _canvas_public(_own(db.get_canvas_job(job_id), user))
+
+
+@app.get("/canvas/{job_id}/download")
+def download_canvas(job_id: str, user: dict = Depends(auth.get_current_user)):
+    job = _own(db.get_canvas_job(job_id), user)
+    if job["status"] != "done" or not job["output_path"]:
+        raise HTTPException(404, "Canvas ist noch nicht fertig")
+    return FileResponse(job["output_path"], media_type="video/mp4",
+                        filename=f"canvas_{job_id[:8]}.mp4")

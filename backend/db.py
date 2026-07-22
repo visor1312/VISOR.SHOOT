@@ -151,6 +151,21 @@ CREATE TABLE IF NOT EXISTS pack_items (
     error TEXT,
     created_at TEXT NOT NULL
 );
+
+-- Spotify Canvas: kurzer (3-8s) stummer 9:16-Loop, der auf Spotify das Cover
+-- ersetzt. Ein Canvas = ein Video-Ausschnitt am Hook, gestylt, ohne Ton.
+CREATE TABLE IF NOT EXISTS canvas_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id),
+    video_path TEXT NOT NULL,
+    song_path TEXT NOT NULL,
+    style TEXT,
+    duration_sec REAL NOT NULL DEFAULT 6,
+    status TEXT NOT NULL DEFAULT 'pending',
+    output_path TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -654,5 +669,51 @@ def list_pack_items(pack_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list
     with _connect(db_path) as conn:
         rows = conn.execute(
             "SELECT * FROM pack_items WHERE pack_id = ? ORDER BY idx", (pack_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Spotify Canvas (kurzer stummer 9:16-Loop)
+
+
+def create_canvas_job(video_path: str, song_path: str, style: str | None,
+                      duration_sec: float, user_id: str | None = None,
+                      db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    job_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO canvas_jobs (id, video_path, song_path, style, duration_sec, "
+            "status, user_id, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (job_id, video_path, song_path, style, duration_sec, user_id, _now()),
+        )
+    return job_id
+
+
+def update_canvas_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
+    if not fields:
+        return
+    allowed = {"video_path", "song_path", "style", "status", "output_path", "error"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"Unbekannte Felder: {unknown}")
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _connect(db_path) as conn:
+        conn.execute(f"UPDATE canvas_jobs SET {set_clause} WHERE id = ?",
+                     (*fields.values(), job_id))
+
+
+def get_canvas_job(job_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM canvas_jobs WHERE id = ?", (job_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_canvas_jobs(user_id: str, limit: int = 50,
+                     db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM canvas_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]
