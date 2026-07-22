@@ -119,6 +119,38 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     locked_until TEXT,
     last_fail_at TEXT
 );
+
+-- Wochen-Content / Content-Packs: EIN Song/Video -> viele fertige Posts
+-- (Matrix aus Hook-Varianten x Styles x Formaten). Der Pack haelt die
+-- gemeinsame Quelle + Analyse (Sync/Hook), jedes pack_item ist ein einzelner
+-- Render-Auftrag. Wie alles per user_id gescoped.
+CREATE TABLE IF NOT EXISTS content_packs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id),
+    video_path TEXT NOT NULL,
+    song_path TEXT NOT NULL,
+    with_subtitles INTEGER NOT NULL DEFAULT 0,
+    lyrics TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    offset_ms REAL,
+    confidence REAL,
+    hooks_json TEXT,          -- Liste der gewaehlten Hook-Fenster [{start,end}]
+    error TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pack_items (
+    id TEXT PRIMARY KEY,
+    pack_id TEXT NOT NULL REFERENCES content_packs(id),
+    idx INTEGER NOT NULL,     -- Reihenfolge im Pack (0..n-1)
+    hook_index INTEGER NOT NULL,
+    style_key TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    output_path TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -530,3 +562,90 @@ def record_login_failure(email: str, locked_until: str | None,
 def reset_login_failures(email: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
     with _connect(db_path) as conn:
         conn.execute("DELETE FROM login_attempts WHERE email = ?", (email,))
+
+
+# ---------------------------------------------------------------------------
+# Wochen-Content / Content-Packs (Matrix aus Hook x Style x Format)
+
+
+def create_content_pack(video_path: str, song_path: str, with_subtitles: bool,
+                        lyrics: str | None = None, user_id: str | None = None,
+                        db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    pack_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO content_packs (id, video_path, song_path, with_subtitles, "
+            "lyrics, status, user_id, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (pack_id, video_path, song_path, 1 if with_subtitles else 0,
+             lyrics or None, user_id, _now()),
+        )
+    return pack_id
+
+
+def update_content_pack(pack_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
+    if not fields:
+        return
+    allowed = {"video_path", "song_path", "status", "offset_ms", "confidence",
+               "hooks_json", "error"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"Unbekannte Felder: {unknown}")
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _connect(db_path) as conn:
+        conn.execute(f"UPDATE content_packs SET {set_clause} WHERE id = ?",
+                     (*fields.values(), pack_id))
+
+
+def get_content_pack(pack_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM content_packs WHERE id = ?", (pack_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_content_packs(user_id: str, limit: int = 50,
+                       db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM content_packs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def create_pack_item(pack_id: str, idx: int, hook_index: int, style_key: str,
+                     platform: str, db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    item_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO pack_items (id, pack_id, idx, hook_index, style_key, platform, "
+            "status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
+            (item_id, pack_id, idx, hook_index, style_key, platform, _now()),
+        )
+    return item_id
+
+
+def update_pack_item(item_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields: Any) -> None:
+    if not fields:
+        return
+    allowed = {"status", "output_path", "error"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"Unbekannte Felder: {unknown}")
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _connect(db_path) as conn:
+        conn.execute(f"UPDATE pack_items SET {set_clause} WHERE id = ?",
+                     (*fields.values(), item_id))
+
+
+def get_pack_item(item_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM pack_items WHERE id = ?", (item_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_pack_items(pack_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM pack_items WHERE pack_id = ? ORDER BY idx", (pack_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]

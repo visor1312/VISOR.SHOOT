@@ -604,3 +604,163 @@ def download_take(project_id: str, take_id: str, user: dict = Depends(auth.get_c
     if take["status"] != "done" or not take["output_path"]:
         raise HTTPException(409, "Take ist noch nicht fertig synchronisiert")
     return FileResponse(take["output_path"], media_type="video/mp4", filename=Path(take["output_path"]).name)
+
+
+# ---------------------------------------------------------------------------
+# Wochen-Content / Content-Packs: EIN Song/Video -> viele fertige Posts.
+# Analyse (Sync/Hook/Untertitel) EINMAL, dann Matrix aus Hook x Style x Format.
+
+def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
+                      platform_keys: list[str], beat_effects: bool) -> None:
+    from backend.pipeline.content_pack import build_item_matrix, select_hook_windows
+    from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
+    from backend.pipeline.platforms import get_platform
+    from backend.pipeline.render_pipeline import run_headless_render
+
+    pack = db.get_content_pack(pack_id)
+    if not pack:
+        return
+    try:
+        # 1) Analyse einmal: Sync-Versatz + Hook-Kandidaten.
+        db.update_content_pack(pack_id, status="analyzing")
+        audio = storage.pack_dir(pack_id) / "video_audio.wav"
+        extract_audio(pack["video_path"], audio)
+        offset = compute_offset(pack["song_path"], audio)
+        video_dur = _probe_duration_sec(pack["video_path"])
+        hook = detect_hook(pack["song_path"])
+        windows = select_hook_windows(offset.offset_ms / 1000.0, video_dur,
+                                      hook.best, hook.alternatives, hook_count)
+        if not windows:
+            db.update_content_pack(
+                pack_id, status="error",
+                error="Kein Hook passt vollstaendig ins gefilmte Video. "
+                      "Bitte einen laengeren Take filmen oder den Hook-Bereich mitfilmen.")
+            return
+        db.update_content_pack(
+            pack_id, offset_ms=offset.offset_ms, confidence=offset.confidence,
+            hooks_json=json.dumps([{"start_sec": w.start_sec, "end_sec": w.end_sec}
+                                   for w in windows]))
+
+        # 2) Optional Untertitel (einmal fuer alle Items).
+        cues = None
+        if pack["with_subtitles"]:
+            db.update_content_pack(pack_id, status="transcribing")
+            vocals = separate_vocals(pack["song_path"])
+            transcribe_src = str(vocals) if vocals else pack["song_path"]
+            words = transcribe(transcribe_src, language="de",
+                               model_size=AUTO_SUBTITLE_MODEL_BEST,
+                               initial_prompt=pack["lyrics"] or None)
+            if pack["lyrics"]:
+                from backend.pipeline.lyrics_align import align_lyrics_to_words
+                aligned = align_lyrics_to_words(pack["lyrics"], words)
+                if aligned:
+                    words = aligned
+            lines = group_words_into_lines(words)
+            cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
+
+        # 3) Matrix anlegen (Hook x Style x Format), dann Item fuer Item rendern.
+        specs = build_item_matrix(len(windows), style_keys, platform_keys)
+        item_ids: list[str] = [
+            db.create_pack_item(pack_id, s.idx, s.hook_index, s.style_key, s.platform)
+            for s in specs
+        ]
+        db.update_content_pack(pack_id, status="rendering")
+        editor_dir = Path(__file__).resolve().parent.parent / "editor"
+        any_ok = False
+        for spec, item_id in zip(specs, item_ids):
+            try:
+                db.update_pack_item(item_id, status="rendering")
+                win = windows[spec.hook_index]
+                p = get_platform(spec.platform)
+                ws = storage.pack_dir(pack_id) / "ws" / str(spec.idx)
+                info = build_workspace(
+                    ws, pack["video_path"], pack["song_path"],
+                    offset_ms=pack["offset_ms"] or offset.offset_ms,
+                    hook_start_sec=win.start_sec, hook_end_sec=win.end_sec,
+                    style_key=spec.style_key, subtitle_cues=cues,
+                    beat_effects=beat_effects, width=p.width, height=p.height,
+                )
+                out = storage.pack_item_output_path(pack_id, spec.idx)
+                run_headless_render(editor_dir, info["render_args"], out)
+                db.update_pack_item(item_id, status="done", output_path=str(out), error=None)
+                any_ok = True
+            except Exception as e:  # ein kaputtes Item stoppt nicht das ganze Paket
+                db.update_pack_item(item_id, status="error", error=str(e))
+        db.update_content_pack(pack_id, status="done" if any_ok else "error",
+                               error=None if any_ok else "Kein Item konnte gerendert werden.")
+    except Exception as e:
+        db.update_content_pack(pack_id, status="error", error=str(e))
+
+
+@app.post("/packs")
+def create_pack(background_tasks: BackgroundTasks, video: UploadFile = File(...),
+                song: UploadFile = File(...), styles: str = Form("clean"),
+                hook_count: int = Form(2), platforms: str = Form("reel"),
+                beat_effects: str = Form("false"), with_subtitles: str = Form("false"),
+                lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
+    from backend.pipeline.content_pack import MAX_PACK_ITEMS
+    from backend.pipeline.platforms import parse_platform_keys
+    from backend.pipeline.styles import STYLES
+
+    style_keys = [s for s in (x.strip() for x in styles.split(",")) if s in STYLES]
+    if not style_keys:
+        style_keys = ["clean"]
+    platform_objs = parse_platform_keys(platforms)
+    platform_keys = [p.key for p in platform_objs]
+    hook_count = max(1, min(6, hook_count))
+    want_subs = with_subtitles.lower() in ("true", "1", "yes", "on")
+    want_beat = beat_effects.lower() in ("true", "1", "yes", "on")
+
+    # Frueh spiegeln, was die Matrix erzeugt (deckelt auf MAX_PACK_ITEMS).
+    planned = min(MAX_PACK_ITEMS, hook_count * len(style_keys) * len(platform_keys))
+
+    v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
+    s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
+    pack_id = db.create_content_pack(video_path="", song_path="", with_subtitles=want_subs,
+                                     lyrics=lyrics.strip() or None, user_id=user["id"])
+    v_dest = _save_upload(video, storage.pack_video_path(pack_id, v_suffix))
+    s_dest = _save_upload(song, storage.pack_song_path(pack_id, s_suffix))
+    db.update_content_pack(pack_id, video_path=str(v_dest), song_path=str(s_dest),
+                           status="analyzing")
+    background_tasks.add_task(_run_content_pack, pack_id, style_keys, hook_count,
+                             platform_keys, want_beat)
+    return {"pack_id": pack_id, "status": "analyzing", "planned_items": planned}
+
+
+def _pack_public(pack: dict, with_items: bool = False) -> dict:
+    items = db.list_pack_items(pack["id"])
+    done = sum(1 for i in items if i["status"] == "done")
+    out = {
+        "pack_id": pack["id"], "status": pack["status"], "error": pack["error"],
+        "with_subtitles": bool(pack["with_subtitles"]), "created_at": pack["created_at"],
+        "item_count": len(items), "done_count": done,
+    }
+    if with_items:
+        out["items"] = [
+            {"idx": i["idx"], "hook_index": i["hook_index"], "style": i["style_key"],
+             "platform": i["platform"], "status": i["status"], "error": i["error"],
+             "ready": i["status"] == "done" and bool(i["output_path"])}
+            for i in items
+        ]
+    return out
+
+
+@app.get("/packs")
+def list_packs(limit: int = 50, user: dict = Depends(auth.get_current_user)):
+    return [_pack_public(p) for p in db.list_content_packs(user["id"], limit=limit)]
+
+
+@app.get("/packs/{pack_id}")
+def get_pack(pack_id: str, user: dict = Depends(auth.get_current_user)):
+    pack = _own(db.get_content_pack(pack_id), user)
+    return _pack_public(pack, with_items=True)
+
+
+@app.get("/packs/{pack_id}/items/{idx}/download")
+def download_pack_item(pack_id: str, idx: int, user: dict = Depends(auth.get_current_user)):
+    pack = _own(db.get_content_pack(pack_id), user)
+    item = next((i for i in db.list_pack_items(pack["id"]) if i["idx"] == idx), None)
+    if not item or item["status"] != "done" or not item["output_path"]:
+        raise HTTPException(404, "Dieses Item ist noch nicht fertig")
+    return FileResponse(item["output_path"], media_type="video/mp4",
+                        filename=f"hookcut_{pack_id[:8]}_{idx}.mp4")

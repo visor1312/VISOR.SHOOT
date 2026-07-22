@@ -76,3 +76,21 @@ def edit_output_path(job_id: str, platform_key: str | None = None) -> Path:
     Mit platform_key: eine Datei pro Zielformat (final_reel.mp4, ...)."""
     name = "final.mp4" if platform_key is None else f"final_{platform_key}.mp4"
     return edit_job_dir(job_id) / name
+
+
+# --- Wochen-Content / Content-Packs ---------------------------------------
+
+def pack_dir(pack_id: str) -> Path:
+    return PROJECTS_ROOT / "packs" / pack_id
+
+
+def pack_video_path(pack_id: str, suffix: str) -> Path:
+    return pack_dir(pack_id) / f"video{suffix}"
+
+
+def pack_song_path(pack_id: str, suffix: str) -> Path:
+    return pack_dir(pack_id) / f"song{suffix}"
+
+
+def pack_item_output_path(pack_id: str, item_idx: int) -> Path:
+    return pack_dir(pack_id) / f"item_{item_idx}.mp4"
