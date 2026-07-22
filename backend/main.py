@@ -18,7 +18,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend import auth, db, storage
+from backend import auth, config, db, storage
 from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.hook_detect import detect_hook
@@ -40,15 +40,26 @@ AUTO_SUBTITLE_MODEL = "small"
 # einmaliger Download) und langsam, aber genau, was bei Untertiteln zaehlt.
 AUTO_SUBTITLE_MODEL_BEST = "large-v3"
 
-app = FastAPI(title="HOOKCUT")
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    db.init_db()
+    yield
+
+
+app = FastAPI(title="HOOKCUT", lifespan=_lifespan)
 
 # Das React-Dashboard (web/, Vite auf Port 5173) spricht das Backend ueber den
 # /api-Proxy an (same-origin, web/vite.config.ts). CORS deckt nur direkte
 # Aufrufe vom Dev-Server ab - seit dem Login-System mit Session-Cookies darf
 # hier KEIN Wildcard mehr stehen (Credentials + "*" ist per Spec verboten).
+# Die erlaubten Herkuenfte kommen aus config (Env), damit beim Hosting nur eine
+# Umgebungsvariable gesetzt werden muss (HOOKCUT_CORS_ORIGINS).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,9 +69,10 @@ app.include_router(auth.router)
 app.include_router(auth.admin_router)
 
 
-@app.on_event("startup")
-def _on_startup() -> None:
-    db.init_db()
+@app.get("/health")
+def health():
+    """Einfacher Health-Check (fuer Hosting/Monitoring)."""
+    return {"status": "ok"}
 
 
 def _save_upload(upload: UploadFile, dest: Path) -> Path:
@@ -658,12 +670,20 @@ def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
             lines = group_words_into_lines(words)
             cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
 
-        # 3) Matrix anlegen (Hook x Style x Format), dann Item fuer Item rendern.
+        # 3) Matrix anlegen (Hook x Style x Format).
         specs = build_item_matrix(len(windows), style_keys, platform_keys)
         item_ids: list[str] = [
             db.create_pack_item(pack_id, s.idx, s.hook_index, s.style_key, s.platform)
             for s in specs
         ]
+
+        # Hybrid-Weiche: lokal (Default) rendert dieser Prozess die Items selbst.
+        # Beim Hosting (HOOKCUT_LOCAL_RENDER=0) bleiben die Items 'pending' und
+        # ein lokaler Render-Agent zieht sie ueber den /render-Vertrag ab.
+        if not config.LOCAL_RENDER:
+            db.update_content_pack(pack_id, status="rendering")
+            return
+
         db.update_content_pack(pack_id, status="rendering")
         editor_dir = Path(__file__).resolve().parent.parent / "editor"
         any_ok = False
@@ -764,3 +784,66 @@ def download_pack_item(pack_id: str, idx: int, user: dict = Depends(auth.get_cur
         raise HTTPException(404, "Dieses Item ist noch nicht fertig")
     return FileResponse(item["output_path"], media_type="video/mp4",
                         filename=f"hookcut_{pack_id[:8]}_{idx}.mp4")
+
+
+# ---------------------------------------------------------------------------
+# Render-Job-Vertrag (Hybrid): im lokalen Betrieb rendert der In-Process-Worker
+# selbst. Beim Hosting (HOOKCUT_LOCAL_RENDER=0) bleiben die pack_items 'pending'
+# und ein lokaler Render-Agent zieht sie hierueber ab: pending -> claim ->
+# rendern -> result. So ist "Job anlegen" (Cloud) von "rendern" (lokal) getrennt.
+
+def _own_pack_item(item_id: str, user: dict) -> tuple[dict, dict]:
+    item = db.get_pack_item(item_id)
+    if not item:
+        raise HTTPException(404, "Nicht gefunden")
+    pack = db.get_content_pack(item["pack_id"])
+    if not pack or pack.get("user_id") != user["id"]:
+        raise HTTPException(404, "Nicht gefunden")
+    return pack, item
+
+
+def _pack_item_spec(pack: dict, item: dict) -> dict:
+    """Alles, was ein Render-Agent braucht, um dieses Item zu bauen."""
+    hooks = json.loads(pack["hooks_json"]) if pack["hooks_json"] else []
+    hook = hooks[item["hook_index"]] if item["hook_index"] < len(hooks) else None
+    return {
+        "item_id": item["id"], "pack_id": pack["id"], "idx": item["idx"],
+        "style": item["style_key"], "platform": item["platform"],
+        "offset_ms": pack["offset_ms"], "with_subtitles": bool(pack["with_subtitles"]),
+        "hook": hook,
+    }
+
+
+@app.get("/render/pending")
+def render_pending(user: dict = Depends(auth.get_current_user)):
+    """Offene Render-Auftraege des angemeldeten Nutzers (fuer den Render-Agenten)."""
+    out = []
+    for pack in db.list_content_packs(user["id"], limit=200):
+        for item in db.list_pack_items(pack["id"]):
+            if item["status"] == "pending":
+                out.append(_pack_item_spec(pack, item))
+    return out
+
+
+@app.post("/render/{item_id}/claim")
+def render_claim(item_id: str, user: dict = Depends(auth.get_current_user)):
+    pack, item = _own_pack_item(item_id, user)
+    if item["status"] != "pending":
+        raise HTTPException(409, f"Item ist nicht offen (Status: {item['status']})")
+    db.update_pack_item(item_id, status="rendering")
+    return _pack_item_spec(pack, item)
+
+
+@app.post("/render/{item_id}/result")
+def render_result(item_id: str, video: UploadFile = File(...),
+                  user: dict = Depends(auth.get_current_user)):
+    pack, item = _own_pack_item(item_id, user)
+    out = storage.pack_item_output_path(pack["id"], item["idx"])
+    _save_upload(video, out)
+    db.update_pack_item(item_id, status="done", output_path=str(out), error=None)
+    # Pack als fertig markieren, sobald kein Item mehr offen/rendert.
+    items = db.list_pack_items(pack["id"])
+    if all(i["status"] in ("done", "error") for i in items):
+        any_ok = any(i["status"] == "done" for i in items)
+        db.update_content_pack(pack["id"], status="done" if any_ok else "error")
+    return {"ok": True}

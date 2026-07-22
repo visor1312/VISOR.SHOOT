@@ -162,6 +162,13 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with _connect(db_path) as conn:
+        # WAL: bessere Nebenlaeufigkeit (Leser blockieren Schreiber nicht) -
+        # wichtig fuers Hosting mit mehreren gleichzeitigen Anfragen. Die
+        # Einstellung ist dauerhaft in der DB-Datei gespeichert.
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass  # z.B. read-only Dateisystem - dann bleibt es beim Default
         conn.executescript(SCHEMA)
         # Mini-Migration fuer bestehende DBs: CREATE IF NOT EXISTS ergaenzt
         # keine Spalten. ALTER TABLE wirft bei schon vorhandener Spalte einen
