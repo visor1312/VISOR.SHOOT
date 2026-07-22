@@ -1,3 +1,4 @@
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Upload,
@@ -11,6 +12,7 @@ import {
   Users,
   DollarSign,
   Mic2,
+  Settings,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -19,60 +21,56 @@ import type { User } from "../api";
 interface NavItem {
   label: string;
   icon: LucideIcon;
-  active?: boolean;
+  to: string;
   soon?: boolean;
 }
 
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Upload", icon: Upload },
-  { label: "Hook Generator", icon: Zap },
-  { label: "Meine fertigen Reels", icon: Music2 },
-  { label: "Offene Projekte", icon: FolderOpen },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Hook Generator", icon: Zap, to: "/hook" },
+  { label: "Meine fertigen Reels", icon: Music2, to: "/reels" },
+  { label: "Offene Projekte", icon: FolderOpen, to: "/projekte" },
 ];
 
 const analyticsNav: NavItem[] = [
-  { label: "Spotify Streaming Dashboard", icon: TrendingUp },
+  { label: "Spotify Streaming Dashboard", icon: TrendingUp, to: "/spotify", soon: true },
 ];
 
 const dbNav: NavItem[] = [
-  { label: "Type Beats Datenbank", icon: Disc3 },
-  { label: "Angefangene Tracks Datenbank", icon: Layers },
+  { label: "Type Beats Datenbank", icon: Disc3, to: "/type-beats", soon: true },
+  { label: "Angefangene Tracks Datenbank", icon: Layers, to: "/tracks", soon: true },
 ];
 
 const soonNav: NavItem[] = [
-  { label: "Analytics", icon: BarChart3, soon: true },
-  { label: "Collab Hub", icon: Users, soon: true },
-  { label: "Monetize", icon: DollarSign, soon: true },
+  { label: "Analytics", icon: BarChart3, to: "/analytics", soon: true },
+  { label: "Collab Hub", icon: Users, to: "/collab", soon: true },
+  { label: "Monetize", icon: DollarSign, to: "/monetize", soon: true },
 ];
 
 function NavRow({ item }: { item: NavItem }) {
   const Icon = item.icon;
-  if (item.soon) {
-    return (
-      <div className="flex items-center justify-between px-3 py-2 rounded-lg text-ink-600 cursor-default">
-        <span className="flex items-center gap-3 text-sm">
-          <Icon size={18} />
-          {item.label}
-        </span>
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      className={({ isActive }) =>
+        `flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+          isActive
+            ? "bg-brand-500/12 text-brand-400 font-medium"
+            : "text-muted hover:text-white hover:bg-ink-800"
+        }`
+      }
+    >
+      <span className="flex items-center gap-3">
+        <Icon size={18} />
+        {item.label}
+      </span>
+      {item.soon && (
         <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-ink-800 text-ink-600">
           Soon
         </span>
-      </div>
-    );
-  }
-  return (
-    <a
-      href="#"
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-        item.active
-          ? "bg-brand-500/12 text-brand-400 font-medium"
-          : "text-muted hover:text-white hover:bg-ink-800"
-      }`}
-    >
-      <Icon size={18} />
-      {item.label}
-    </a>
+      )}
+    </NavLink>
   );
 }
 
@@ -91,7 +89,15 @@ function initials(name: string): string {
   return (letters || "?").toUpperCase();
 }
 
-export default function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }) {
+export default function Sidebar({
+  user,
+  onLogout,
+  onOpenWizard,
+}: {
+  user: User;
+  onLogout: () => void;
+  onOpenWizard: () => void;
+}) {
   return (
     <aside className="w-64 shrink-0 h-screen sticky top-0 bg-ink-900 border-r border-ink-700 flex flex-col">
       {/* Logo */}
@@ -105,41 +111,61 @@ export default function Sidebar({ user, onLogout }: { user: User; onLogout: () =
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         <div className="space-y-1 pt-2">
           {mainNav.map((i) => (
-            <NavRow key={i.label} item={i} />
+            <NavRow key={i.to} item={i} />
           ))}
+          {/* "Reel erstellen" oeffnet den Assistenten als Overlay (keine Route). */}
+          <button
+            onClick={onOpenWizard}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted hover:text-white hover:bg-ink-800 transition-colors"
+          >
+            <Upload size={18} />
+            Reel erstellen
+          </button>
         </div>
 
         <SectionLabel>Analytics</SectionLabel>
         <div className="space-y-1">
           {analyticsNav.map((i) => (
-            <NavRow key={i.label} item={i} />
+            <NavRow key={i.to} item={i} />
           ))}
         </div>
 
         <SectionLabel>Datenbanken</SectionLabel>
         <div className="space-y-1">
           {dbNav.map((i) => (
-            <NavRow key={i.label} item={i} />
+            <NavRow key={i.to} item={i} />
           ))}
         </div>
 
         <SectionLabel>Demnächst</SectionLabel>
         <div className="space-y-1">
           {soonNav.map((i) => (
-            <NavRow key={i.label} item={i} />
+            <NavRow key={i.to} item={i} />
           ))}
         </div>
       </nav>
 
       {/* User */}
       <div className="flex items-center gap-3 px-4 py-4 border-t border-ink-700">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0 flex items-center justify-center text-xs font-bold text-white">
-          {initials(user.display_name)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{user.display_name}</p>
-          <p className="text-xs text-muted">{user.is_admin ? "Admin" : "Free Plan"}</p>
-        </div>
+        <NavLink
+          to="/einstellungen"
+          title="Einstellungen"
+          className="flex items-center gap-3 flex-1 min-w-0 group"
+        >
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0 flex items-center justify-center text-xs font-bold text-white">
+            {initials(user.display_name)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate group-hover:text-brand-400 transition-colors">
+              {user.display_name}
+            </p>
+            <p className="text-xs text-muted">{user.is_admin ? "Admin" : "Free Plan"}</p>
+          </div>
+        </NavLink>
+        <NavLink to="/einstellungen" title="Einstellungen"
+          className="text-muted hover:text-white p-1">
+          <Settings size={17} />
+        </NavLink>
         <button onClick={onLogout} title="Abmelden"
           className="text-muted hover:text-white cursor-pointer p-1 -mr-1">
           <LogOut size={18} />

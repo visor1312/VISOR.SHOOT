@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2, Mic2 } from "lucide-react";
-import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard";
-import HookAnalyzer from "./components/HookAnalyzer";
-import CreateReelWizard from "./components/CreateReelWizard";
+import AppShell from "./components/AppShell";
 import AuthScreen from "./components/AuthScreen";
+import DashboardPage from "./pages/DashboardPage";
+import HookPage from "./pages/HookPage";
+import ReelsPage from "./pages/ReelsPage";
+import ProjektePage from "./pages/ProjektePage";
+import EinstellungenPage from "./pages/EinstellungenPage";
+import ComingSoonPage from "./pages/ComingSoonPage";
 import { getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
 type AuthPhase = "loading" | "loggedOut" | "loggedIn";
@@ -12,11 +16,6 @@ type AuthPhase = "loading" | "loggedOut" | "loggedIn";
 function App() {
   const [authPhase, setAuthPhase] = useState<AuthPhase>("loading");
   const [user, setUser] = useState<User | null>(null);
-  const [hookOpen, setHookOpen] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  // Beim Schliessen eines Modals hochgezaehlt: der key-Wechsel laesst das
-  // Dashboard neu mounten und damit seine Daten frisch vom Backend laden.
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,8 +24,6 @@ function App() {
     setUnauthorizedHandler(() => {
       setUser(null);
       setAuthPhase("loggedOut");
-      setHookOpen(false);
-      setWizardOpen(false);
     });
     getMe()
       .then((u) => {
@@ -43,12 +40,6 @@ function App() {
     };
   }, []);
 
-  function handleAuthed(u: User) {
-    setUser(u);
-    setAuthPhase("loggedIn");
-    setRefreshKey((k) => k + 1);
-  }
-
   async function handleLogout() {
     try {
       await logout();
@@ -57,12 +48,6 @@ function App() {
     }
     setUser(null);
     setAuthPhase("loggedOut");
-  }
-
-  function closeModals() {
-    setHookOpen(false);
-    setWizardOpen(false);
-    setRefreshKey((k) => k + 1);
   }
 
   if (authPhase === "loading") {
@@ -80,21 +65,33 @@ function App() {
   }
 
   if (authPhase === "loggedOut" || !user) {
-    return <AuthScreen onAuthed={handleAuthed} />;
+    return (
+      <AuthScreen
+        onAuthed={(u) => {
+          setUser(u);
+          setAuthPhase("loggedIn");
+        }}
+      />
+    );
   }
 
   return (
-    <div className="flex min-h-screen bg-ink-950 text-white">
-      <Sidebar user={user} onLogout={handleLogout} />
-      <Dashboard
-        key={refreshKey}
-        user={user}
-        onOpenHook={() => setHookOpen(true)}
-        onOpenWizard={() => setWizardOpen(true)}
-      />
-      {hookOpen && <HookAnalyzer onClose={closeModals} />}
-      {wizardOpen && <CreateReelWizard onClose={closeModals} />}
-    </div>
+    <Routes>
+      <Route element={<AppShell user={user} setUser={setUser} onLogout={handleLogout} />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="hook" element={<HookPage />} />
+        <Route path="reels" element={<ReelsPage />} />
+        <Route path="projekte" element={<ProjektePage />} />
+        <Route path="einstellungen" element={<EinstellungenPage />} />
+        <Route path="spotify" element={<ComingSoonPage title="Spotify Streaming Dashboard" />} />
+        <Route path="type-beats" element={<ComingSoonPage title="Type Beats Datenbank" />} />
+        <Route path="tracks" element={<ComingSoonPage title="Angefangene Tracks Datenbank" />} />
+        <Route path="analytics" element={<ComingSoonPage title="Analytics" />} />
+        <Route path="collab" element={<ComingSoonPage title="Collab Hub" />} />
+        <Route path="monetize" element={<ComingSoonPage title="Monetize" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
