@@ -495,3 +495,47 @@ export async function getPack(packId: string): Promise<PackDetail> {
 export function packItemDownloadUrl(packId: string, idx: number): string {
   return `${BASE}/packs/${packId}/items/${idx}/download`;
 }
+
+// ---------------------------------------------------------------------------
+// Spotify Canvas: kurzer (3-8s) stummer 9:16-Loop
+
+export type CanvasStatus = "pending" | "analyzing" | "rendering" | "done" | "error";
+
+export interface CanvasJob {
+  canvas_id: string;
+  status: CanvasStatus;
+  error: string | null;
+  style: string | null;
+  duration_sec: number;
+  created_at: string;
+  has_output: boolean;
+}
+
+export async function createCanvas(
+  video: File,
+  song: File,
+  opts: { style: string; durationSec: number; useHook: boolean },
+): Promise<{ canvas_id: string; duration_sec: number }> {
+  const form = new FormData();
+  form.append("video", video);
+  form.append("song", song);
+  form.append("style", opts.style);
+  form.append("duration_sec", String(opts.durationSec));
+  form.append("use_hook", opts.useHook ? "true" : "false");
+  const res = await requestOrExplain(`${BASE}/canvas`, { method: "POST", body: form });
+  return jsonOrThrow<{ canvas_id: string; duration_sec: number }>(res);
+}
+
+export async function listCanvas(limit = 50): Promise<CanvasJob[]> {
+  const res = await requestOrExplain(`${BASE}/canvas?limit=${limit}`);
+  return jsonOrThrow<CanvasJob[]>(res);
+}
+
+export async function getCanvas(canvasId: string): Promise<CanvasJob> {
+  const res = await requestOrExplain(`${BASE}/canvas/${canvasId}`);
+  return jsonOrThrow<CanvasJob>(res);
+}
+
+export function canvasDownloadUrl(canvasId: string): string {
+  return `${BASE}/canvas/${canvasId}/download`;
+}

@@ -5,6 +5,7 @@ import AppShell from "./components/AppShell";
 import AuthScreen from "./components/AuthScreen";
 import DashboardPage from "./pages/DashboardPage";
 import HookPage from "./pages/HookPage";
+import CanvasPage from "./pages/CanvasPage";
 import ReelsPage from "./pages/ReelsPage";
 import PacksPage from "./pages/PacksPage";
 import PackDetailPage from "./pages/PackDetailPage";
@@ -82,6 +83,7 @@ function App() {
       <Route element={<AppShell user={user} setUser={setUser} onLogout={handleLogout} />}>
         <Route index element={<DashboardPage />} />
         <Route path="hook" element={<HookPage />} />
+        <Route path="canvas" element={<CanvasPage />} />
         <Route path="reels" element={<ReelsPage />} />
         <Route path="wochen-content" element={<PacksPage />} />
         <Route path="wochen-content/:id" element={<PackDetailPage />} />

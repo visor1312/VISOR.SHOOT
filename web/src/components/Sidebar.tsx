@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Upload,
   Zap,
+  Film,
   Music2,
   CalendarClock,
   FolderOpen,
@@ -29,6 +30,7 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
   { label: "Hook Generator", icon: Zap, to: "/hook" },
+  { label: "Spotify Canvas", icon: Film, to: "/canvas" },
   { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content" },
   { label: "Meine fertigen Reels", icon: Music2, to: "/reels" },
   { label: "Offene Projekte", icon: FolderOpen, to: "/projekte" },
