@@ -1,35 +1,201 @@
-import { Mail, User as UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy } from "lucide-react";
+import {
+  updateDisplayName, changePassword, listInvites, createInvite, listUsers,
+  type InviteCode, type AdminUser,
+} from "../api";
 import { useApp } from "../components/app-context";
 
-/** Platzhalter-Version (Commit 1): zeigt das eigene Konto an. Das Bearbeiten
- * (Name/Passwort) und der Admin-Bereich (Einladungen/Nutzer) folgen in
- * Commit 3, sobald die Backend-Endpunkte stehen. */
-export default function EinstellungenPage() {
-  const { user } = useApp();
-  return (
-    <main className="flex-1 min-w-0 px-8 py-7">
-      <h1 className="text-3xl font-bold tracking-tight">Einstellungen</h1>
-      <p className="text-muted mt-1">Dein Konto.</p>
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+}
 
-      <div className="mt-6 max-w-xl bg-ink-850 border border-ink-700 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <UserIcon size={18} className="text-muted" />
-          <div>
-            <p className="text-xs text-muted">Anzeigename</p>
-            <p className="text-sm font-medium">{user.display_name}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Mail size={18} className="text-muted" />
-          <div>
-            <p className="text-xs text-muted">E-Mail</p>
-            <p className="text-sm font-medium">{user.email}</p>
-          </div>
-        </div>
-        <p className="text-sm text-muted pt-2 border-t border-ink-700">
-          {user.is_admin ? "Rolle: Admin" : "Rolle: Nutzer"}
-        </p>
+export default function EinstellungenPage() {
+  const { user, setUser } = useApp();
+  return (
+    <main className="flex-1 min-w-0 px-8 py-7 max-w-3xl">
+      <h1 className="text-3xl font-bold tracking-tight">Einstellungen</h1>
+      <p className="text-muted mt-1">Dein Konto{user.is_admin ? " und die Verwaltung" : ""}.</p>
+
+      <div className="mt-6 space-y-4">
+        <NameCard user={user} onUpdated={setUser} />
+        <PasswordCard />
+        {user.is_admin && <AdminSection />}
       </div>
     </main>
+  );
+}
+
+function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-ink-850 border border-ink-700 rounded-2xl p-6">
+      <h2 className="flex items-center gap-2 font-semibold">{icon} {title}</h2>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function Feedback({ ok, err }: { ok: string; err: string }) {
+  if (err) return <p className="text-sm text-red-400 mt-2">{err}</p>;
+  if (ok) return <p className="text-sm text-brand-400 mt-2 flex items-center gap-1"><Check size={14} /> {ok}</p>;
+  return null;
+}
+
+const inputClass =
+  "w-full text-sm bg-ink-800 border border-ink-700 focus:border-brand-500 rounded-xl px-3 py-2.5 outline-none";
+
+function NameCard({ user, onUpdated }: { user: { display_name: string; email: string }; onUpdated: (u: import("../api").User) => void }) {
+  const [name, setName] = useState(user.display_name);
+  const [busy, setBusy] = useState(false);
+  const [ok, setOk] = useState("");
+  const [err, setErr] = useState("");
+
+  async function save() {
+    setBusy(true); setOk(""); setErr("");
+    try {
+      const updated = await updateDisplayName(name.trim());
+      onUpdated(updated);
+      setOk("Gespeichert.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Konto" icon={<UserIcon size={18} className="text-brand-400" />}>
+      <label className="block">
+        <span className="text-sm text-muted">Anzeigename</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputClass} mt-1.5`} />
+      </label>
+      <div className="flex items-center gap-2 mt-3 text-sm text-muted">
+        <Mail size={15} /> {user.email} <span className="text-ink-600">(nicht änderbar)</span>
+      </div>
+      <button disabled={busy || name.trim() === "" || name.trim() === user.display_name} onClick={save}
+        className="mt-4 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-ink-950 font-semibold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+        {busy && <Loader2 size={15} className="animate-spin" />} Namen speichern
+      </button>
+      <Feedback ok={ok} err={err} />
+    </Card>
+  );
+}
+
+function PasswordCard() {
+  const [cur, setCur] = useState("");
+  const [next, setNext] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [ok, setOk] = useState("");
+  const [err, setErr] = useState("");
+
+  async function save() {
+    setOk(""); setErr("");
+    if (next !== repeat) { setErr("Die neuen Passwörter stimmen nicht überein."); return; }
+    setBusy(true);
+    try {
+      await changePassword(cur, next);
+      setOk("Passwort geändert. Andere Geräte wurden abgemeldet.");
+      setCur(""); setNext(""); setRepeat("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Passwort ändern" icon={<KeyRound size={18} className="text-brand-400" />}>
+      <div className="space-y-3">
+        <input type="password" placeholder="Aktuelles Passwort" autoComplete="current-password"
+          value={cur} onChange={(e) => setCur(e.target.value)} className={inputClass} />
+        <input type="password" placeholder="Neues Passwort (mind. 8 Zeichen)" autoComplete="new-password"
+          value={next} onChange={(e) => setNext(e.target.value)} className={inputClass} />
+        <input type="password" placeholder="Neues Passwort wiederholen" autoComplete="new-password"
+          value={repeat} onChange={(e) => setRepeat(e.target.value)} className={inputClass} />
+      </div>
+      <button disabled={busy || !cur || !next || !repeat} onClick={save}
+        className="mt-4 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-ink-950 font-semibold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+        {busy && <Loader2 size={15} className="animate-spin" />} Passwort ändern
+      </button>
+      <Feedback ok={ok} err={err} />
+    </Card>
+  );
+}
+
+function AdminSection() {
+  const [invites, setInvites] = useState<InviteCode[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [err, setErr] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listInvites(), listUsers()])
+      .then(([i, u]) => { if (!cancelled) { setInvites(i); setUsers(u); } })
+      .catch((e) => !cancelled && setErr(e instanceof Error ? e.message : String(e)));
+    return () => { cancelled = true; };
+  }, []);
+
+  async function makeInvite() {
+    setCreating(true); setErr("");
+    try {
+      const inv = await createInvite();
+      setInvites((prev) => [...prev, inv]);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <>
+      <Card title="Einladungscodes" icon={<Ticket size={18} className="text-brand-400" />}>
+        <p className="text-sm text-muted">
+          Neue Konten können sich nur mit einem Einladungscode registrieren.
+        </p>
+        <button disabled={creating} onClick={makeInvite}
+          className="mt-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-ink-950 font-semibold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+          {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Neuen Code erzeugen
+        </button>
+        {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
+        <div className="mt-4 space-y-1.5">
+          {invites.length === 0 && <p className="text-sm text-muted">Noch keine Codes.</p>}
+          {invites.map((inv) => (
+            <div key={inv.code}
+              className="flex items-center gap-3 bg-ink-800 rounded-lg px-3 py-2 text-sm">
+              <code className={`font-mono ${inv.used ? "text-ink-600 line-through" : "text-white"}`}>{inv.code}</code>
+              <span className="flex-1 text-xs text-muted">
+                {inv.used ? `verwendet von ${inv.used_by_email}` : "offen"}
+              </span>
+              {!inv.used && (
+                <button title="Code kopieren" onClick={() => navigator.clipboard.writeText(inv.code)}
+                  className="text-muted hover:text-white"><Copy size={14} /></button>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={`Nutzer (${users.length})`} icon={<Users size={18} className="text-brand-400" />}>
+        <div className="space-y-1.5">
+          {users.map((u) => (
+            <div key={u.id} className="flex items-center gap-3 bg-ink-800 rounded-lg px-3 py-2 text-sm">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{u.display_name}</p>
+                <p className="text-xs text-muted truncate">{u.email}</p>
+              </div>
+              {u.is_admin && (
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-400">
+                  Admin
+                </span>
+              )}
+              <span className="text-xs text-muted shrink-0">{formatDate(u.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
   );
 }

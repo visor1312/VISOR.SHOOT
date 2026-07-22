@@ -150,6 +150,57 @@ export async function logout(): Promise<void> {
   await jsonOrThrow(res);
 }
 
+/** Anzeigenamen aendern -> aktualisierter User. */
+export async function updateDisplayName(displayName: string): Promise<User> {
+  const res = await requestOrExplain(`${BASE}/auth/me`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name: displayName }),
+  });
+  return jsonOrThrow<User>(res);
+}
+
+/** Passwort aendern (bleibt in diesem Browser eingeloggt). */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const res = await requestOrExplain(
+    `${BASE}/auth/change-password`,
+    jsonPost({ current_password: currentPassword, new_password: newPassword }),
+  );
+  await jsonOrThrow(res);
+}
+
+// --- Admin (nur fuer Admin-Konten) ---------------------------------------
+
+export interface InviteCode {
+  code: string;
+  created_at: string;
+  used: boolean;
+  used_by_email: string | null;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export async function listInvites(): Promise<InviteCode[]> {
+  const res = await requestOrExplain(`${BASE}/admin/invites`);
+  return jsonOrThrow<InviteCode[]>(res);
+}
+
+export async function createInvite(): Promise<InviteCode> {
+  const res = await requestOrExplain(`${BASE}/admin/invites`, { method: "POST" });
+  return jsonOrThrow<InviteCode>(res);
+}
+
+export async function listUsers(): Promise<AdminUser[]> {
+  const res = await requestOrExplain(`${BASE}/admin/users`);
+  return jsonOrThrow<AdminUser[]>(res);
+}
+
 /** Projekt inkl. aller Takes, wie GET /projects es liefert. */
 export interface ProjectSummary {
   id: string;
