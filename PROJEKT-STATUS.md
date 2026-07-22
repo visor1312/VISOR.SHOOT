@@ -33,7 +33,7 @@ web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
           → react-router: main.tsx BrowserRouter, App.tsx rendert eingeloggt
             die Routen in components/AppShell.tsx (Sidebar + <Outlet/>,
             Kontext in components/app-context.ts: user/setUser/openWizard).
-            Seiten in pages/: DashboardPage, HookPage, ReelsPage, ProjektePage,
+            Seiten in pages/: DashboardPage, HookPage, CanvasPage, ReelsPage, ProjektePage,
             EinstellungenPage (Konto + Admin), PacksPage + PackDetailPage
             (Wochen-Content), ComingSoonPage. Neue Seite ⇒ Route in App.tsx +
             NavLink in Sidebar.tsx. CreatePackWizard.tsx = Wochen-Content-Dialog.
@@ -128,6 +128,20 @@ Song/Video viele fertige Posts auf einen Schlag.
 - Wiederverwendet `build_workspace` + `run_headless_render` + die
   Untertitel-Pipeline aus dem Edit-Flow, ohne diesen zu ändern.
 
+## Spotify Canvas (3–8s stummer 9:16-Loop, +Streams)
+
+- **pipeline/content_pack.py**: `canvas_window` (schneidet ein `duration_sec`-
+  Fenster am Hook, das ins gefilmte Video passt; schiebt bei Überlauf nach
+  vorn; None wenn Video < 3s) + `clamp_canvas_duration` (3–8s).
+- **DB:** Tabelle `canvas_jobs` (user-gescoped). `_run_canvas_job` (main.py):
+  Analyse → Fenster am Hook → `build_workspace` 1080×1920 gestylt → render →
+  **Ton per ffmpeg `-an` strippen** (Canvas ist stumm; isoliert, ohne
+  `build_workspace` anzufassen).
+- **Routen:** `POST /canvas`, `GET /canvas`, `GET /canvas/{id}`,
+  `GET /canvas/{id}/download` (Ownership-404, Dauer server-seitig geklemmt).
+  Frontend: CanvasPage (loopende stumme Vorschau + Spotify-Upload-Hinweis) +
+  CreateCanvasWizard.
+
 ## Hybrid-Hosting-Fundament (Richtung Online, ohne teure Cloud-GPU)
 
 Entscheidung: Konten/Daten/Seiten kommen auf einen günstigen Server, das
@@ -152,8 +166,8 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
    `/render/{item}/result` hochlädt). Erst dann ist der Hybrid-Kreis geschlossen.
 2. **Abrechnung** (Stripe, 10€/Monat) — ergibt erst mit Server Sinn.
 3. **„Bleibt-online"-Features** Smart Link / Release-Landingpage + EPK
-   (Pressekit) — die klassischen Abo-Gründe. Dazu Spotify Canvas (9:16-Loop,
-   3–8s; baut fast geschenkt auf der Render-Engine auf).
+   (Pressekit) — die klassischen Abo-Gründe.
+   (Spotify Canvas ist umgesetzt, siehe oben.)
 
 ## Wichtige gelernte Lektionen (nicht wiederholen!)
 
@@ -193,7 +207,7 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
 
 ## Zustand / Qualität
 
-- 146 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
+- 156 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
   echten Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
   Auth- und Navigations-Flows zusätzlich per Playwright im echten Browser
   (gegen den Vite-Proxy) verifiziert.
@@ -220,8 +234,8 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
    Stripe + Smart Link/EPK (Details im Roadmap-Abschnitt oben).
 4. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
 5. Roadmap-Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
-   beachten), Wort-Karaoke-Highlight, Spotify Canvas. (Batch/Wochen-Content
-   ist umgesetzt.)
+   beachten), Wort-Karaoke-Highlight. (Batch/Wochen-Content und Spotify Canvas
+   sind umgesetzt.)
    (Multi-Plattform-Presets sind umgesetzt, warten auf Nutzer-Test.)
 
 ## Stil der Zusammenarbeit mit dem Besitzer

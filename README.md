@@ -59,6 +59,14 @@ herunterladbar. Der Rechenaufwand vervielfacht sich entsprechend — auf dem
 eigenen Rechner ist das gewollt (kostenlos), fürs spätere Hosting bleibt das
 Rendern deshalb bewusst lokal (siehe unten).
 
+**Spotify Canvas:** Ein kurzer (3–8 Sekunden), sich wiederholender, **stummer**
+9:16-Clip, der auf Spotify das Cover ersetzt — Tracks mit Canvas bekommen
+deutlich mehr Streams. Video + Song hochladen, Länge und Look wählen, „auf den
+Hook schneiden" → HOOKCUT nimmt den energiereichsten Moment, rendert ihn als
+9:16 und entfernt den Ton (Spotify spielt den Song selbst). Danach in **Spotify
+for Artists** beim Track „Canvas hinzufügen" und die heruntergeladene Datei
+wählen. Menü in der Sidebar: **„Spotify Canvas"**.
+
 **Passwort vergessen:** Solange HOOKCUT nur lokal läuft, gibt es bewusst
 keinen „Passwort vergessen"-Link (dafür bräuchte es einen E-Mail-Versand, der
 erst mit dem späteren Online-Hosting kommt). Stattdessen am HOOKCUT-Rechner
