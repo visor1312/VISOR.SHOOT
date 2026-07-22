@@ -42,12 +42,22 @@ Einladungscodes → „Neuen Code erzeugen"** (nur als Admin sichtbar). Alternat
 weiterhin per `hookcut-einladung.bat`.
 
 **Die Oberfläche hat jetzt echte Seiten** (über die Sidebar, mit eigenen
-Adressen wie `/reels`, `/einstellungen`): Dashboard, Hook Generator, Meine
-fertigen Reels, Offene Projekte und Einstellungen. Unter **Einstellungen**
-lassen sich Anzeigename und Passwort ändern; als Admin zusätzlich
-Einladungscodes erzeugen und alle Nutzer sehen — dafür ist keine
+Adressen wie `/reels`, `/einstellungen`): Dashboard, Hook Generator,
+Wochen-Content, Meine fertigen Reels, Offene Projekte und Einstellungen. Unter
+**Einstellungen** lassen sich Anzeigename und Passwort ändern; als Admin
+zusätzlich Einladungscodes erzeugen und alle Nutzer sehen — dafür ist keine
 Kommandozeile mehr nötig. Bereiche, die noch nicht gebaut sind (Analytics,
 Datenbanken …), zeigen eine ehrliche „Demnächst"-Seite statt eines toten Links.
+
+**Wochen-Content (Content-Pakete):** Der Baustein gegen das größte Problem
+von Indie-Musikern — konsistent posten, ohne auszubrennen. Ein Song + Video →
+mehrere fertige Posts auf einen Schlag: HOOKCUT kombiniert automatisch die
+besten Hook-Stellen mit den gewählten Looks und Formaten (z.B. 2 Hooks × 3
+Styles × 2 Formate = 12 Videos), genug für eine ganze Woche. Jedes Video wird
+einzeln gerendert (der Assistent zeigt live „x/y fertig") und ist einzeln
+herunterladbar. Der Rechenaufwand vervielfacht sich entsprechend — auf dem
+eigenen Rechner ist das gewollt (kostenlos), fürs spätere Hosting bleibt das
+Rendern deshalb bewusst lokal (siehe unten).
 
 **Passwort vergessen:** Solange HOOKCUT nur lokal läuft, gibt es bewusst
 keinen „Passwort vergessen"-Link (dafür bräuchte es einen E-Mail-Versand, der

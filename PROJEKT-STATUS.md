@@ -34,8 +34,9 @@ web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
             die Routen in components/AppShell.tsx (Sidebar + <Outlet/>,
             Kontext in components/app-context.ts: user/setUser/openWizard).
             Seiten in pages/: DashboardPage, HookPage, ReelsPage, ProjektePage,
-            EinstellungenPage (Konto + Admin), ComingSoonPage. Neue Seite ⇒
-            Route in App.tsx + NavLink in Sidebar.tsx.
+            EinstellungenPage (Konto + Admin), PacksPage + PackDetailPage
+            (Wochen-Content), ComingSoonPage. Neue Seite ⇒ Route in App.tsx +
+            NavLink in Sidebar.tsx. CreatePackWizard.tsx = Wochen-Content-Dialog.
 backend/  Python FastAPI (Port 8000) + auth.py (Benutzer-System) + pipeline/-Module:
           sync_offset (Onset-Korrelation), hook_detect, transcribe
           (faster-whisper large-v3 auf Demucs-Vocal-Stem), lyrics_align
@@ -108,6 +109,52 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   Sitzung rohes 401-JSON statt Login-Maske. Das Gradio-Legacy (frontend/app.py)
   umgeht die HTTP-Auth (ruft die Pipeline direkt) — bleibt deprecated/lokal.
 
+## Wochen-Content / Content-Packs (das erste „warum 10€/Monat"-Feature)
+
+Recherche (2026): Das #1-Problem der Zielgruppe ist konsistent posten ohne
+Burnout (3–5 Kurzvideos/Woche über mehrere Plattformen). Antwort: aus EINEM
+Song/Video viele fertige Posts auf einen Schlag.
+
+- **pipeline/content_pack.py** (rein + testbar): `select_hook_windows`
+  (mehrere Hook-Fenster, die mit 1s-Clamp ins gefilmte Video passen, in
+  Ranking-Reihenfolge) + `build_item_matrix` (kartesisch Hook × Style × Format,
+  gedeckelt auf `MAX_PACK_ITEMS=24`).
+- **DB:** `content_packs` + `pack_items` (user-gescoped). Analyse (Sync + Hook +
+  optional Untertitel) läuft EINMAL in `_run_content_pack`; jedes pack_item ist
+  ein einzelner Render-Auftrag. Ein kaputtes Item stoppt nicht das Paket.
+- **Routen:** `POST /packs`, `GET /packs`, `GET /packs/{id}`,
+  `GET /packs/{id}/items/{idx}/download` (Ownership-404). Frontend: PacksPage +
+  PackDetailPage (pollt live), CreatePackWizard.
+- Wiederverwendet `build_workspace` + `run_headless_render` + die
+  Untertitel-Pipeline aus dem Edit-Flow, ohne diesen zu ändern.
+
+## Hybrid-Hosting-Fundament (Richtung Online, ohne teure Cloud-GPU)
+
+Entscheidung: Konten/Daten/Seiten kommen auf einen günstigen Server, das
+schwere Video-Rendern bleibt beim Nutzer (lokale App als Render-Companion) —
+Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
+
+- **backend/config.py**: alles über Env — `HOOKCUT_CORS_ORIGINS` (Domains),
+  `HOOKCUT_SECURE_COOKIES`, `HOOKCUT_LOCAL_RENDER` (Hybrid-Weiche).
+- **main.py**: CORS aus config; `lifespan` statt `on_event`; `GET /health`.
+  **db.py**: SQLite WAL-Modus (Nebenläufigkeit).
+- **Render-Job-Vertrag** (für den späteren lokalen Render-Agenten):
+  `GET /render/pending`, `POST /render/{item}/claim` (pending→rendering, 409
+  wenn vergeben), `POST /render/{item}/result` (fertiges MP4 hochladen).
+  Lokal (`HOOKCUT_LOCAL_RENDER=1`, Default) rendert der In-Process-Worker in
+  `_run_content_pack`; beim Hosting (`=0`) bleiben die Items offen und der
+  Agent zieht sie über diesen Vertrag ab.
+
+## Roadmap fürs Bezahl-Release (bewusst DANACH, je ein eigener Block)
+
+1. **Echtes Deployment** (Server + Domain) + **lokaler Render-Agent**
+   (Companion, der pending-Items zieht, lokal rendert, das MP4 per
+   `/render/{item}/result` hochlädt). Erst dann ist der Hybrid-Kreis geschlossen.
+2. **Abrechnung** (Stripe, 10€/Monat) — ergibt erst mit Server Sinn.
+3. **„Bleibt-online"-Features** Smart Link / Release-Landingpage + EPK
+   (Pressekit) — die klassischen Abo-Gründe. Dazu Spotify Canvas (9:16-Loop,
+   3–8s; baut fast geschenkt auf der Render-Engine auf).
+
 ## Wichtige gelernte Lektionen (nicht wiederholen!)
 
 1. **Vocal-MENGE ist kein Hook-Signal** (Rap: Strophen sind vocal-dichter als
@@ -146,7 +193,7 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 
 ## Zustand / Qualität
 
-- 127 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
+- 146 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
   echten Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
   Auth- und Navigations-Flows zusätzlich per Playwright im echten Browser
   (gegen den Vite-Proxy) verifiziert.
@@ -168,11 +215,13 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
    Chrome-Render geht nur beim Nutzer). Danach ggf. Intensität/Stride
    feinjustieren (beat_pulse.py hat stride=2/4 schon, UI bewusst nur Toggle).
 2. Style-Intensitäten nach Nutzer-Feedback feinjustieren.
-3. Hosting/"online verfügbar" (vertagt): Empfehlung Hybrid — billige
-   Python-Analyse-API + Browser-Render beim Nutzer.
+3. Hosting: Fundament steht (config/lifespan/WAL/health + Render-Vertrag,
+   siehe oben). Nächster Block: echtes Deployment + lokaler Render-Agent +
+   Stripe + Smart Link/EPK (Details im Roadmap-Abschnitt oben).
 4. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
-5. Roadmap-Ideen: Batch/Multi-Version-Generator, all-in-one-Strukturmodell
-   als Pro-Backend (NATTEN/HF-Blocker beachten), Wort-Karaoke-Highlight.
+5. Roadmap-Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
+   beachten), Wort-Karaoke-Highlight, Spotify Canvas. (Batch/Wochen-Content
+   ist umgesetzt.)
    (Multi-Plattform-Presets sind umgesetzt, warten auf Nutzer-Test.)
 
 ## Stil der Zusammenarbeit mit dem Besitzer
