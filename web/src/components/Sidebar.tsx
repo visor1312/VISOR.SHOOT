@@ -4,6 +4,7 @@ import {
   Upload,
   Zap,
   Music2,
+  CalendarClock,
   FolderOpen,
   TrendingUp,
   Disc3,
@@ -28,6 +29,7 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
   { label: "Hook Generator", icon: Zap, to: "/hook" },
+  { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content" },
   { label: "Meine fertigen Reels", icon: Music2, to: "/reels" },
   { label: "Offene Projekte", icon: FolderOpen, to: "/projekte" },
 ];

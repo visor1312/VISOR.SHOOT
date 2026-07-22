@@ -426,3 +426,72 @@ export async function waitForEdit(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
 }
+
+// ---------------------------------------------------------------------------
+// Wochen-Content / Content-Packs: ein Song -> viele fertige Posts
+
+export type PackStatus =
+  | "pending" | "analyzing" | "transcribing" | "rendering" | "done" | "error";
+
+export interface PackItem {
+  idx: number;
+  hook_index: number;
+  style: string;
+  platform: string;
+  status: PackStatus;
+  error: string | null;
+  ready: boolean;
+}
+
+export interface PackSummary {
+  pack_id: string;
+  status: PackStatus;
+  error: string | null;
+  with_subtitles: boolean;
+  created_at: string;
+  item_count: number;
+  done_count: number;
+}
+
+export interface PackDetail extends PackSummary {
+  items: PackItem[];
+}
+
+export async function createPack(
+  video: File,
+  song: File,
+  opts: {
+    styles: string[];
+    hookCount: number;
+    platforms: string[];
+    beatEffects?: boolean;
+    withSubtitles?: boolean;
+    lyrics?: string;
+  },
+): Promise<{ pack_id: string; planned_items: number }> {
+  const form = new FormData();
+  form.append("video", video);
+  form.append("song", song);
+  form.append("styles", opts.styles.length ? opts.styles.join(",") : "clean");
+  form.append("hook_count", String(opts.hookCount));
+  form.append("platforms", opts.platforms.length ? opts.platforms.join(",") : "reel");
+  form.append("beat_effects", opts.beatEffects ? "true" : "false");
+  form.append("with_subtitles", opts.withSubtitles ? "true" : "false");
+  form.append("lyrics", opts.lyrics ?? "");
+  const res = await requestOrExplain(`${BASE}/packs`, { method: "POST", body: form });
+  return jsonOrThrow<{ pack_id: string; planned_items: number }>(res);
+}
+
+export async function listPacks(limit = 50): Promise<PackSummary[]> {
+  const res = await requestOrExplain(`${BASE}/packs?limit=${limit}`);
+  return jsonOrThrow<PackSummary[]>(res);
+}
+
+export async function getPack(packId: string): Promise<PackDetail> {
+  const res = await requestOrExplain(`${BASE}/packs/${packId}`);
+  return jsonOrThrow<PackDetail>(res);
+}
+
+export function packItemDownloadUrl(packId: string, idx: number): string {
+  return `${BASE}/packs/${packId}/items/${idx}/download`;
+}

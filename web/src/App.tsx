@@ -6,6 +6,8 @@ import AuthScreen from "./components/AuthScreen";
 import DashboardPage from "./pages/DashboardPage";
 import HookPage from "./pages/HookPage";
 import ReelsPage from "./pages/ReelsPage";
+import PacksPage from "./pages/PacksPage";
+import PackDetailPage from "./pages/PackDetailPage";
 import ProjektePage from "./pages/ProjektePage";
 import EinstellungenPage from "./pages/EinstellungenPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
@@ -81,6 +83,8 @@ function App() {
         <Route index element={<DashboardPage />} />
         <Route path="hook" element={<HookPage />} />
         <Route path="reels" element={<ReelsPage />} />
+        <Route path="wochen-content" element={<PacksPage />} />
+        <Route path="wochen-content/:id" element={<PackDetailPage />} />
         <Route path="projekte" element={<ProjektePage />} />
         <Route path="einstellungen" element={<EinstellungenPage />} />
         <Route path="spotify" element={<ComingSoonPage title="Spotify Streaming Dashboard" />} />
