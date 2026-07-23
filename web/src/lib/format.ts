@@ -28,3 +28,14 @@ export function editJobStatusMeta(
   if (status === "error") return { label: "Fehler", className: "bg-red-500/15 text-red-400" };
   return { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" };
 }
+
+/** Aus den Takes eines Projekts abgeleiteter Sammelstatus. */
+export type ProjectStatus = "done" | "processing" | "draft" | "error";
+
+/** Ampel fuer den Projektstatus - durchgehend deutsch (Dashboard + Projekte-Seite). */
+export const projectStatusMeta: Record<ProjectStatus, { label: string; className: string }> = {
+  done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
+  processing: { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" },
+  draft: { label: "Entwurf", className: "bg-ink-700 text-muted" },
+  error: { label: "Fehler", className: "bg-red-500/15 text-red-400" },
+};

@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, Music2, Download, Loader2 } from "lucide-react";
 import { listProjects, downloadUrl, type ProjectSummary, type Take } from "../api";
-import { formatDate } from "../lib/format";
-
-type ProjectStatus = "done" | "processing" | "draft" | "error";
-
-const statusMeta: Record<ProjectStatus, { label: string; className: string }> = {
-  done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
-  processing: { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" },
-  draft: { label: "Entwurf", className: "bg-ink-700 text-muted" },
-  error: { label: "Fehler", className: "bg-red-500/15 text-red-400" },
-};
+import { formatDate, projectStatusMeta, type ProjectStatus } from "../lib/format";
 
 function projectStatus(takes: Take[]): ProjectStatus {
   if (takes.some((t) => t.status === "processing" || t.status === "pending")) return "processing";
@@ -63,7 +54,7 @@ export default function ProjektePage() {
         <div className="mt-6 space-y-2">
           {projects.map((p) => {
             const status = projectStatus(p.takes);
-            const meta = statusMeta[status];
+            const meta = projectStatusMeta[status];
             const done = latestDoneTake(p.takes);
             return (
               <div key={p.id}

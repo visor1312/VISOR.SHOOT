@@ -23,16 +23,13 @@ import {
   type Take,
   type User,
 } from "../api";
-import { formatDate, formatTime, editJobStatusMeta } from "../lib/format";
-
-type ProjectStatus = "done" | "processing" | "draft" | "error";
-
-const statusMeta: Record<ProjectStatus, { label: string; className: string }> = {
-  done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
-  processing: { label: "Processing", className: "bg-amber-500/15 text-amber-400" },
-  draft: { label: "Draft", className: "bg-ink-700 text-muted" },
-  error: { label: "Fehler", className: "bg-red-500/15 text-red-400" },
-};
+import {
+  formatDate,
+  formatTime,
+  editJobStatusMeta,
+  projectStatusMeta,
+  type ProjectStatus,
+} from "../lib/format";
 
 /** Projektstatus aus den Takes ableiten: läuft etwas? Ist etwas fertig? */
 function projectStatus(takes: Take[]): ProjectStatus {
@@ -307,7 +304,7 @@ export default function Dashboard({
             )}
             {projects.map((p, i) => {
               const status = projectStatus(p.takes);
-              const meta = statusMeta[status];
+              const meta = projectStatusMeta[status];
               const done = latestDoneTake(p.takes);
               return (
                 <div
