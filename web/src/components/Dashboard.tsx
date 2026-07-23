@@ -23,15 +23,9 @@ import {
   type Take,
   type User,
 } from "../api";
+import { formatDate, formatTime, editJobStatusMeta } from "../lib/format";
 
 type ProjectStatus = "done" | "processing" | "draft" | "error";
-
-/** Edit-Job-Status auf eine Ampel abbilden (fuer die "Meine Reels"-Karten). */
-function editStatusMeta(status: EditJobSummary["status"]): { label: string; className: string } {
-  if (status === "done") return { label: "Fertig", className: "bg-brand-500/15 text-brand-400" };
-  if (status === "error") return { label: "Fehler", className: "bg-red-500/15 text-red-400" };
-  return { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" };
-}
 
 const statusMeta: Record<ProjectStatus, { label: string; className: string }> = {
   done: { label: "Fertig", className: "bg-brand-500/15 text-brand-400" },
@@ -50,16 +44,6 @@ function projectStatus(takes: Take[]): ProjectStatus {
 
 function latestDoneTake(takes: Take[]): Take | undefined {
   return [...takes].reverse().find((t) => t.status === "done" && t.output_path);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-}
-
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 /** Wie viele Einträge sind jünger als 7 Tage? Für die Delta-Zeile der Stat-Karten. */
@@ -272,7 +256,7 @@ export default function Dashboard({
             </div>
           )}
           {reels.map((r) => {
-            const meta = editStatusMeta(r.status);
+            const meta = editJobStatusMeta(r.status);
             const readyOutputs = (r.outputs ?? []).filter((o) => o.ready);
             return (
               <div key={r.job_id}

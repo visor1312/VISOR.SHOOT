@@ -6,5 +6,8 @@ venv/
 projects/*/
 !projects/.gitkeep
 *.db
+# SQLite-WAL-Begleitdateien (seit journal_mode=WAL, siehe backend/db.py)
+*.db-wal
+*.db-shm
 .DS_Store
 *.egg-info/

@@ -3,15 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { CalendarClock, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { listPacks, type PackSummary, type PackStatus } from "../api";
 import CreatePackWizard from "../components/CreatePackWizard";
+import { formatDate } from "../lib/format";
 
 function statusMeta(status: PackStatus): { label: string; className: string } {
   if (status === "done") return { label: "Fertig", className: "bg-brand-500/15 text-brand-400" };
   if (status === "error") return { label: "Fehler", className: "bg-red-500/15 text-red-400" };
   return { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" };
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** Uebersicht aller Content-Pakete + Erstell-Dialog. */
@@ -71,7 +68,7 @@ export default function PacksPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">Content-Paket · {p.item_count} Videos</p>
-                  <p className="text-xs text-muted">{formatDate(p.created_at)}</p>
+                  <p className="text-xs text-muted">{formatDate(p.created_at, { year: true })}</p>
                 </div>
                 <span className="text-sm text-muted">{p.done_count}/{p.item_count} fertig</span>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-md ${meta.className}`}>{meta.label}</span>

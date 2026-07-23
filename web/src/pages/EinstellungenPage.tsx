@@ -5,10 +5,7 @@ import {
   type InviteCode, type AdminUser,
 } from "../api";
 import { useApp } from "../components/app-context";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
-}
+import { formatDate } from "../lib/format";
 
 export default function EinstellungenPage() {
   const { user, setUser } = useApp();
@@ -191,7 +188,7 @@ function AdminSection() {
                   Admin
                 </span>
               )}
-              <span className="text-xs text-muted shrink-0">{formatDate(u.created_at)}</span>
+              <span className="text-xs text-muted shrink-0">{formatDate(u.created_at, { year: true })}</span>
             </div>
           ))}
         </div>

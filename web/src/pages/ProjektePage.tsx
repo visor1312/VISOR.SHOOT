@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, Music2, Download, Loader2 } from "lucide-react";
 import { listProjects, downloadUrl, type ProjectSummary, type Take } from "../api";
+import { formatDate } from "../lib/format";
 
 type ProjectStatus = "done" | "processing" | "draft" | "error";
 
@@ -20,10 +21,6 @@ function projectStatus(takes: Take[]): ProjectStatus {
 
 function latestDoneTake(takes: Take[]): Take | undefined {
   return [...takes].reverse().find((t) => t.status === "done" && t.output_path);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** Alle Projekte des Nutzers (Take-basierter Workflow), mit Download. */
@@ -78,7 +75,7 @@ export default function ProjektePage() {
                   <p className="font-medium truncate flex items-center gap-2">
                     <Music2 size={14} className="text-muted shrink-0" /> {p.name}
                   </p>
-                  <p className="text-xs text-muted">{formatDate(p.created_at)}</p>
+                  <p className="text-xs text-muted">{formatDate(p.created_at, { year: true })}</p>
                 </div>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-md ${meta.className}`}>
                   {meta.label}

@@ -464,11 +464,32 @@ def edit_hook(job_id: str, background_tasks: BackgroundTasks,
     return {"job_id": job_id, "status": "hooking"}
 
 
+def _subtitle_cues_for(song_path: str, lyrics: str | None) -> list:
+    """Untertitel-Cues fuer den unsichtbaren Render erzeugen. Edit-Flow und
+    Content-Packs teilen sich exakt diese Logik: auf der isolierten Gesangsspur
+    (falls Demucs verfuegbar) transkribieren - ohne Beat wird die Erkennung
+    drastisch genauer, Deutsch erzwungen. Liegt Nutzertext vor, gilt dieser als
+    Wahrheit (exakt seine Woerter, Timing aus der Erkennung via lyrics_align)."""
+    from backend.pipeline.freecut_workspace import SubtitleCue
+    vocals = separate_vocals(song_path)
+    transcribe_src = str(vocals) if vocals else song_path
+    words = transcribe(transcribe_src, language="de",
+                       model_size=AUTO_SUBTITLE_MODEL_BEST,
+                       initial_prompt=lyrics or None)
+    if lyrics:
+        from backend.pipeline.lyrics_align import align_lyrics_to_words
+        aligned = align_lyrics_to_words(lyrics, words)
+        if aligned:
+            words = aligned
+    lines = group_words_into_lines(words)
+    return [SubtitleCue(l.start, l.end, l.text) for l in lines]
+
+
 def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: bool,
                      platform_keys: str) -> None:
     """Schritt 3: Style anwenden + unsichtbar via FreeCut rendern -
     einmal pro gewaehltem Zielformat (Multi-Plattform-Export)."""
-    from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
+    from backend.pipeline.freecut_workspace import build_workspace
     from backend.pipeline.platforms import parse_platform_keys
     from backend.pipeline.render_pipeline import run_headless_render
     job = db.get_edit_job(job_id)
@@ -483,23 +504,8 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: 
 
         cues = None
         if job["with_subtitles"]:
-            # Auf der isolierten Gesangsspur transkribieren (falls Demucs da) -
-            # ohne Beat wird die Erkennung drastisch genauer. Deutsch erzwungen.
             db.update_edit_job(job_id, status="transcribing")
-            vocals = separate_vocals(job["song_path"])
-            transcribe_src = str(vocals) if vocals else job["song_path"]
-            words = transcribe(transcribe_src, language="de",
-                               model_size=AUTO_SUBTITLE_MODEL_BEST,
-                               initial_prompt=job["lyrics"] or None)
-            if job["lyrics"]:
-                # Nutzertext = Wahrheit: exakt seine Woerter anzeigen, Timing
-                # aus der Erkennung uebernehmen (lyrics_align).
-                from backend.pipeline.lyrics_align import align_lyrics_to_words
-                aligned = align_lyrics_to_words(job["lyrics"], words)
-                if aligned:
-                    words = aligned
-            lines = group_words_into_lines(words)
-            cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
+            cues = _subtitle_cues_for(job["song_path"], job["lyrics"])
 
         # Analyse (Sync/Hook/Untertitel) gilt fuer alle Formate - nur der
         # Workspace-Bau + Render laeuft pro Plattform. Nach jedem fertigen
@@ -625,7 +631,7 @@ def download_take(project_id: str, take_id: str, user: dict = Depends(auth.get_c
 def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
                       platform_keys: list[str], beat_effects: bool) -> None:
     from backend.pipeline.content_pack import build_item_matrix, select_hook_windows
-    from backend.pipeline.freecut_workspace import SubtitleCue, build_workspace
+    from backend.pipeline.freecut_workspace import build_workspace
     from backend.pipeline.platforms import get_platform
     from backend.pipeline.render_pipeline import run_headless_render
 
@@ -657,18 +663,7 @@ def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
         cues = None
         if pack["with_subtitles"]:
             db.update_content_pack(pack_id, status="transcribing")
-            vocals = separate_vocals(pack["song_path"])
-            transcribe_src = str(vocals) if vocals else pack["song_path"]
-            words = transcribe(transcribe_src, language="de",
-                               model_size=AUTO_SUBTITLE_MODEL_BEST,
-                               initial_prompt=pack["lyrics"] or None)
-            if pack["lyrics"]:
-                from backend.pipeline.lyrics_align import align_lyrics_to_words
-                aligned = align_lyrics_to_words(pack["lyrics"], words)
-                if aligned:
-                    words = aligned
-            lines = group_words_into_lines(words)
-            cues = [SubtitleCue(l.start, l.end, l.text) for l in lines]
+            cues = _subtitle_cues_for(pack["song_path"], pack["lyrics"])
 
         # 3) Matrix anlegen (Hook x Style x Format).
         specs = build_item_matrix(len(windows), style_keys, platform_keys)
@@ -687,7 +682,9 @@ def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
         db.update_content_pack(pack_id, status="rendering")
         editor_dir = Path(__file__).resolve().parent.parent / "editor"
         any_ok = False
-        for spec, item_id in zip(specs, item_ids):
+        # strict=True: item_ids wird 1:1 aus specs erzeugt - laufen die Laengen
+        # je auseinander, ist das ein Bug und soll knallen statt still zu kuerzen.
+        for spec, item_id in zip(specs, item_ids, strict=True):
             try:
                 db.update_pack_item(item_id, status="rendering")
                 win = windows[spec.hook_index]

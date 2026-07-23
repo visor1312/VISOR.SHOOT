@@ -7,6 +7,7 @@ import {
   type HookCandidate,
   type HookJob,
 } from "../api";
+import { formatTime } from "../lib/format";
 
 type Phase = "form" | "running" | "done" | "error";
 
@@ -16,12 +17,6 @@ const RUNNING_LABEL: Record<string, string> = {
   separating: "Gesang wird vom Beat getrennt…",
   analyzing: "Song-Struktur wird analysiert…",
 };
-
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 /** Viral Hook Detector als eigene Seite (frueher ein Modal). */
 export default function HookPage() {

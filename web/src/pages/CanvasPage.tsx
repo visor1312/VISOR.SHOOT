@@ -2,16 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Disc3, Loader2, Download, AlertCircle, Info } from "lucide-react";
 import { listCanvas, canvasDownloadUrl, type CanvasJob } from "../api";
 import CreateCanvasWizard from "../components/CreateCanvasWizard";
+import { formatDate } from "../lib/format";
 
 const RUNNING_LABEL: Record<string, string> = {
   pending: "In der Warteschlange…",
   analyzing: "Song wird analysiert…",
   rendering: "Canvas wird gerendert…",
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
-}
 
 /** Uebersicht + Erstellung von Spotify-Canvases; pollt solange etwas rendert. */
 export default function CanvasPage() {
@@ -96,7 +93,7 @@ export default function CanvasPage() {
                   <span className="text-sm font-medium capitalize truncate">{c.style ?? "Canvas"}</span>
                   <span className="text-xs text-muted shrink-0">{c.duration_sec}s</span>
                 </div>
-                <p className="text-xs text-muted mt-0.5">{formatDate(c.created_at)}</p>
+                <p className="text-xs text-muted mt-0.5">{formatDate(c.created_at, { year: true })}</p>
                 {c.status === "done" && c.has_output && (
                   <a href={canvasDownloadUrl(c.canvas_id)} download
                     className="mt-2 flex items-center justify-center gap-1.5 w-full bg-ink-800 hover:bg-ink-700 text-muted hover:text-white text-xs py-1.5 rounded-lg transition-colors">

@@ -2,30 +2,23 @@ import { useEffect, useState } from "react";
 import { Video, Download, Sparkles, Loader2 } from "lucide-react";
 import { listEditJobs, editDownloadUrl, type EditJobSummary } from "../api";
 import { useApp } from "../components/app-context";
-
-function statusMeta(status: EditJobSummary["status"]): { label: string; className: string } {
-  if (status === "done") return { label: "Fertig", className: "bg-brand-500/15 text-brand-400" };
-  if (status === "error") return { label: "Fehler", className: "bg-red-500/15 text-red-400" };
-  return { label: "Läuft…", className: "bg-amber-500/15 text-amber-400" };
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
-}
+import { formatDate, editJobStatusMeta } from "../lib/format";
 
 /** Vollwertige Galerie aller Wizard-Reels des angemeldeten Nutzers. */
 export default function ReelsPage() {
-  const { openWizard } = useApp();
+  const { openWizard, refreshKey } = useApp();
   const [reels, setReels] = useState<EditJobSummary[] | null>(null);
   const [err, setErr] = useState("");
 
+  // refreshKey zaehlt nach jedem Wizard-Schluss hoch -> Liste neu laden,
+  // damit ein frisch erstelltes Reel sofort auftaucht.
   useEffect(() => {
     let cancelled = false;
     listEditJobs(100)
       .then((r) => !cancelled && setReels(r))
       .catch((e) => !cancelled && setErr(e instanceof Error ? e.message : String(e)));
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]);
 
   return (
     <main className="flex-1 min-w-0 px-8 py-7">
@@ -61,7 +54,7 @@ export default function ReelsPage() {
       {reels && reels.length > 0 && (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {reels.map((r) => {
-            const meta = statusMeta(r.status);
+            const meta = editJobStatusMeta(r.status);
             const ready = (r.outputs ?? []).filter((o) => o.ready);
             return (
               <div key={r.job_id} className="bg-ink-850 border border-ink-700 rounded-2xl overflow-hidden">
@@ -87,7 +80,7 @@ export default function ReelsPage() {
                       {meta.label}
                     </span>
                   </div>
-                  <p className="text-xs text-muted mt-1">{formatDate(r.created_at)}</p>
+                  <p className="text-xs text-muted mt-1">{formatDate(r.created_at, { year: true })}</p>
                   {r.status === "done" && ready.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {ready.map((o) => (
