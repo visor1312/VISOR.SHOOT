@@ -66,6 +66,41 @@ def test_invite_single_use(client):
     assert client.post("/auth/register", json=second).status_code == 400
 
 
+def test_invite_claim_is_atomic(tmp_path):
+    """Einloesen gewinnt nur EINMAL - die Absicherung gegen zwei
+    gleichzeitige Registrierungen mit demselben Code."""
+    dbp = tmp_path / "state.db"
+    db.init_db(dbp)
+    user_a = db.create_user("a@example.com", "A", "hash", db_path=dbp)
+    user_b = db.create_user("b@example.com", "B", "hash", db_path=dbp)
+    code = db.create_invite_code("code-einmal", db_path=dbp)
+    assert db.mark_invite_used(code, user_a, db_path=dbp) is True
+    # Zweiter Zugriff auf denselben Code darf nicht durchgehen - und darf
+    # den urspruenglichen Besitzer nicht ueberschreiben.
+    assert db.mark_invite_used(code, user_b, db_path=dbp) is False
+    assert db.get_invite_code(code, db_path=dbp)["used_by"] == user_a
+
+
+def test_register_rolls_back_user_when_invite_lost(tmp_path, monkeypatch):
+    """Schnappt sich jemand den Code GENAU zwischen Konto-Anlage und
+    Einloesen, darf kein halbfertiges Konto zurueckbleiben.
+
+    Der Zustand ist von aussen nicht herstellbar (die Vorab-Pruefung faengt
+    einen laengst verbrauchten Code ab), deshalb wird hier das verlorene
+    Rennen simuliert: mark_invite_used meldet False.
+    """
+    dbp = tmp_path / "state.db"
+    db.init_db(dbp)
+    code = db.create_invite_code("code-weg", db_path=dbp)
+    monkeypatch.setattr(db, "mark_invite_used", lambda *a, **kw: False)
+
+    before = db.count_users(db_path=dbp)
+    with pytest.raises(auth.RegisterError):
+        auth.register_user(code, "neu@example.com", "Neu", TEST_PASSWORD, db_path=dbp)
+    assert db.get_user_by_email("neu@example.com", db_path=dbp) is None
+    assert db.count_users(db_path=dbp) == before
+
+
 def test_duplicate_email_case_insensitive(client):
     email = _unique_email()
     r = client.post("/auth/register", json={

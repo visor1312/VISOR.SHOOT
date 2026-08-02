@@ -446,6 +446,14 @@ def create_user(email: str, display_name: str, password_hash: str,
     return user_id
 
 
+def delete_user(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Nur fuer den Rueckbau einer angefangenen Registrierung (siehe
+    auth.register_user): der Einladungscode wurde zwischendurch von jemand
+    anderem verbraucht, also darf das halbfertige Konto nicht bestehen bleiben."""
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
 def get_user_by_email(email: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
     with _connect(db_path) as conn:
         row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
@@ -505,12 +513,22 @@ def get_invite_code(code: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optiona
         return dict(row) if row else None
 
 
-def mark_invite_used(code: str, user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+def mark_invite_used(code: str, user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    """Loest den Code ein und liefert True, wenn das geklappt hat.
+
+    Das "AND used_by IS NULL" ist die eigentliche Absicherung: SQLite fuehrt
+    das UPDATE atomar aus, also kann von zwei gleichzeitigen Registrierungen
+    mit demselben Code nur EINE gewinnen - die andere bekommt False. Ohne
+    diese Bedingung haetten beide den Code verbraucht und es waeren zwei
+    Konten aus einer Einladung entstanden.
+    """
     with _connect(db_path) as conn:
-        conn.execute(
-            "UPDATE invite_codes SET used_by = ?, used_at = ? WHERE code = ?",
+        cur = conn.execute(
+            "UPDATE invite_codes SET used_by = ?, used_at = ? "
+            "WHERE code = ? AND used_by IS NULL",
             (user_id, _now(), code),
         )
+        return cur.rowcount > 0
 
 
 def list_invite_codes(db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:

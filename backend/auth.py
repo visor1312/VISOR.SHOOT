@@ -150,7 +150,13 @@ def register_user(invite_code: str, email: str, display_name: str, password: str
     is_first = db.count_users(db_path=db_path) == 0
     user_id = db.create_user(email, display_name, hash_password(password),
                              is_admin=is_first, db_path=db_path)
-    db.mark_invite_used(invite["code"], user_id, db_path=db_path)
+    # Der Code wird nur eingeloest, wenn er JETZT noch frei ist. Hat ihn
+    # zwischenzeitlich jemand anderes verbraucht (zwei gleichzeitige
+    # Registrierungen mit demselben Code), wird das eben angelegte Konto
+    # wieder entfernt - sonst entstuenden zwei Konten aus einer Einladung.
+    if not db.mark_invite_used(invite["code"], user_id, db_path=db_path):
+        db.delete_user(user_id, db_path=db_path)
+        raise RegisterError(400, "Einladungscode ungueltig oder schon verwendet.")
     if is_first:
         db.claim_orphan_rows(user_id, db_path=db_path)
     user = db.get_user_by_id(user_id, db_path=db_path)

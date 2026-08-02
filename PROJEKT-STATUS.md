@@ -207,7 +207,7 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
 
 ## Zustand / Qualität
 
-- 156 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
+- 158 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
   echten Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
   Auth- und Navigations-Flows zusätzlich per Playwright im echten Browser
   (gegen den Vite-Proxy) verifiziert.
@@ -222,6 +222,42 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
   Wizard ersetzt); die alten REST-Endpunkte (/projects POST, /takes, /sync,
   /presets) bleiben fürs Gradio-Legacy + dokumentierte API bestehen, das
   Dashboard nutzt weiterhin GET /projects + Take-Download.
+
+## Sicherheit (Review-Stand August 2026)
+
+Durchgesehen wurde die komplette Auth-Fläche: auth.py, die Ownership-Regel in
+main.py, das DB-Schema und die Datei-Ausgabe.
+
+Geprüft und in Ordnung:
+- Passwörter mit bcrypt (12 Runden), 72-Byte-Grenze vor jedem Hash/Check.
+- In der DB liegt nur der SHA-256-Hash des Session-Tokens, nie das Token.
+- Cookie httpOnly + SameSite=lax; Secure-Flag über HOOKCUT_SECURE_COOKIES.
+- Login: einheitliche Fehlermeldung UND konstante Laufzeit (bcrypt läuft auch
+  bei unbekannter E-Mail gegen einen Dummy-Hash) — verrät nicht, welche
+  E-Mails registriert sind. Lockout (5 Fehlversuche → 15 min) liegt in der DB.
+- Jede Datenroute hängt an get_current_user; fremde Ressourcen geben 404
+  (nicht 403). Offen sind nur die statischen Kataloge (/styles, /platforms,
+  /presets, /health). Admin-Routen zusätzlich hinter get_admin_user.
+- Passwortwechsel wirft alle Sitzungen (auch andere Geräte) weg.
+- password_hash taucht in keiner Antwort auf. Alle Dateipfade kommen aus der
+  DB, nie aus der URL — kein Path-Traversal.
+
+Behoben in diesem Durchgang:
+- Einladungscodes wurden mit einem bedingungslosen UPDATE eingelöst. Zwei
+  gleichzeitige Registrierungen mit demselben Code hätten beide durchgehen
+  können (zwei Konten aus einer Einladung). Jetzt `WHERE used_by IS NULL` +
+  Auswertung von rowcount; verliert eine Registrierung das Rennen, wird das
+  eben angelegte Konto wieder entfernt.
+
+Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
+- Kein Größenlimit für Uploads — lokal egal, online ein Füll-die-Platte-Risiko.
+- Nach einer abgelaufenen Sperre bleibt fail_count stehen: der nächste
+  Fehlversuch sperrt sofort wieder für 15 min. Für den Besitzer harmlos
+  (hookcut-passwort-reset.bat), online aber ein Ärgernis-Hebel gegen fremde
+  Konten.
+- Die „erstes Konto wird Admin"-Prüfung ist selbst nicht renn-sicher; bei
+  zwei exakt gleichzeitigen Erst-Registrierungen könnten zwei Admins
+  entstehen. Praktisch nur relevant, wenn das Ding online geht.
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
