@@ -120,6 +120,23 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     last_fail_at TEXT
 );
 
+-- Musiker-Profil: die OEFFENTLICHE Seite eines Kontos. Bewusst getrennt von
+-- users - dort liegen E-Mail und Passwort-Hash, die nie jemand anderes sehen
+-- darf. Was hier steht, ist fuer andere Musiker sichtbar.
+-- handle = das Kuerzel in der Profil-Adresse (@name), eindeutig.
+CREATE TABLE IF NOT EXISTS profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    handle TEXT NOT NULL UNIQUE,
+    artist_name TEXT NOT NULL,
+    bio TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    genres TEXT NOT NULL DEFAULT '',
+    links_json TEXT NOT NULL DEFAULT '{}',
+    avatar_path TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 -- Wochen-Content / Content-Packs: EIN Song/Video -> viele fertige Posts
 -- (Matrix aus Hook-Varianten x Styles x Formaten). Der Pack haelt die
 -- gemeinsame Quelle + Analyse (Sync/Hook), jedes pack_item ist ein einzelner
@@ -452,6 +469,53 @@ def delete_user(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
     anderem verbraucht, also darf das halbfertige Konto nicht bestehen bleiben."""
     with _connect(db_path) as conn:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
+def create_profile(user_id: str, handle: str, artist_name: str,
+                   db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    now = _now()
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO profiles (user_id, handle, artist_name, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, handle, artist_name, now, now),
+        )
+
+
+def get_profile(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM profiles WHERE user_id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_profile_by_handle(handle: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM profiles WHERE handle = ?", (handle,)).fetchone()
+        return dict(row) if row else None
+
+
+def handle_exists(handle: str, db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    with _connect(db_path) as conn:
+        return conn.execute(
+            "SELECT 1 FROM profiles WHERE handle = ?", (handle,)).fetchone() is not None
+
+
+# Was am Profil geaendert werden darf. handle und user_id stehen bewusst NICHT
+# drin: der Handle steckt in Profil-Adressen, ein stiller Wechsel wuerde
+# fremde Links brechen (spaeter ggf. eigene Route mit Weiterleitung).
+_PROFILE_FIELDS = ("artist_name", "bio", "city", "genres", "links_json", "avatar_path")
+
+
+def update_profile(user_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields) -> None:
+    erlaubt = {k: v for k, v in fields.items() if k in _PROFILE_FIELDS}
+    if not erlaubt:
+        return
+    spalten = ", ".join(f"{k} = ?" for k in erlaubt)
+    with _connect(db_path) as conn:
+        conn.execute(
+            f"UPDATE profiles SET {spalten}, updated_at = ? WHERE user_id = ?",
+            (*erlaubt.values(), _now(), user_id),
+        )
 
 
 def get_user_by_email(email: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:

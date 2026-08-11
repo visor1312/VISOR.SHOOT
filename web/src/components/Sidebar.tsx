@@ -14,6 +14,7 @@ import {
   Users,
   DollarSign,
   Mic2,
+  UserCircle,
   Settings,
   LogOut,
   type LucideIcon,
@@ -29,6 +30,7 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Mein Profil", icon: UserCircle, to: "/profil" },
   { label: "Hook Generator", icon: Zap, to: "/hook" },
   { label: "Spotify Canvas", icon: Film, to: "/canvas" },
   { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content" },

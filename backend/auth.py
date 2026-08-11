@@ -19,6 +19,8 @@ Design (bewusst online-tauglich, laeuft aber komplett lokal):
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -120,6 +122,47 @@ def delete_session(token: str, db_path: str | Path = db.DEFAULT_DB_PATH) -> None
     db.delete_session_row(_hash_token(token), db_path=db_path)
 
 
+_UMLAUTE = {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}
+
+
+def make_handle(anzeigename: str, db_path: str | Path = db.DEFAULT_DB_PATH) -> str:
+    """Eindeutiges Kuerzel fuer die Profil-Adresse (@name) aus dem Anzeigenamen.
+
+    Umlaute werden ausgeschrieben, alles andere ausser a-z und 0-9 faellt weg.
+    Ist das Kuerzel vergeben, wird durchnummeriert (yng, yng2, yng3 ...).
+    """
+    basis = anzeigename.strip().lower()
+    for umlaut, ersatz in _UMLAUTE.items():
+        basis = basis.replace(umlaut, ersatz)
+    basis = re.sub(r"[^a-z0-9]", "", basis)[:20]
+    if not basis:
+        basis = "musiker"
+    if not db.handle_exists(basis, db_path=db_path):
+        return basis
+    for n in range(2, 1000):
+        kandidat = f"{basis}{n}"
+        if not db.handle_exists(kandidat, db_path=db_path):
+            return kandidat
+    # Praktisch unerreichbar - lieber ein haessliches Kuerzel als eine Ausnahme.
+    return f"{basis}{secrets.token_hex(4)}"
+
+
+def ensure_profile(user: dict, db_path: str | Path = db.DEFAULT_DB_PATH) -> dict:
+    """Profil holen und bei Bedarf anlegen.
+
+    Konten aus der Zeit vor den Profilen (z.B. das des Besitzers) haben noch
+    keins - statt einer Migration wird es beim ersten Zugriff nachgezogen.
+    """
+    profil = db.get_profile(user["id"], db_path=db_path)
+    if profil:
+        return profil
+    db.create_profile(user["id"], make_handle(user["display_name"], db_path=db_path),
+                      user["display_name"], db_path=db_path)
+    profil = db.get_profile(user["id"], db_path=db_path)
+    assert profil is not None
+    return profil
+
+
 class RegisterError(Exception):
     def __init__(self, status_code: int, message: str):
         super().__init__(message)
@@ -164,6 +207,10 @@ def register_user(invite_code: str, email: str, display_name: str, password: str
     if invite is not None and not db.mark_invite_used(invite["code"], user_id, db_path=db_path):
         db.delete_user(user_id, db_path=db_path)
         raise RegisterError(400, "Einladungscode ungueltig oder schon verwendet.")
+    # Erst NACH dem Einloesen anlegen: im Rueckbau-Fall oben gibt es dann kein
+    # Profil, das den Fremdschluessel auf users blockieren wuerde.
+    db.create_profile(user_id, make_handle(display_name, db_path=db_path),
+                      display_name, db_path=db_path)
     if is_first:
         db.claim_orphan_rows(user_id, db_path=db_path)
     user = db.get_user_by_id(user_id, db_path=db_path)
@@ -202,6 +249,46 @@ def public_user(user: dict) -> dict:
     """Nur die Felder, die das Frontend sehen darf (nie der Passwort-Hash)."""
     return {"id": user["id"], "email": user["email"],
             "display_name": user["display_name"], "is_admin": bool(user["is_admin"])}
+
+
+# Erlaubte Profil-Links. Bewusst eine feste Liste statt "irgendeine URL":
+# so landet nichts Unerwartetes als anklickbarer Link auf fremden Profilen.
+PROFILE_LINK_KEYS = ("spotify", "instagram", "youtube", "tiktok", "soundcloud", "website")
+BIO_MAX = 500
+CITY_MAX = 80
+ARTIST_NAME_MAX = 60
+GENRES_MAX = 5
+
+
+def clean_link(url: str) -> str | None:
+    """Nur http(s) durchlassen. Ohne diese Pruefung koennte jemand einen
+    `javascript:`-Link im Profil hinterlegen, den andere anklicken."""
+    url = url.strip()
+    if not url:
+        return None
+    if not url.lower().startswith(("http://", "https://")):
+        return None
+    return url[:300]
+
+
+def public_profile(profile: dict) -> dict:
+    """Profil so, wie andere Musiker es sehen duerfen."""
+    try:
+        links = json.loads(profile["links_json"] or "{}")
+    except ValueError:
+        links = {}
+    genres = [g for g in (profile["genres"] or "").split(",") if g]
+    return {
+        "user_id": profile["user_id"],
+        "handle": profile["handle"],
+        "artist_name": profile["artist_name"],
+        "bio": profile["bio"],
+        "city": profile["city"],
+        "genres": genres,
+        "links": {k: v for k, v in links.items() if k in PROFILE_LINK_KEYS},
+        "has_avatar": bool(profile["avatar_path"]),
+        "created_at": profile["created_at"],
+    }
 
 
 def get_current_user(hookcut_session: str | None = Cookie(default=None)) -> dict:
@@ -357,3 +444,66 @@ def admin_list_users(_: dict = Depends(get_admin_user)):
          "is_admin": bool(u["is_admin"]), "created_at": u["created_at"]}
         for u in db.list_users()
     ]
+
+
+# ---------------------------------------------------------------------------
+# Musiker-Profile: die oeffentliche Seite eines Kontos (Basis fuers Netzwerk)
+
+profiles_router = APIRouter(prefix="/profiles")
+
+
+class UpdateProfileBody(BaseModel):
+    artist_name: str | None = None
+    bio: str | None = None
+    city: str | None = None
+    genres: list[str] | None = None
+    links: dict[str, str] | None = None
+
+
+@profiles_router.get("/me")
+def profile_me(user: dict = Depends(get_current_user)):
+    return public_profile(ensure_profile(user))
+
+
+@profiles_router.patch("/me")
+def profile_update(body: UpdateProfileBody, user: dict = Depends(get_current_user)):
+    ensure_profile(user)  # Altkonten haben evtl. noch keins
+    felder: dict = {}
+
+    if body.artist_name is not None:
+        name = body.artist_name.strip()
+        if not name:
+            raise HTTPException(422, "Bitte einen Kuenstlernamen angeben.")
+        felder["artist_name"] = name[:ARTIST_NAME_MAX]
+    if body.bio is not None:
+        felder["bio"] = body.bio.strip()[:BIO_MAX]
+    if body.city is not None:
+        felder["city"] = body.city.strip()[:CITY_MAX]
+    if body.genres is not None:
+        # Komma ist das Trennzeichen in der Spalte - darf im Genre nicht vorkommen.
+        sauber = [g.strip().replace(",", " ")[:30] for g in body.genres if g.strip()]
+        felder["genres"] = ",".join(sauber[:GENRES_MAX])
+    if body.links is not None:
+        links = {}
+        for schluessel, wert in body.links.items():
+            if schluessel not in PROFILE_LINK_KEYS:
+                continue
+            geprueft = clean_link(wert)
+            if geprueft:
+                links[schluessel] = geprueft
+        felder["links_json"] = json.dumps(links)
+
+    db.update_profile(user["id"], **felder)
+    profil = db.get_profile(user["id"])
+    assert profil is not None
+    return public_profile(profil)
+
+
+@profiles_router.get("/{handle}")
+def profile_by_handle(handle: str, _: dict = Depends(get_current_user)):
+    """Fremdes Profil ansehen. Vorerst nur fuer angemeldete Nutzer - oeffentliche
+    Profilseiten fuer Nicht-Angemeldete kommen mit dem Livegang."""
+    profil = db.get_profile_by_handle(handle.strip().lower())
+    if not profil:
+        raise HTTPException(404, "Profil nicht gefunden")
+    return public_profile(profil)

@@ -76,6 +76,20 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   Werkzeug). Die offene Musiker-Plattform setzt `0`; dann wird ein
   mitgeschickter Code ignoriert und **nicht** verbraucht. `GET /auth/config`
   (öffentlich) sagt der Login-Maske, ob sie das Code-Feld zeigen muss.
+- **Musiker-Profile** (`profiles`-Tabelle, `profiles_router`): die ÖFFENTLICHE
+  Seite eines Kontos, bewusst getrennt von `users` (dort liegen E-Mail und
+  Passwort-Hash). Felder: `handle` (eindeutiges @Kürzel für Profil-Adressen),
+  artist_name, bio, city, genres, links_json, avatar_path.
+  `GET/PATCH /profiles/me`, `GET /profiles/{handle}`.
+  - Der **handle** wird bei der Registrierung aus dem Anzeigenamen erzeugt
+    (`auth.make_handle`: Umlaute ausgeschrieben, nur a-z0-9, bei Kollision
+    durchnummeriert) und ist über `update_profile` **nicht** änderbar — er
+    steckt in Profil-Adressen, ein stiller Wechsel würde fremde Links brechen.
+  - `auth.ensure_profile` zieht Profile für Altkonten beim ersten Zugriff nach
+    (statt einer Migration).
+  - **Links werden geprüft** (`auth.clean_link`): nur http(s), feste Liste
+    erlaubter Arten. Ohne das könnte jemand einen `javascript:`-Link im Profil
+    hinterlegen, den andere anklicken.
 - **Ownership-Regel (WICHTIG):** jede Daten-Route hat
   `Depends(auth.get_current_user)`; Listen filtern `WHERE user_id = ?`,
   Einzel-/Download-Routen werfen über den `_own()`-Helper **404** bei fremden

@@ -546,3 +546,52 @@ export async function getCanvas(canvasId: string): Promise<CanvasJob> {
 export function canvasDownloadUrl(canvasId: string): string {
   return `${BASE}/canvas/${canvasId}/download`;
 }
+
+// ---------------------------------------------------------------------------
+// Musiker-Profile (Grundlage fuers Netzwerk)
+
+/** Erlaubte Link-Arten - muss zu PROFILE_LINK_KEYS in backend/auth.py passen. */
+export const PROFILE_LINK_KEYS = [
+  "spotify", "instagram", "youtube", "tiktok", "soundcloud", "website",
+] as const;
+
+export type ProfileLinkKey = (typeof PROFILE_LINK_KEYS)[number];
+
+export interface Profile {
+  user_id: string;
+  handle: string;
+  artist_name: string;
+  bio: string;
+  city: string;
+  genres: string[];
+  links: Partial<Record<ProfileLinkKey, string>>;
+  has_avatar: boolean;
+  created_at: string;
+}
+
+export interface ProfileUpdate {
+  artist_name?: string;
+  bio?: string;
+  city?: string;
+  genres?: string[];
+  links?: Partial<Record<ProfileLinkKey, string>>;
+}
+
+export async function getMyProfile(): Promise<Profile> {
+  const res = await requestOrExplain(`${BASE}/profiles/me`);
+  return jsonOrThrow<Profile>(res);
+}
+
+export async function updateMyProfile(patch: ProfileUpdate): Promise<Profile> {
+  const res = await requestOrExplain(`${BASE}/profiles/me`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return jsonOrThrow<Profile>(res);
+}
+
+export async function getProfile(handle: string): Promise<Profile> {
+  const res = await requestOrExplain(`${BASE}/profiles/${encodeURIComponent(handle)}`);
+  return jsonOrThrow<Profile>(res);
+}
