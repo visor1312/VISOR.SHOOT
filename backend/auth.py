@@ -129,7 +129,12 @@ class RegisterError(Exception):
 
 def register_user(invite_code: str, email: str, display_name: str, password: str,
                   db_path: str | Path = db.DEFAULT_DB_PATH) -> dict:
-    """Kompletter Registrierungs-Ablauf. Wirft RegisterError mit Status+Text."""
+    """Kompletter Registrierungs-Ablauf. Wirft RegisterError mit Status+Text.
+
+    Ob ein Einladungscode noetig ist, entscheidet config.INVITE_ONLY: als
+    lokales Werkzeug ja, als offene Plattform nein (HOOKCUT_INVITE_ONLY=0).
+    Im offenen Modus wird ein mitgeschickter Code schlicht ignoriert.
+    """
     email = normalize_email(email)
     display_name = display_name.strip()
     if not email or "@" not in email:
@@ -140,9 +145,11 @@ def register_user(invite_code: str, email: str, display_name: str, password: str
     if pw_error:
         raise RegisterError(422, pw_error)
 
-    invite = db.get_invite_code(invite_code.strip(), db_path=db_path)
-    if not invite or invite["used_by"]:
-        raise RegisterError(400, "Einladungscode ungueltig oder schon verwendet.")
+    invite = None
+    if config.INVITE_ONLY:
+        invite = db.get_invite_code(invite_code.strip(), db_path=db_path)
+        if not invite or invite["used_by"]:
+            raise RegisterError(400, "Einladungscode ungueltig oder schon verwendet.")
     if db.get_user_by_email(email, db_path=db_path):
         raise RegisterError(409, "Diese E-Mail-Adresse ist schon registriert.")
 
@@ -154,7 +161,7 @@ def register_user(invite_code: str, email: str, display_name: str, password: str
     # zwischenzeitlich jemand anderes verbraucht (zwei gleichzeitige
     # Registrierungen mit demselben Code), wird das eben angelegte Konto
     # wieder entfernt - sonst entstuenden zwei Konten aus einer Einladung.
-    if not db.mark_invite_used(invite["code"], user_id, db_path=db_path):
+    if invite is not None and not db.mark_invite_used(invite["code"], user_id, db_path=db_path):
         db.delete_user(user_id, db_path=db_path)
         raise RegisterError(400, "Einladungscode ungueltig oder schon verwendet.")
     if is_first:
@@ -229,7 +236,8 @@ router = APIRouter(prefix="/auth")
 
 
 class RegisterBody(BaseModel):
-    invite_code: str
+    # Im offenen Modus (Plattform) schickt die Oberflaeche gar keinen Code mit.
+    invite_code: str = ""
     email: str
     display_name: str
     password: str
@@ -238,6 +246,13 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: str
     password: str
+
+
+@router.get("/config")
+def auth_config():
+    """Was die Login-Maske wissen muss, bevor jemand angemeldet ist:
+    Wird ein Einladungscode verlangt? Bewusst oeffentlich (kein Geheimnis)."""
+    return {"invite_required": config.INVITE_ONLY}
 
 
 @router.post("/register")

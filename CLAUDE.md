@@ -75,6 +75,10 @@ tests/            pytest
   Kataloge (`/styles`, `/platforms`, `/presets`, `/health`).
 - **`db.py`-Funktionen** immer mit `db_path=`-Keyword (Tests nutzen
   eigene DBs über `HOOKCUT_DB`).
+- **Einstellbares Verhalten** gehört in `backend/config.py` (Env-Variable mit
+  sicherem Standard), nicht als `os.environ`-Abfrage quer im Code. Beispiel:
+  `HOOKCUT_INVITE_ONLY` — Standard `1` (lokal nur mit Einladung), die offene
+  Plattform setzt `0`.
 - **Neue Python-Pakete** brauchen Windows-Wheels und gehören gepinnt in
   `requirements.txt` mit deutschem Kommentar, warum sie da sind.
 

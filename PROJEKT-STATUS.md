@@ -70,8 +70,12 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   hashpw/checkpw validiert!), Server-Side-Sessions (Token nur als SHA-256-Hash
   in der DB, httpOnly-Cookie `hookcut_session`, sliding 30 Tage), Login-Lockout
   (5 Fehlversuche → 15 min, DB-Tabelle), FastAPI-Dependency `get_current_user`,
-  Router `/auth/{register,login,logout,me}`. Registrierung NUR mit
-  Einladungscode.
+  Router `/auth/{register,login,logout,me,config}`.
+- **Registrierung: zwei Modi** über `config.INVITE_ONLY` (`HOOKCUT_INVITE_ONLY`).
+  Standard `1` = nur mit Einladungscode (sichere Voreinstellung fürs lokale
+  Werkzeug). Die offene Musiker-Plattform setzt `0`; dann wird ein
+  mitgeschickter Code ignoriert und **nicht** verbraucht. `GET /auth/config`
+  (öffentlich) sagt der Login-Maske, ob sie das Code-Feld zeigen muss.
 - **Ownership-Regel (WICHTIG):** jede Daten-Route hat
   `Depends(auth.get_current_user)`; Listen filtern `WHERE user_id = ?`,
   Einzel-/Download-Routen werfen über den `_own()`-Helper **404** bei fremden
@@ -258,6 +262,14 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 - Die „erstes Konto wird Admin"-Prüfung ist selbst nicht renn-sicher; bei
   zwei exakt gleichzeitigen Erst-Registrierungen könnten zwei Admins
   entstehen. Praktisch nur relevant, wenn das Ding online geht.
+- **Neu mit der offenen Registrierung** (`HOOKCUT_INVITE_ONLY=0`): Der 409
+  „E-Mail schon registriert" verrät, ob eine Adresse ein Konto hat. Bisher war
+  das durch den Einladungszwang gedeckelt — im offenen Modus ist es das nicht
+  mehr. Bewusst so gelassen, weil die Alternative (immer 200 antworten und per
+  Mail klären) ohne E-Mail-Versand nicht ehrlich umsetzbar ist. **Mit der
+  E-Mail-Bestätigung in Phase 2 erledigt sich das**; bis dahin dokumentiert.
+- Ebenfalls offen bis zum Livegang: Rate-Limit auf die Registrierung. Ohne
+  Einladungszwang kann sonst ein Skript beliebig viele Konten anlegen.
 
 ## Offene / nächste Themen (Stand der Diskussion)
 

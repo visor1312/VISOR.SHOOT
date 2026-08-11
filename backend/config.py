@@ -38,3 +38,9 @@ SECURE_COOKIES: bool = _env_bool("HOOKCUT_SECURE_COOKIES", False)
 # im Hybrid-Modell auf 0/false setzen: dann bleiben die Render-Auftraege offen
 # und ein lokaler Render-Agent zieht sie ueber den /render-Vertrag ab.
 LOCAL_RENDER: bool = _env_bool("HOOKCUT_LOCAL_RENDER", True)
+
+# Registrierung nur mit Einladungscode? Als lokales Einzelplatz-Werkzeug bleibt
+# das an (sichere Voreinstellung: wer das Backend erreicht, kann sich nicht
+# einfach ein Konto anlegen). Die oeffentliche Musiker-Plattform setzt
+# HOOKCUT_INVITE_ONLY=0 - dann ist die Registrierung fuer alle offen.
+INVITE_ONLY: bool = _env_bool("HOOKCUT_INVITE_ONLY", True)

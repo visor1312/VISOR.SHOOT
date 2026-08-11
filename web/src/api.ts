@@ -124,6 +124,13 @@ export async function getMe(): Promise<User | null> {
   return jsonOrThrow<User>(res);
 }
 
+/** Verlangt dieser Server einen Einladungscode? (Lokales Werkzeug: ja,
+ *  offene Plattform: nein.) Wird vor dem Anmelden abgefragt. */
+export async function getAuthConfig(): Promise<{ invite_required: boolean }> {
+  const res = await requestOrExplain(`${BASE}/auth/config`, undefined, { authRequest: true });
+  return jsonOrThrow<{ invite_required: boolean }>(res);
+}
+
 export async function login(email: string, password: string): Promise<User> {
   const res = await requestOrExplain(
     `${BASE}/auth/login`, jsonPost({ email, password }), { authRequest: true });

@@ -1,23 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, LogIn, Mic2, Ticket, UserPlus } from "lucide-react";
-import { login, register, type User } from "../api";
+import { getAuthConfig, login, register, type User } from "../api";
 
 type Mode = "login" | "register";
 
-/** Vollbild-Login/Registrierung im HOOKCUT-Look. Registrierung nur mit
- * Einladungscode (hookcut-einladung.bat erzeugt Codes). */
+/** Vollbild-Login/Registrierung im HOOKCUT-Look. Ob ein Einladungscode noetig
+ * ist, sagt der Server (/auth/config): das lokale Werkzeug verlangt einen,
+ * die offene Plattform nicht. */
 export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => void }) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [inviteRequired, setInviteRequired] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // Bis die Antwort da ist, bleibt es beim strengeren Fall (Code noetig) -
+  // so wird nie faelschlich ein Feld ausgeblendet, das der Server braucht.
+  useEffect(() => {
+    let cancelled = false;
+    getAuthConfig()
+      .then((c) => !cancelled && setInviteRequired(c.invite_required))
+      .catch(() => { /* Standard beibehalten */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const canSubmit = mode === "login"
     ? email.trim() !== "" && password !== ""
-    : email.trim() !== "" && password !== "" && displayName.trim() !== "" && inviteCode.trim() !== "";
+    : email.trim() !== "" && password !== "" && displayName.trim() !== ""
+      && (!inviteRequired || inviteCode.trim() !== "");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,7 +71,9 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
           <p className="text-sm text-muted mt-1">
             {mode === "login"
               ? "Willkommen zurück – melde dich mit deinem Konto an."
-              : "Registrierung nur mit Einladungscode."}
+              : inviteRequired
+                ? "Registrierung nur mit Einladungscode."
+                : "Kostenlos für Musiker – in unter einer Minute startklar."}
           </p>
 
           {err && (
@@ -70,14 +85,16 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
           <form onSubmit={submit} className="mt-5 space-y-4">
             {mode === "register" && (
               <>
-                <Field label="Einladungscode">
-                  <div className="relative">
-                    <Ticket size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                    <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)}
-                      placeholder="Code aus hookcut-einladung.bat" autoComplete="off"
-                      className="w-full text-sm bg-ink-800 border border-ink-700 focus:border-brand-500 rounded-xl pl-9 pr-3 py-2.5 outline-none" />
-                  </div>
-                </Field>
+                {inviteRequired && (
+                  <Field label="Einladungscode">
+                    <div className="relative">
+                      <Ticket size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                      <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)}
+                        placeholder="Code aus hookcut-einladung.bat" autoComplete="off"
+                        className="w-full text-sm bg-ink-800 border border-ink-700 focus:border-brand-500 rounded-xl pl-9 pr-3 py-2.5 outline-none" />
+                    </div>
+                  </Field>
+                )}
                 <Field label="Anzeigename">
                   <input value={displayName} onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="z.B. YngLyric" autoComplete="nickname"
@@ -111,7 +128,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
                 Noch keinen Zugang?{" "}
                 <button onClick={() => switchMode("register")}
                   className="text-brand-400 hover:text-brand-500 font-medium">
-                  Mit Einladungscode registrieren
+                  {inviteRequired ? "Mit Einladungscode registrieren" : "Kostenlos registrieren"}
                 </button>
               </>
             ) : (

@@ -194,6 +194,52 @@ def test_first_user_becomes_admin(tmp_path):
     assert second["is_admin"] == 0
 
 
+def test_open_registration_needs_no_invite(tmp_path, monkeypatch):
+    """Plattform-Modus (HOOKCUT_INVITE_ONLY=0): Registrierung ohne Code."""
+    dbp = tmp_path / "offen.db"
+    db.init_db(dbp)
+    monkeypatch.setattr(auth.config, "INVITE_ONLY", False)
+
+    user = auth.register_user("", "offen@example.com", "Offen",
+                              TEST_PASSWORD, db_path=dbp)
+    assert user["email"] == "offen@example.com"
+    # Auch im offenen Modus gilt: erstes Konto wird Admin, zweites nicht.
+    zweiter = auth.register_user("", "zwei@example.com", "Zwei",
+                                 TEST_PASSWORD, db_path=dbp)
+    assert user["is_admin"] == 1 and zweiter["is_admin"] == 0
+
+
+def test_open_registration_ignores_supplied_code(tmp_path, monkeypatch):
+    """Ein mitgeschickter Code wird im offenen Modus ignoriert - und dabei
+    NICHT verbraucht (sonst waeren Einladungen nach einem Moduswechsel weg)."""
+    dbp = tmp_path / "offen2.db"
+    db.init_db(dbp)
+    code = db.create_invite_code("unberuehrt", db_path=dbp)
+    monkeypatch.setattr(auth.config, "INVITE_ONLY", False)
+
+    auth.register_user("quatsch-existiert-nicht", "x@example.com", "X",
+                       TEST_PASSWORD, db_path=dbp)
+    assert db.get_invite_code(code, db_path=dbp)["used_by"] is None
+
+
+def test_invite_still_required_when_enabled(tmp_path, monkeypatch):
+    """Lokaler Modus bleibt geschlossen - ohne gueltigen Code kein Konto."""
+    dbp = tmp_path / "zu.db"
+    db.init_db(dbp)
+    monkeypatch.setattr(auth.config, "INVITE_ONLY", True)
+
+    with pytest.raises(auth.RegisterError):
+        auth.register_user("", "y@example.com", "Y", TEST_PASSWORD, db_path=dbp)
+    assert db.count_users(db_path=dbp) == 0
+
+
+def test_auth_config_reports_invite_mode(client, monkeypatch):
+    monkeypatch.setattr(auth.config, "INVITE_ONLY", False)
+    assert client.get("/auth/config").json() == {"invite_required": False}
+    monkeypatch.setattr(auth.config, "INVITE_ONLY", True)
+    assert client.get("/auth/config").json() == {"invite_required": True}
+
+
 def test_expired_session_is_rejected(tmp_path):
     dbp = tmp_path / "auth.db"
     db.init_db(dbp)
