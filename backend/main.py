@@ -1114,6 +1114,9 @@ def create_post(title: str = Form(...), categories: str = Form(...),
     titel = title.strip()
     if not titel:
         raise HTTPException(422, "Bitte einen Titel angeben.")
+    # Garantiert, dass jeder Autor ein Profil hat - der Feed verlaesst sich
+    # darauf und verbindet Beitrag und Profil hart (JOIN statt LEFT JOIN).
+    auth.ensure_profile(user)
     kategorien = _kategorien_pruefen(categories)
     geprueftes_bpm = _bpm_pruefen(bpm)
 
@@ -1198,3 +1201,55 @@ def admin_hide_post(post_id: str, _: dict = Depends(auth.get_admin_user)):
         raise HTTPException(404, "Beitrag nicht gefunden")
     db.update_post(post_id, status="hidden")
     return {"ok": True}
+
+
+def _feed_eintrag(zeile: dict) -> dict:
+    """Feed-Zeile (Beitrag + Autorenprofil aus dem JOIN) in die Antwort."""
+    autor = {
+        "user_id": zeile["user_id"], "handle": zeile["handle"],
+        "artist_name": zeile["artist_name"], "bio": zeile["bio"],
+        "city": zeile["city"], "genres": zeile["author_genres"],
+        "links_json": zeile["links_json"], "avatar_path": zeile["avatar_path"],
+        "created_at": zeile["author_created_at"],
+    }
+    return _post_public(zeile, autor)
+
+
+def _feed_kategorien(categories: str) -> list[str]:
+    """Kategorie-Filter aus der URL - Unbekanntes wird still verworfen,
+    damit ein Tippfehler nicht die ganze Seite scheitern laesst."""
+    return [c for c in (x.strip().lower() for x in categories.split(",")) if c in POST_CATEGORIES]
+
+
+@app.get("/feed/discover")
+def feed_discover(categories: str = "", genre: str = "", open_only: bool = True,
+                  before: str | None = None, limit: int = 20,
+                  user: dict = Depends(auth.get_current_user)):
+    """Entdecken: alle offenen Projekte. Das ist die Startansicht - wer neu
+    ist, folgt noch niemandem und saehe im "Folge ich"-Feed nichts."""
+    zeilen = db.list_feed(user["id"], only_following=False,
+                          categories=_feed_kategorien(categories), genre=genre,
+                          open_only=open_only, before=before, limit=limit)
+    return [_feed_eintrag(z) for z in zeilen]
+
+
+@app.get("/feed")
+def feed_following(categories: str = "", genre: str = "", open_only: bool = True,
+                   before: str | None = None, limit: int = 20,
+                   user: dict = Depends(auth.get_current_user)):
+    """Eigene Beitraege plus die der Profile, denen man folgt."""
+    zeilen = db.list_feed(user["id"], only_following=True,
+                          categories=_feed_kategorien(categories), genre=genre,
+                          open_only=open_only, before=before, limit=limit)
+    return [_feed_eintrag(z) for z in zeilen]
+
+
+@app.get("/profiles/{handle}/posts")
+def posts_by_profile(handle: str, limit: int = 50,
+                     _: dict = Depends(auth.get_current_user)):
+    """Beitraege einer Person - fuer die Profilseite. Zeigt auch erledigte,
+    damit man sieht, woran jemand gearbeitet hat."""
+    profil = db.get_profile_by_handle(handle.strip().lower())
+    if not profil:
+        raise HTTPException(404, "Profil nicht gefunden")
+    return [_post_public(p) for p in db.list_posts_by_user(profil["user_id"], limit=limit)]

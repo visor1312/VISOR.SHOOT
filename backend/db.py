@@ -632,6 +632,95 @@ def delete_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
 
 
+def list_feed(viewer_id: str, *, only_following: bool = False,
+              categories: Sequence[str] = (), genre: str = "",
+              open_only: bool = True, before: str | None = None, limit: int = 20,
+              db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Beitraege fuer den Feed, neueste zuerst.
+
+    only_following=False ist die Entdecken-Ansicht (alle) - die Startansicht,
+    denn wer neu ist, folgt noch niemandem und saehe sonst eine leere Seite.
+    only_following=True zeigt eigene Beitraege plus die der gefolgten Profile.
+
+    Das Autorenprofil kommt per JOIN mit, und die Kategorien werden fuer ALLE
+    Treffer in einer zweiten Abfrage geholt - sonst waere es eine Abfrage pro
+    Beitrag. Der JOIN darf hart sein (kein LEFT): create_post stellt sicher,
+    dass jeder Autor ein Profil hat.
+    """
+    bedingungen = ["p.status = 'active'"]
+    werte: list = []
+
+    if open_only:
+        bedingungen.append("p.open_state = 'open'")
+
+    if only_following:
+        erlaubt = following_ids(viewer_id, db_path=db_path) + [viewer_id]
+        platzhalter = ",".join("?" for _ in erlaubt)
+        bedingungen.append(f"p.user_id IN ({platzhalter})")
+        werte.extend(erlaubt)
+
+    if categories:
+        platzhalter = ",".join("?" for _ in categories)
+        bedingungen.append(
+            f"p.id IN (SELECT post_id FROM post_categories WHERE category IN ({platzhalter}))")
+        werte.extend(categories)
+
+    if genre.strip():
+        # Absichtlich Teiltreffer: "rap" soll auch "Deutschrap" finden.
+        bedingungen.append("LOWER(p.genres) LIKE ?")
+        werte.append(f"%{genre.strip().lower()}%")
+
+    if before:
+        bedingungen.append("p.created_at < ?")
+        werte.append(before)
+
+    werte.append(max(1, min(100, limit)))
+
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT p.*, "
+            "       pr.handle, pr.artist_name, pr.bio, pr.city, pr.links_json, "
+            "       pr.avatar_path, pr.genres AS author_genres, "
+            "       pr.created_at AS author_created_at "
+            "FROM posts p JOIN profiles pr ON pr.user_id = p.user_id "
+            f"WHERE {' AND '.join(bedingungen)} "
+            "ORDER BY p.created_at DESC LIMIT ?",
+            werte,
+        ).fetchall()
+        beitraege = [dict(r) for r in rows]
+
+        if beitraege:
+            ids = [b["id"] for b in beitraege]
+            platzhalter = ",".join("?" for _ in ids)
+            kat_rows = conn.execute(
+                f"SELECT post_id, category FROM post_categories WHERE post_id IN ({platzhalter})",
+                ids).fetchall()
+            nach_post: dict[str, list[str]] = {i: [] for i in ids}
+            for r in kat_rows:
+                nach_post[r["post_id"]].append(r["category"])
+            for b in beitraege:
+                b["categories"] = sorted(nach_post[b["id"]])
+        return beitraege
+
+
+def list_posts_by_user(user_id: str, limit: int = 50,
+                       db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Beitraege einer Person (fuer die Profilseite) - auch erledigte."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM posts WHERE user_id = ? AND status = 'active' "
+            "ORDER BY created_at DESC LIMIT ?",
+            (user_id, max(1, min(100, limit)))).fetchall()
+        beitraege = [dict(r) for r in rows]
+        for b in beitraege:
+            b["categories"] = [
+                r["category"] for r in conn.execute(
+                    "SELECT category FROM post_categories WHERE post_id = ? ORDER BY category",
+                    (b["id"],)).fetchall()
+            ]
+        return beitraege
+
+
 # --- Folgen -----------------------------------------------------------------
 
 def follow(follower_id: str, followee_id: str,
