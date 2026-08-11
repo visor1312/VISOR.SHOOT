@@ -697,7 +697,11 @@ export function postAudioUrl(postId: string): string {
 }
 
 export interface InterestState {
+  /** Habe ICH Interesse gezeigt? */
   interested: boolean;
+  /** Wie viele insgesamt - sieht jeder. */
+  count: number;
+  /** Die Namen sieht nur der Autor des Beitrags; sonst leer. */
   people: Profile[];
 }
 

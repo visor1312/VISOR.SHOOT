@@ -1114,9 +1114,6 @@ def create_post(title: str = Form(...), categories: str = Form(...),
     titel = title.strip()
     if not titel:
         raise HTTPException(422, "Bitte einen Titel angeben.")
-    # Garantiert, dass jeder Autor ein Profil hat - der Feed verlaesst sich
-    # darauf und verbindet Beitrag und Profil hart (JOIN statt LEFT JOIN).
-    auth.ensure_profile(user)
     kategorien = _kategorien_pruefen(categories)
     geprueftes_bpm = _bpm_pruefen(bpm)
 
@@ -1203,16 +1200,25 @@ def admin_hide_post(post_id: str, _: dict = Depends(auth.get_admin_user)):
     return {"ok": True}
 
 
-def _feed_eintrag(zeile: dict) -> dict:
-    """Feed-Zeile (Beitrag + Autorenprofil aus dem JOIN) in die Antwort."""
-    autor = {
+def _autor_aus_zeile(zeile: dict) -> dict:
+    """Das per JOIN mitgelesene Autorenprofil aus einer Ergebniszeile.
+
+    Feed und Kommentare lesen dasselbe Profil-Set mit; ohne diesen Helfer
+    stuende die Feldliste zweimal da und wuerde beim naechsten neuen
+    Profilfeld an einer der beiden Stellen vergessen.
+    """
+    return {
         "user_id": zeile["user_id"], "handle": zeile["handle"],
         "artist_name": zeile["artist_name"], "bio": zeile["bio"],
         "city": zeile["city"], "genres": zeile["author_genres"],
         "links_json": zeile["links_json"], "avatar_path": zeile["avatar_path"],
         "created_at": zeile["author_created_at"],
     }
-    return _post_public(zeile, autor)
+
+
+def _feed_eintrag(zeile: dict) -> dict:
+    """Feed-Zeile (Beitrag + Autorenprofil aus dem JOIN) in die Antwort."""
+    return _post_public(zeile, _autor_aus_zeile(zeile))
 
 
 def _mit_zaehlern(eintraege: list[dict]) -> list[dict]:
@@ -1269,13 +1275,7 @@ COMMENT_MAX = 1000
 
 
 def _kommentar_public(zeile: dict) -> dict:
-    autor = {
-        "user_id": zeile["user_id"], "handle": zeile["handle"],
-        "artist_name": zeile["artist_name"], "bio": zeile["bio"],
-        "city": zeile["city"], "genres": zeile["author_genres"],
-        "links_json": zeile["links_json"], "avatar_path": zeile["avatar_path"],
-        "created_at": zeile["author_created_at"],
-    }
+    autor = _autor_aus_zeile(zeile)
     return {"id": zeile["id"], "post_id": zeile["post_id"], "body": zeile["body"],
             "created_at": zeile["created_at"], "author": auth.public_profile(autor)}
 
@@ -1303,11 +1303,18 @@ def list_interest(post_id: str, user: dict = Depends(auth.get_current_user)):
     Das IST der Kontaktweg: Direktnachrichten gibt es (noch) nicht, aber die
     Profile tragen die Links zu Instagram, Spotify & Co. Der Autor sieht also,
     wer helfen will, und erreicht die Person ueber ihre eigenen Kanaele.
+
+    Die Namensliste bekommt NUR der Autor. Alle anderen sehen ihren eigenen
+    Zustand und die Anzahl - so viel zeigt die Oberflaeche auch, und die
+    Schnittstelle soll nicht mehr herausgeben als die Ansicht.
     """
-    _sichtbarer_post(post_id)
+    post = _sichtbarer_post(post_id)
+    leute = db.list_interested(post_id)
+    ist_autor = post["user_id"] == user["id"]
     return {
         "interested": db.has_interest(post_id, user["id"]),
-        "people": [auth.public_profile(p) for p in db.list_interested(post_id)],
+        "count": len(leute),
+        "people": [auth.public_profile(p) for p in leute] if ist_autor else [],
     }
 
 
@@ -1324,7 +1331,6 @@ def create_comment(post_id: str, body: str = Form(...),
     text = body.strip()
     if not text:
         raise HTTPException(422, "Bitte einen Text eingeben.")
-    auth.ensure_profile(user)  # der JOIN in list_comments verlaesst sich darauf
     comment_id = db.create_comment(post_id, user["id"], text[:COMMENT_MAX])
     return next(k for k in (_kommentar_public(z) for z in db.list_comments(post_id))
                 if k["id"] == comment_id)

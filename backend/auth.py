@@ -22,6 +22,7 @@ import hashlib
 import json
 import re
 import secrets
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -152,15 +153,33 @@ def ensure_profile(user: dict, db_path: str | Path = db.DEFAULT_DB_PATH) -> dict
 
     Konten aus der Zeit vor den Profilen (z.B. das des Besitzers) haben noch
     keins - statt einer Migration wird es beim ersten Zugriff nachgezogen.
+
+    Wird aus get_current_user heraus aufgerufen, gilt also fuer JEDE
+    angemeldete Anfrage. Das ist Absicht: die Listen fuer Feed, Kommentare und
+    Interessenten verbinden hart mit profiles - ein Konto ohne Profil wuerde
+    dort lautlos herausfallen, ohne dass irgendetwas fehlschlaegt. Statt das an
+    jeder Schreibstelle einzeln zu bedenken (und eine zu vergessen), kann es
+    hier gar nicht mehr passieren.
+
+    Zwei gleichzeitige Anfragen desselben neuen Kontos koennen beide feststellen,
+    dass ein Profil fehlt - deshalb wird ein Konflikt abgefangen und danach neu
+    gelesen: entweder hat die andere Anfrage unser Profil angelegt (gleicher
+    Schluessel), oder ein fremdes Konto hat sich das Kuerzel geschnappt, dann
+    liefert make_handle beim naechsten Versuch ein anderes.
     """
     profil = db.get_profile(user["id"], db_path=db_path)
     if profil:
         return profil
-    db.create_profile(user["id"], make_handle(user["display_name"], db_path=db_path),
-                      user["display_name"], db_path=db_path)
-    profil = db.get_profile(user["id"], db_path=db_path)
-    assert profil is not None
-    return profil
+    for _ in range(5):
+        try:
+            db.create_profile(user["id"], make_handle(user["display_name"], db_path=db_path),
+                              user["display_name"], db_path=db_path)
+        except sqlite3.IntegrityError:
+            pass
+        profil = db.get_profile(user["id"], db_path=db_path)
+        if profil:
+            return profil
+    raise HTTPException(500, "Profil konnte nicht angelegt werden.")
 
 
 class RegisterError(Exception):
@@ -311,12 +330,18 @@ def profile_detail(profile: dict, viewer: dict | None = None,
 
 
 def get_current_user(hookcut_session: str | None = Cookie(default=None)) -> dict:
-    """FastAPI-Dependency: liefert den eingeloggten User oder 401."""
+    """FastAPI-Dependency: liefert den eingeloggten User oder 401.
+
+    Zieht nebenbei ein fehlendes Profil nach (siehe ensure_profile) - damit
+    ist ueberall im Netzwerk garantiert, dass zu jedem Konto ein Profil
+    existiert. Kostet nur beim allerersten Aufruf eines Altkontos etwas.
+    """
     if not hookcut_session:
         raise HTTPException(401, "Nicht angemeldet")
     user = get_user_for_token(hookcut_session)
     if not user:
         raise HTTPException(401, "Nicht angemeldet")
+    ensure_profile(user)
     return user
 
 

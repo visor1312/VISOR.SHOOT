@@ -199,7 +199,7 @@ export default function PostDetailPage() {
       {istAutor && (
         <section className="mt-6">
           <h2 className="text-lg font-semibold">
-            Wer helfen will ({interesse?.people.length ?? 0})
+            Wer helfen will ({interesse?.count ?? 0})
           </h2>
           {interesse && interesse.people.length === 0 ? (
             <p className="text-sm text-muted mt-2">

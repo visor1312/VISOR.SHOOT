@@ -7,6 +7,8 @@ zu Instagram & Co., ueber die der Kontakt dann laeuft).
 """
 from __future__ import annotations
 
+import sqlite3
+
 from backend import db
 
 
@@ -37,6 +39,25 @@ def test_interest_flow(auth_client, second_auth_client):
     r2 = second_auth_client.delete(f"/posts/{post['id']}/interest")
     assert r2.json()["interested"] is False
     assert auth_client.get(f"/posts/{post['id']}/interest").json()["people"] == []
+
+
+def test_interest_list_is_only_for_the_author(auth_client, second_auth_client):
+    """Die Namensliste ist der Kontaktweg des Autors - nicht fuer alle.
+
+    Die Oberflaeche zeigt sie ohnehin nur ihm; die Schnittstelle darf nicht
+    mehr herausgeben als die Ansicht, sonst sieht jeder mit direktem Zugriff
+    mehr als vorgesehen.
+    """
+    post = _post(auth_client)
+    second_auth_client.post(f"/posts/{post['id']}/interest")
+
+    fremd = second_auth_client.get(f"/posts/{post['id']}/interest").json()
+    assert fremd["interested"] is True   # eigener Zustand: ja
+    assert fremd["count"] == 1           # Anzahl: ja
+    assert fremd["people"] == []         # Namen: nein
+
+    autor = auth_client.get(f"/posts/{post['id']}/interest").json()
+    assert len(autor["people"]) == 1
 
 
 def test_interest_twice_is_harmless(auth_client, second_auth_client):
@@ -115,6 +136,32 @@ def test_interactions_on_hidden_post_are_404(auth_client, second_auth_client):
     db.update_post(post["id"], status="hidden")
     assert second_auth_client.post(f"/posts/{post['id']}/interest").status_code == 404
     assert second_auth_client.get(f"/posts/{post['id']}/comments").status_code == 404
+
+
+def test_interest_of_profileless_account_is_visible(auth_client, second_auth_client):
+    """Regression: ein Konto OHNE Profil darf nicht lautlos verschwinden.
+
+    Die Interessenten-Liste verbindet hart mit profiles. Fehlte das Profil,
+    war das Interesse zwar gespeichert, aber fuer den Autor unsichtbar - ohne
+    Fehlermeldung. Seit get_current_user ein Profil garantiert, kann das nicht
+    mehr passieren; hier wird der Zustand kuenstlich hergestellt.
+    """
+    post = _post(auth_client)
+    fremder = second_auth_client.user["id"]
+
+    # Profil direkt aus der DB entfernen - simuliert ein Konto aus der Zeit
+    # vor den Profilen. Bewusst ohne db-Helfer: Profile zu loeschen ist
+    # nirgends im Produktivcode vorgesehen.
+    with sqlite3.connect(str(db.DEFAULT_DB_PATH)) as conn:
+        conn.execute("DELETE FROM profiles WHERE user_id = ?", (fremder,))
+    assert db.get_profile(fremder) is None
+
+    # Der naechste angemeldete Aufruf zieht das Profil nach ...
+    r = second_auth_client.post(f"/posts/{post['id']}/interest")
+    assert r.status_code == 200
+    # ... und der Autor sieht die Person.
+    leute = auth_client.get(f"/posts/{post['id']}/interest").json()["people"]
+    assert fremder in {p["user_id"] for p in leute}
 
 
 def test_interactions_require_login(client):
