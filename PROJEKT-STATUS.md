@@ -45,7 +45,12 @@ web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
             EinstellungenPage (Konto + Admin), PacksPage + PackDetailPage
             (Wochen-Content), ComingSoonPage. Neue Seite ⇒ Route in App.tsx +
             NavLink in Sidebar.tsx. CreatePackWizard.tsx = Wochen-Content-Dialog.
-backend/  Python FastAPI (Port 8000) + auth.py (Benutzer-System) + pipeline/-Module:
+backend/  Python FastAPI (Port 8000). Bewusst nach Produkt getrennt:
+          main.py    = das WERKZEUG (Sync, Hook, Styles, Packs, Canvas)
+          network.py = das NETZWERK (Beitraege, Feed, Interesse, Kommentare)
+          auth.py    = Benutzer-System + Profile
+          Beide Router haengen in main.py per include_router.
+          Dazu die pipeline/-Module:
           sync_offset (Onset-Korrelation), hook_detect, transcribe
           (faster-whisper large-v3 auf Demucs-Vocal-Stem), lyrics_align
           (Nutzertext = Wahrheit, KI nur Timing), styles, beat_pulse
@@ -98,6 +103,7 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   - **Links werden geprüft** (`auth.clean_link`): nur http(s), feste Liste
     erlaubter Arten. Ohne das könnte jemand einen `javascript:`-Link im Profil
     hinterlegen, den andere anklicken.
+
 ## Das Netzwerk (Phase 1, August 2026)
 
 Aus dem Einzelplatz-Werkzeug wird eine Plattform für Musiker: „offene
@@ -404,12 +410,8 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 5. Bilder an Beiträgen — erst wenn der Object Storage steht; die lokale
    Platte ist dafür der falsche Ort.
 6. Blockieren/Stummschalten von Nutzern.
-7. `backend/main.py` ist auf ~1.350 Zeilen gewachsen (Werkzeug UND Netzwerk
-   in einer Datei). Funktioniert und folgt dem bestehenden Aufbau, wird aber
-   unübersichtlich — das Netzwerk könnte in ein eigenes Modul. Reines
-   Aufräumen ohne sichtbaren Nutzen, deshalb nicht eigenmächtig gemacht.
-8. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
-9. Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
+7. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
+8. Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
    beachten), Wort-Karaoke-Highlight.
 
 ## Stil der Zusammenarbeit mit dem Besitzer

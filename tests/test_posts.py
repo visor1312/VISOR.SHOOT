@@ -12,7 +12,7 @@ import math
 import struct
 import wave
 
-from backend import db, main, storage
+from backend import db, network, storage
 
 
 def _wav_bytes(sekunden: float, rate: int = 8000) -> bytes:
@@ -73,7 +73,7 @@ def test_audio_too_long_is_rejected_and_leaves_nothing(auth_client):
 def test_audio_too_large_is_rejected(auth_client):
     """Ueber der Groessengrenze -> 413. Wichtig: der Upload wird ABGEBROCHEN,
     nicht erst komplett geschrieben und dann geprueft."""
-    zu_gross = b"\x00" * (main.POST_AUDIO_MAX_BYTES + 1024)
+    zu_gross = b"\x00" * (network.POST_AUDIO_MAX_BYTES + 1024)
     r = auth_client.post("/posts", data={"title": "Zu gross", "categories": "beat"},
                          files={"audio": ("gross.wav", zu_gross, "audio/wav")})
     assert r.status_code == 413
@@ -109,8 +109,8 @@ def test_title_required(auth_client):
 
 def test_long_text_is_capped(auth_client):
     r = _post(auth_client, titel="T" * 300, body="B" * 5000)
-    assert len(r.json()["title"]) == main.POST_TITLE_MAX
-    assert len(r.json()["body"]) == main.POST_BODY_MAX
+    assert len(r.json()["title"]) == network.POST_TITLE_MAX
+    assert len(r.json()["body"]) == network.POST_BODY_MAX
 
 
 def test_close_and_reopen_project(auth_client):
@@ -168,7 +168,7 @@ def test_only_admin_can_hide(auth_client, second_auth_client):
 
 
 def test_spam_brake(auth_client, monkeypatch):
-    monkeypatch.setattr(main, "POST_MAX_PER_HOUR", 3)
+    monkeypatch.setattr(network, "POST_MAX_PER_HOUR", 3)
     for _ in range(3):
         assert _post(auth_client).status_code == 200
     assert _post(auth_client).status_code == 429
@@ -182,4 +182,4 @@ def test_posts_require_login(client):
 def test_category_catalog_is_public(client):
     r = client.get("/post-categories")
     assert r.status_code == 200
-    assert {c["key"] for c in r.json()} == set(main.POST_CATEGORIES)
+    assert {c["key"] for c in r.json()} == set(network.POST_CATEGORIES)

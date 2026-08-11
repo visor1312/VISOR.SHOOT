@@ -87,7 +87,9 @@ zurücksetzen.
 
 ```
 backend/          FastAPI + SQLite (kein ORM)
-  main.py         Routen (Werkzeug UND Netzwerk); _own/_own_public s.u.
+  main.py         Das WERKZEUG: Sync, Hook, Styles, Packs, Canvas (+ _own)
+  network.py      Das NETZWERK: Beiträge, Feed, Interesse, Kommentare
+                  (+ _own_public, gedeckelter Upload) — eigener APIRouter
   auth.py         Passwörter, Sessions, Profile, Admin-Routen
   db.py           Schema + Zugriff; jede Funktion nimmt db_path=
   config.py       Env-Konfiguration (Hosting-Schalter)
