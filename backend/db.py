@@ -11,7 +11,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, Sequence
 
 # HOOKCUT_DB uebersteuert den DB-Pfad (wird beim Import gelesen). Genutzt von
 # den Tests (tests/conftest.py), damit API-Tests NIE in die echte state.db
@@ -119,6 +119,40 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     locked_until TEXT,
     last_fail_at TEXT
 );
+
+-- Offene Projekte ("mir fehlt noch ein Refrain") - der Kern des Netzwerks.
+-- ACHTUNG, andere Sichtbarkeits-Regel als beim Rest: Beitraege darf JEDES
+-- angemeldete Mitglied lesen (das ist der Zweck eines Feeds); aendern und
+-- loeschen darf nur der Autor. Siehe _own_public() in main.py.
+-- open_state = hat sich schon jemand gefunden? (Produkt-Zustand)
+-- status     = Moderation (Betreiber kann ausblenden). Bewusst getrennt.
+CREATE TABLE IF NOT EXISTS posts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    genres TEXT NOT NULL DEFAULT '',
+    bpm INTEGER,
+    audio_path TEXT,
+    audio_duration_sec REAL,
+    open_state TEXT NOT NULL DEFAULT 'open',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Eigene Tabelle statt kommagetrennter Spalte: hiernach wird GEFILTERT
+-- ("zeig mir alle, die einen Beat brauchen"). In einer Textspalte wuerde
+-- die Suche nach 'beat' auch 'boombeat' treffen und keinen Index nutzen.
+CREATE TABLE IF NOT EXISTS post_categories (
+    post_id TEXT NOT NULL REFERENCES posts(id),
+    category TEXT NOT NULL,
+    PRIMARY KEY (post_id, category)
+);
+
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
 
 -- Musiker-Profil: die OEFFENTLICHE Seite eines Kontos. Bewusst getrennt von
 -- users - dort liegen E-Mail und Passwort-Hash, die nie jemand anderes sehen
@@ -516,6 +550,85 @@ def update_profile(user_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields
             f"UPDATE profiles SET {spalten}, updated_at = ? WHERE user_id = ?",
             (*erlaubt.values(), _now(), user_id),
         )
+
+
+# --- Beitraege (offene Projekte) ------------------------------------------
+
+def create_post(user_id: str, title: str, body: str = "", genres: str = "",
+                bpm: int | None = None, categories: Sequence[str] = (),
+                db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    post_id = str(uuid.uuid4())
+    now = _now()
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO posts (id, user_id, title, body, genres, bpm, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, user_id, title, body, genres, bpm, now, now),
+        )
+        conn.executemany(
+            "INSERT OR IGNORE INTO post_categories (post_id, category) VALUES (?, ?)",
+            [(post_id, c) for c in categories],
+        )
+    return post_id
+
+
+def get_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+        if not row:
+            return None
+        post = dict(row)
+        post["categories"] = [
+            r["category"] for r in conn.execute(
+                "SELECT category FROM post_categories WHERE post_id = ? ORDER BY category",
+                (post_id,)).fetchall()
+        ]
+        return post
+
+
+# open_state/status stehen drin (erledigt-Schalter, Moderation), user_id nicht:
+# der Autor eines Beitrags ist unveraenderlich.
+_POST_FIELDS = ("title", "body", "genres", "bpm", "audio_path",
+                "audio_duration_sec", "open_state", "status")
+
+
+def update_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH, **fields) -> None:
+    erlaubt = {k: v for k, v in fields.items() if k in _POST_FIELDS}
+    if not erlaubt:
+        return
+    spalten = ", ".join(f"{k} = ?" for k in erlaubt)
+    with _connect(db_path) as conn:
+        conn.execute(
+            f"UPDATE posts SET {spalten}, updated_at = ? WHERE id = ?",
+            (*erlaubt.values(), _now(), post_id),
+        )
+
+
+def set_post_categories(post_id: str, categories: Sequence[str],
+                        db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM post_categories WHERE post_id = ?", (post_id,))
+        conn.executemany(
+            "INSERT OR IGNORE INTO post_categories (post_id, category) VALUES (?, ?)",
+            [(post_id, c) for c in categories],
+        )
+
+
+def delete_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Raeumt die Kategorien mit weg - sonst haelt der Fremdschluessel dagegen."""
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM post_categories WHERE post_id = ?", (post_id,))
+        conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+
+
+def count_recent_posts(user_id: str, since_iso: str,
+                       db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Fuer die Spam-Bremse: wie viele Beitraege seit <since_iso>?"""
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM posts WHERE user_id = ? AND created_at > ?",
+            (user_id, since_iso)).fetchone()
+        return int(row["n"])
 
 
 def get_user_by_email(email: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:

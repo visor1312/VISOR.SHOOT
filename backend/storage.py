@@ -112,3 +112,15 @@ def canvas_song_path(job_id: str, suffix: str) -> Path:
 
 def canvas_output_path(job_id: str) -> Path:
     return canvas_dir(job_id) / "canvas.mp4"
+
+
+# --- Netzwerk: Beitraege (offene Projekte) --------------------------------
+
+def post_dir(post_id: str) -> Path:
+    return PROJECTS_ROOT / "posts" / post_id
+
+
+def post_audio_path(post_id: str, suffix: str) -> Path:
+    """Hoerprobe eines Beitrags. Eine Datei pro Beitrag, Endung wie hochgeladen
+    (die Positivliste steckt in main.py: POST_AUDIO_SUFFIXES)."""
+    return post_dir(post_id) / f"audio{suffix}"
