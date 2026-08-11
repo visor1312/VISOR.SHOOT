@@ -12,6 +12,7 @@ import PackDetailPage from "./pages/PackDetailPage";
 import ProjektePage from "./pages/ProjektePage";
 import EinstellungenPage from "./pages/EinstellungenPage";
 import ProfilPage from "./pages/ProfilPage";
+import FeedPage from "./pages/FeedPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import { getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
@@ -89,6 +90,7 @@ function App() {
         <Route path="wochen-content" element={<PacksPage />} />
         <Route path="wochen-content/:id" element={<PackDetailPage />} />
         <Route path="projekte" element={<ProjektePage />} />
+        <Route path="projekte-feed" element={<FeedPage />} />
         <Route path="profil" element={<ProfilPage />} />
         <Route path="einstellungen" element={<EinstellungenPage />} />
         <Route path="spotify" element={<ComingSoonPage title="Spotify Streaming Dashboard" />} />

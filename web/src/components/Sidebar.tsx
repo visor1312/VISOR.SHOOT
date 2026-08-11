@@ -14,6 +14,7 @@ import {
   Users,
   DollarSign,
   Mic2,
+  Users2,
   UserCircle,
   Settings,
   LogOut,
@@ -30,12 +31,15 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Offene Projekte", icon: Users2, to: "/projekte-feed" },
   { label: "Mein Profil", icon: UserCircle, to: "/profil" },
   { label: "Hook Generator", icon: Zap, to: "/hook" },
   { label: "Spotify Canvas", icon: Film, to: "/canvas" },
   { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content" },
   { label: "Meine fertigen Reels", icon: Music2, to: "/reels" },
-  { label: "Offene Projekte", icon: FolderOpen, to: "/projekte" },
+  // Frueher "Offene Projekte" - umbenannt, seit es den gleichnamigen
+  // Netzwerk-Feed gibt. Hier liegen die EIGENEN Aufnahme-Projekte.
+  { label: "Meine Aufnahmen", icon: FolderOpen, to: "/projekte" },
 ];
 
 const analyticsNav: NavItem[] = [

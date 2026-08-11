@@ -29,7 +29,7 @@ export default function ProjektePage() {
 
   return (
     <main className="flex-1 min-w-0 px-8 py-7">
-      <h1 className="text-3xl font-bold tracking-tight">Offene Projekte</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Meine Aufnahmen</h1>
       <p className="text-muted mt-1">Deine Projekte und ihre synchronisierten Takes.</p>
 
       {err && (

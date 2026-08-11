@@ -575,6 +575,161 @@ export interface Profile {
   is_following?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Netzwerk: offene Projekte
+
+export interface PostCategory {
+  key: string;
+  name: string;
+}
+
+export interface Post {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  genres: string[];
+  bpm: number | null;
+  categories: string[];
+  has_audio: boolean;
+  audio_duration_sec: number | null;
+  open_state: "open" | "closed";
+  created_at: string;
+  /** Nur im Feed und in der Einzelansicht mitgeliefert. */
+  author?: Profile;
+  interest_count?: number;
+  comment_count?: number;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  body: string;
+  created_at: string;
+  author: Profile;
+}
+
+export async function getPostCategories(): Promise<PostCategory[]> {
+  const res = await requestOrExplain(`${BASE}/post-categories`, undefined,
+    { authRequest: true });
+  return jsonOrThrow<PostCategory[]>(res);
+}
+
+export interface NewPost {
+  title: string;
+  categories: string[];
+  body?: string;
+  genres?: string;
+  bpm?: number;
+  audio?: File | null;
+}
+
+export async function createPost(post: NewPost): Promise<Post> {
+  const form = new FormData();
+  form.append("title", post.title);
+  form.append("categories", post.categories.join(","));
+  form.append("body", post.body ?? "");
+  form.append("genres", post.genres ?? "");
+  form.append("bpm", String(post.bpm ?? 0));
+  if (post.audio) form.append("audio", post.audio);
+  const res = await requestOrExplain(`${BASE}/posts`, { method: "POST", body: form });
+  return jsonOrThrow<Post>(res);
+}
+
+export interface FeedQuery {
+  categories?: string[];
+  genre?: string;
+  openOnly?: boolean;
+  before?: string;
+  limit?: number;
+}
+
+function feedQueryString(q: FeedQuery): string {
+  const p = new URLSearchParams();
+  if (q.categories?.length) p.set("categories", q.categories.join(","));
+  if (q.genre) p.set("genre", q.genre);
+  if (q.openOnly === false) p.set("open_only", "false");
+  if (q.before) p.set("before", q.before);
+  if (q.limit) p.set("limit", String(q.limit));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+/** Entdecken: alle offenen Projekte. Startansicht, weil ein neues Konto
+ *  noch niemandem folgt und der andere Feed dann leer waere. */
+export async function getDiscoverFeed(q: FeedQuery = {}): Promise<Post[]> {
+  const res = await requestOrExplain(`${BASE}/feed/discover${feedQueryString(q)}`);
+  return jsonOrThrow<Post[]>(res);
+}
+
+/** Eigene Beitraege plus die der Profile, denen man folgt. */
+export async function getFollowingFeed(q: FeedQuery = {}): Promise<Post[]> {
+  const res = await requestOrExplain(`${BASE}/feed${feedQueryString(q)}`);
+  return jsonOrThrow<Post[]>(res);
+}
+
+export async function getPost(postId: string): Promise<Post> {
+  const res = await requestOrExplain(`${BASE}/posts/${postId}`);
+  return jsonOrThrow<Post>(res);
+}
+
+export async function getProfilePosts(handle: string): Promise<Post[]> {
+  const res = await requestOrExplain(
+    `${BASE}/profiles/${encodeURIComponent(handle)}/posts`);
+  return jsonOrThrow<Post[]>(res);
+}
+
+export async function setPostOpenState(postId: string, open: boolean): Promise<Post> {
+  const form = new FormData();
+  form.append("open_state", open ? "open" : "closed");
+  const res = await requestOrExplain(`${BASE}/posts/${postId}`,
+    { method: "PATCH", body: form });
+  return jsonOrThrow<Post>(res);
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  const res = await requestOrExplain(`${BASE}/posts/${postId}`, { method: "DELETE" });
+  await jsonOrThrow(res);
+}
+
+export function postAudioUrl(postId: string): string {
+  return `${BASE}/posts/${postId}/audio`;
+}
+
+export interface InterestState {
+  interested: boolean;
+  people: Profile[];
+}
+
+export async function getInterest(postId: string): Promise<InterestState> {
+  const res = await requestOrExplain(`${BASE}/posts/${postId}/interest`);
+  return jsonOrThrow<InterestState>(res);
+}
+
+export async function setInterest(postId: string, want: boolean): Promise<void> {
+  const res = await requestOrExplain(`${BASE}/posts/${postId}/interest`,
+    { method: want ? "POST" : "DELETE" });
+  await jsonOrThrow(res);
+}
+
+export async function getComments(postId: string): Promise<Comment[]> {
+  const res = await requestOrExplain(`${BASE}/posts/${postId}/comments`);
+  return jsonOrThrow<Comment[]>(res);
+}
+
+export async function addComment(postId: string, body: string): Promise<Comment> {
+  const form = new FormData();
+  form.append("body", body);
+  const res = await requestOrExplain(`${BASE}/posts/${postId}/comments`,
+    { method: "POST", body: form });
+  return jsonOrThrow<Comment>(res);
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  const res = await requestOrExplain(`${BASE}/comments/${commentId}`, { method: "DELETE" });
+  await jsonOrThrow(res);
+}
+
 export async function followProfile(handle: string): Promise<Profile> {
   const res = await requestOrExplain(
     `${BASE}/profiles/${encodeURIComponent(handle)}/follow`, { method: "POST" });
