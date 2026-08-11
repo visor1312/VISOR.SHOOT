@@ -291,6 +291,25 @@ def public_profile(profile: dict) -> dict:
     }
 
 
+def profile_detail(profile: dict, viewer: dict | None = None,
+                   db_path: str | Path = db.DEFAULT_DB_PATH) -> dict:
+    """Profil MIT Folge-Zaehlern - fuer Profilseiten.
+
+    Bewusst getrennt von public_profile(): im Feed haengt an jedem Beitrag ein
+    Autor-Profil, und dort waeren zwei Zaehl-Abfragen pro Beitrag eine
+    unnoetige Bremse. Zaehler gibt es nur da, wo sie auch angezeigt werden.
+    """
+    daten = public_profile(profile)
+    daten.update(db.follow_counts(profile["user_id"], db_path=db_path))
+    if viewer is not None:
+        daten["is_self"] = viewer["id"] == profile["user_id"]
+        daten["is_following"] = (
+            False if daten["is_self"]
+            else db.is_following(viewer["id"], profile["user_id"], db_path=db_path)
+        )
+    return daten
+
+
 def get_current_user(hookcut_session: str | None = Cookie(default=None)) -> dict:
     """FastAPI-Dependency: liefert den eingeloggten User oder 401."""
     if not hookcut_session:
@@ -462,7 +481,7 @@ class UpdateProfileBody(BaseModel):
 
 @profiles_router.get("/me")
 def profile_me(user: dict = Depends(get_current_user)):
-    return public_profile(ensure_profile(user))
+    return profile_detail(ensure_profile(user), viewer=user)
 
 
 @profiles_router.patch("/me")
@@ -499,11 +518,31 @@ def profile_update(body: UpdateProfileBody, user: dict = Depends(get_current_use
     return public_profile(profil)
 
 
-@profiles_router.get("/{handle}")
-def profile_by_handle(handle: str, _: dict = Depends(get_current_user)):
-    """Fremdes Profil ansehen. Vorerst nur fuer angemeldete Nutzer - oeffentliche
-    Profilseiten fuer Nicht-Angemeldete kommen mit dem Livegang."""
+def _profil_per_handle(handle: str) -> dict:
     profil = db.get_profile_by_handle(handle.strip().lower())
     if not profil:
         raise HTTPException(404, "Profil nicht gefunden")
-    return public_profile(profil)
+    return profil
+
+
+@profiles_router.get("/{handle}")
+def profile_by_handle(handle: str, user: dict = Depends(get_current_user)):
+    """Fremdes Profil ansehen. Vorerst nur fuer angemeldete Nutzer - oeffentliche
+    Profilseiten fuer Nicht-Angemeldete kommen mit dem Livegang."""
+    return profile_detail(_profil_per_handle(handle), viewer=user)
+
+
+@profiles_router.post("/{handle}/follow")
+def profile_follow(handle: str, user: dict = Depends(get_current_user)):
+    profil = _profil_per_handle(handle)
+    if profil["user_id"] == user["id"]:
+        raise HTTPException(422, "Du kannst dir nicht selbst folgen.")
+    db.follow(user["id"], profil["user_id"])
+    return profile_detail(profil, viewer=user)
+
+
+@profiles_router.delete("/{handle}/follow")
+def profile_unfollow(handle: str, user: dict = Depends(get_current_user)):
+    profil = _profil_per_handle(handle)
+    db.unfollow(user["id"], profil["user_id"])
+    return profile_detail(profil, viewer=user)

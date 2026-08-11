@@ -567,6 +567,24 @@ export interface Profile {
   links: Partial<Record<ProfileLinkKey, string>>;
   has_avatar: boolean;
   created_at: string;
+  // Nur auf Profilseiten mitgeliefert (nicht am Autor eines Feed-Beitrags -
+  // dort waeren die Zaehl-Abfragen pro Beitrag eine unnoetige Bremse).
+  followers?: number;
+  following?: number;
+  is_self?: boolean;
+  is_following?: boolean;
+}
+
+export async function followProfile(handle: string): Promise<Profile> {
+  const res = await requestOrExplain(
+    `${BASE}/profiles/${encodeURIComponent(handle)}/follow`, { method: "POST" });
+  return jsonOrThrow<Profile>(res);
+}
+
+export async function unfollowProfile(handle: string): Promise<Profile> {
+  const res = await requestOrExplain(
+    `${BASE}/profiles/${encodeURIComponent(handle)}/follow`, { method: "DELETE" });
+  return jsonOrThrow<Profile>(res);
 }
 
 export interface ProfileUpdate {

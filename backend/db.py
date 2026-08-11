@@ -150,6 +150,17 @@ CREATE TABLE IF NOT EXISTS post_categories (
     PRIMARY KEY (post_id, category)
 );
 
+-- Wer folgt wem. Beide Spalten zusammen sind der Schluessel, damit doppeltes
+-- Folgen gar nicht erst entstehen kann (INSERT OR IGNORE).
+CREATE TABLE IF NOT EXISTS follows (
+    follower_id TEXT NOT NULL REFERENCES users(id),
+    followee_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (follower_id, followee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -619,6 +630,53 @@ def delete_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
     with _connect(db_path) as conn:
         conn.execute("DELETE FROM post_categories WHERE post_id = ?", (post_id,))
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+
+
+# --- Folgen -----------------------------------------------------------------
+
+def follow(follower_id: str, followee_id: str,
+           db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Idempotent: zweimal folgen ist kein Fehler, sondern egal."""
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO follows (follower_id, followee_id, created_at) "
+            "VALUES (?, ?, ?)",
+            (follower_id, followee_id, _now()),
+        )
+
+
+def unfollow(follower_id: str, followee_id: str,
+             db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute(
+            "DELETE FROM follows WHERE follower_id = ? AND followee_id = ?",
+            (follower_id, followee_id),
+        )
+
+
+def is_following(follower_id: str, followee_id: str,
+                 db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    with _connect(db_path) as conn:
+        return conn.execute(
+            "SELECT 1 FROM follows WHERE follower_id = ? AND followee_id = ?",
+            (follower_id, followee_id)).fetchone() is not None
+
+
+def follow_counts(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict:
+    """Wie viele folgen mir (followers) und wem folge ich (following)?"""
+    with _connect(db_path) as conn:
+        followers = conn.execute(
+            "SELECT COUNT(*) AS n FROM follows WHERE followee_id = ?", (user_id,)).fetchone()["n"]
+        following = conn.execute(
+            "SELECT COUNT(*) AS n FROM follows WHERE follower_id = ?", (user_id,)).fetchone()["n"]
+        return {"followers": int(followers), "following": int(following)}
+
+
+def following_ids(follower_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[str]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT followee_id FROM follows WHERE follower_id = ?", (follower_id,)).fetchall()
+        return [r["followee_id"] for r in rows]
 
 
 def count_recent_posts(user_id: str, since_iso: str,
