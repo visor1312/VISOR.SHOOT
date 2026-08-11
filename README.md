@@ -16,6 +16,41 @@ Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)**, **Phase 3
 (Effekte, Grading, Upscaling)** und **Hook-Erkennung** (Roadmap-Ausbaustufe
 Richtung All-in-One-App fuer Indie-Musiker) sind fertig und lauffähig.
 
+## Neu: das Netzwerk für Musiker
+
+Seit August 2026 ist HOOKCUT nicht mehr nur ein Werkzeug für dich allein,
+sondern der Anfang einer **Plattform für Independent-Musiker**.
+
+Unter **„Offene Projekte"** in der Seitenleiste kannst du posten, woran du
+arbeitest und was dir noch fehlt — „Strophe steht, Hook fehlt", „suche einen
+Beat", „brauche jemanden fürs Mixing". Andere Musiker sehen das, können sich
+melden und mit dir zusammenarbeiten.
+
+- **Posten:** Titel, was du suchst (Refrain, Beat, Feature, Mixing), Text,
+  Genres, BPM und optional eine **Hörprobe bis 30 Sekunden**.
+- **Finden:** Der Reiter *Entdecken* zeigt alle offenen Projekte; mit den
+  Knöpfen oben filterst du nach dem, was du anbieten kannst. *Folge ich*
+  zeigt nur Musiker, denen du folgst.
+- **Melden:** „Ich hab Interesse" drücken oder kommentieren. Wer ein Projekt
+  gepostet hat, sieht alle Interessenten **mit ihren Profilen** — inklusive
+  der Links zu Instagram, Spotify & Co. Darüber läuft der Kontakt.
+- **Aufräumen:** Hat sich jemand gefunden, setzt du dein Projekt auf
+  **„erledigt"**. Dann verschwindet es aus den offenen Anfragen, und niemand
+  antwortet mehr auf etwas Abgeschlossenes.
+
+**Dein Profil** (Seitenleiste → „Mein Profil") ist das, was andere von dir
+sehen: Künstlername, Stadt, Genres, Kurzbeschreibung und deine Links.
+Deine E-Mail bleibt privat. Trag die Links ein — darüber melden sich Leute
+bei dir.
+
+> **Hinweis:** Solange HOOKCUT nur auf deinem Rechner läuft, bist du der
+> einzige Nutzer. Das Netzwerk entfaltet seinen Sinn erst, wenn es online
+> steht — das ist der nächste große Schritt (siehe `PROJEKT-STATUS.md`,
+> Abschnitt „Fahrplan").
+
+Die alte Seite „Offene Projekte" für deine **eigenen** Aufnahmen heißt jetzt
+**„Meine Aufnahmen"** — sonst gäbe es den Namen zweimal.
+
 ## Anmeldung & Konten
 
 HOOKCUT hat ein Benutzer-System: Login, Registrierung und pro Konto ein
@@ -36,6 +71,12 @@ lokal auf deinem Rechner.
    „Mit Einladungscode registrieren" → Code, E-Mail, Anzeigename und Passwort
    eingeben. **Das erste Konto wird automatisch Admin und übernimmt alle schon
    vorhandenen Projekte/Reels.**
+
+**Einladungspflicht ein-/ausschalten:** Auf deinem Rechner bleibt sie an —
+das ist sicherer, weil sonst jeder, der dein Backend erreicht, sich ein Konto
+anlegen könnte. Die spätere öffentliche Plattform setzt die Umgebungsvariable
+`HOOKCUT_INVITE_ONLY=0`, dann ist die Registrierung für alle offen und das
+Code-Feld verschwindet automatisch aus der Login-Maske.
 
 **Weitere Konten:** am bequemsten direkt in HOOKCUT unter **Einstellungen →
 Einladungscodes → „Neuen Code erzeugen"** (nur als Admin sichtbar). Alternativ
@@ -432,6 +473,24 @@ Ausschnitt des Songs ab), probiert das Tool automatisch Top-Vorschlag und
 Alternativen der Reihe nach durch und nimmt die erste, die vollstaendig im
 gefilmten Material liegt - passt keine, wird das transparent gemeldet
 (inkl. Hinweis, welchen Songbereich man beim naechsten Take mitfilmen sollte).
+
+## Mit Claude Code am eigenen Rechner weiterarbeiten
+
+Das Projekt ist so vorbereitet, dass ein neuer Claude-Chat sofort weiß, worum
+es geht: `CLAUDE.md` wird automatisch gelesen (kurze Orientierung + Regeln),
+die Tiefe steht in `PROJEKT-STATUS.md` (Architektur, Fahrplan, Sicherheit,
+gelernte Lektionen). Einfach Claude Code im Projektordner starten.
+
+Nützliche erste Sätze für einen neuen Chat:
+- „Lies CLAUDE.md und PROJEKT-STATUS.md und sag mir, wo wir stehen."
+- „Was ist der nächste Schritt laut Fahrplan?"
+
+**Wenn beim Start eine Fehlermeldung zu `.claude/hooks/session-start.sh`
+kommt:** Dieses Skript installiert in der Cloud-Umgebung automatisch die
+Abhängigkeiten. Auf Windows wird es nicht gebraucht (das macht
+`update-hookcut.bat`) und es beendet sich sofort selbst — falls Windows es
+trotzdem nicht ausführen kann, kannst du die Datei `.claude/settings.json`
+gefahrlos löschen. Am Projekt ändert sich dadurch nichts.
 
 ## Bekannte Grenzen (bewusst, siehe Nicht-Ziele)
 

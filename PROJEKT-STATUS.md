@@ -1,16 +1,24 @@
 # HOOKCUT — Projekt-Übergabe / Status
 
-> **Für jeden neuen Coding-Agenten (oder neuen Chat): ZUERST dieses Dokument
-> lesen, dann README.md.** Stand: Juli 2026, Branch
-> `claude/rap-video-auto-editor-s9xfvt` (alles committed).
+> **Für jeden neuen Coding-Agenten (oder neuen Chat): ZUERST `CLAUDE.md`
+> lesen (kurz), dann dieses Dokument (tief), dann README.md (Bedienung).**
+> Stand: **August 2026**, Branch `claude/rap-video-auto-editor-s9xfvt`
+> (alles committed und gepusht).
 
 ## Was ist HOOKCUT?
 
-All-in-One-Tool für Independent-Musiker (Zielgruppe: nicht-technisch, Deutschrap):
-Handy-Performance-Video + fertiger Song rein → fertiges, gestyltes,
-untertiteltes 9:16-Reel raus. Soll als kommerzielles Produkt verkauft werden.
-Besitzer: YngLyric (louis), arbeitet auf Windows, non-technical — Erklärungen
-einfach halten, `.bat`-Dateien zum Doppelklicken bereitstellen.
+**Zwei Dinge in einem Projekt:**
+
+1. **Das Werkzeug** (fertig, in Benutzung): Handy-Performance-Video + fertiger
+   Song rein → fertiges, gestyltes, untertiteltes 9:16-Reel raus.
+2. **Das Netzwerk** (neu, seit August 2026): ein soziales Netzwerk für
+   Independent-Musiker mit „offenen Projekten" („mir fehlt noch ein Refrain").
+   Kostenlos — das Werkzeug aus 1. wird später das Premium-Angebot
+   (~10 €/Monat). Endziel: Apps für iOS und Android.
+
+Zielgruppe: nicht-technisch, Deutschrap. Besitzer: YngLyric (louis), arbeitet
+auf Windows, non-technical — Erklärungen einfach halten, `.bat`-Dateien zum
+Doppelklicken bereitstellen.
 
 ## Kern-Ablauf (der "Reel erstellen"-Assistent, web/)
 
@@ -118,9 +126,12 @@ Interesse zeigen, kommentieren.
 - **Spam-Bremse:** 10 Beiträge/Stunde. **Notaus:**
   `POST /admin/posts/{id}/hide` (nur Admin). Der vollständige Melde-Ablauf
   für Nutzer kommt in Phase 2.
-- **Frontend:** `pages/FeedPage.tsx` (Reiter Entdecken/Folge ich + Filter),
-  `PostDetailPage.tsx`, `ProfilAnsichtPage.tsx` (`/musiker/:handle`),
+- **Frontend** (alles unter `web/src/`): `pages/FeedPage.tsx` (Reiter
+  Entdecken/Folge ich + Filter), `pages/PostDetailPage.tsx`,
+  `pages/ProfilAnsichtPage.tsx` (Route `/musiker/:handle`),
   `components/CreatePostWizard.tsx`, `components/BeitragsKarte.tsx`.
+  Routen stehen in `web/src/App.tsx`, Navigation in
+  `web/src/components/Sidebar.tsx`.
   Die alte Seite „Offene Projekte" (eigene Aufnahmen) heißt jetzt
   **„Meine Aufnahmen"** — sonst gäbe es den Namen zweimal.
 
@@ -218,15 +229,52 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
   `_run_content_pack`; beim Hosting (`=0`) bleiben die Items offen und der
   Agent zieht sie über diesen Vertrag ab.
 
-## Roadmap fürs Bezahl-Release (bewusst DANACH, je ein eigener Block)
+## Fahrplan (die große Linie, mit dem Besitzer abgestimmt)
 
-1. **Echtes Deployment** (Server + Domain) + **lokaler Render-Agent**
-   (Companion, der pending-Items zieht, lokal rendert, das MP4 per
-   `/render/{item}/result` hochlädt). Erst dann ist der Hybrid-Kreis geschlossen.
-2. **Abrechnung** (Stripe, 10€/Monat) — ergibt erst mit Server Sinn.
-3. **„Bleibt-online"-Features** Smart Link / Release-Landingpage + EPK
-   (Pressekit) — die klassischen Abo-Gründe.
-   (Spotify Canvas ist umgesetzt, siehe oben.)
+Ziel: aus dem Werkzeug wird eine **Plattform für Independent-Musiker** —
+kostenloses Netzwerk mit offenen Projekten, darauf ein Premium-Abo
+(~10 €/Monat) für die Render-Werkzeuge. Web zuerst, Apps später.
+
+**Rahmenbedingungen, die den ganzen Plan formen:**
+- **Budget 0–20 €/Monat.** Investor erst, wenn es läuft und überzeugt.
+  Alles muss auf Gratis-Stufen laufen (Domain ~1 €/Monat, Server/DB/Speicher
+  gratis, E-Mail-Versand gratis bis einige tausend/Monat).
+- **Rendern bleibt auf PCs.** Video-Render auf Servern braucht GPU-Maschinen
+  und kostet echtes Geld pro Video — bei 10 €/Monat würde ein Vielnutzer
+  Verlust machen, und ein Handy kann es gar nicht. Der Vertrag dafür steht
+  schon (`/render/pending|claim|result` + `HOOKCUT_LOCAL_RENDER`).
+- **Abo über die Webseite verkaufen, nicht in der App.** Apple nimmt in der
+  EU rund 12–20 %, und man darf **nicht** beides gleichzeitig anbieten.
+  Also: Abo im Web abschließen, die App schaltet nur frei.
+
+| Phase | Inhalt | Zustand |
+|---|---|---|
+| 0 | Offene Registrierung (`HOOKCUT_INVITE_ONLY`), Musiker-Profile | **fertig** |
+| 1 | Netzwerk: posten, Feed mit Filtern, folgen, Interesse, Kommentare | **fertig** |
+| 2 | **Live stellen** | **als Nächstes** |
+| 3 | Premium-Abo (Stripe) + Render-Agent für den PC | offen |
+| 4 | Apps für iOS und Android (Expo/React Native, NativeWind) | offen |
+
+**Phase 2 im Detail** (das ist der nächste Block):
+1. PostgreSQL statt SQLite — gehostete Server haben keinen dauerhaften
+   Speicher. `db.py` nutzt reines SQL ohne ORM, die Umstellung ist
+   überschaubar, aber echte Arbeit.
+2. Object Storage für Hörproben/Bilder (z.B. Cloudflare R2, 10 GB gratis) —
+   Dateien dürfen nicht auf dem Server-Dateisystem liegen.
+3. Deployment (Fly.io / Railway / Render) + eigene Domain,
+   `HOOKCUT_SECURE_COOKIES=1`, `HOOKCUT_CORS_ORIGINS`, `HOOKCUT_INVITE_ONLY=0`.
+4. **Pflichtseiten und Meldeknopf — nicht verhandelbar:** Impressum,
+   Datenschutzerklärung, AGB, Meldefunktion an jedem Beitrag, Löschweg.
+   Sobald Fremde hochladen, gelten Pflichten (DSA; Art. 17 für fremde
+   Rechte an Beats/Samples). Der Admin-Notaus
+   (`POST /admin/posts/{id}/hide`) ist nur das Minimum für den Betreiber.
+5. Rate-Limit auf die Registrierung + E-Mail-Bestätigung (siehe „Sicherheit").
+6. **Echte Musiker einladen und zuschauen, was sie tun.** Der Moment der
+   Wahrheit — bis dahin ist alles Vermutung.
+
+**Danach (Phase 3+):** Render-Agent (Companion, der pending-Items zieht,
+lokal rendert und per `/render/{item}/result` hochlädt) · Stripe ·
+Benachrichtigungen · „Bleibt-online"-Features Smart Link / EPK.
 
 ## Wichtige gelernte Lektionen (nicht wiederholen!)
 
@@ -266,15 +314,24 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
 
 ## Zustand / Qualität
 
-- 158 pytest-Tests grün (tests/). Web-Build + oxlint grün. Sync + Hook mit
+- **231 pytest-Tests grün** (tests/). Web-Build + oxlint grün. Sync + Hook mit
   echten Dateien validiert (offset ~5039ms, conf 0.88 beim Testmaterial).
-  Auth- und Navigations-Flows zusätzlich per Playwright im echten Browser
-  (gegen den Vite-Proxy) verifiziert.
-- Beat-Effekte (beat_pulse.py + audioPulse in freecut_workspace.py) sind
-  implementiert und getestet, aber noch NICHT vom Nutzer im echten Render
-  bestätigt (Sandbox kann kein Chrome-Rendern).
-- Vom Nutzer end-to-end bestätigt: Sync, Hook-Flow, Styles-Render,
-  9:16-Cover, Untertitel unten + exakte Lyrics.
+- **Im echten Browser durchgespielt** (Playwright gegen den Vite-Proxy):
+  Anmeldung/Registrierung, Navigation, und der komplette Netzwerk-Ablauf mit
+  ZWEI getrennten Konten — Rapper postet mit Hörprobe → Producer findet ihn
+  über den Kategorie-Filter **ohne zu folgen** → öffnet, zeigt Interesse,
+  kommentiert → sieht keinen Erledigt-/Löschen-Knopf → folgt → Beitrag
+  erscheint unter „Folge ich" → Rapper sieht den Interessenten samt Profil →
+  setzt auf erledigt → Beitrag verschwindet aus „Entdecken".
+- **Vom Besitzer end-to-end bestätigt:** Sync, Hook-Flow, Styles-Render,
+  9:16-Cover, Untertitel unten + exakte Lyrics. Außerdem: nach `git pull`
+  startet die App und der Login-Ablauf funktioniert.
+- **Noch NICHT vom Besitzer im echten Render bestätigt** (die Sandbox kann
+  kein Chrome/WebGPU): Beat-Effekte, Multi-Plattform-Export, Wochen-Content,
+  Spotify Canvas. Backend und Tests sagen nichts darüber, ob ein Video am
+  Ende gut aussieht — das kann nur sein Rechner zeigen.
+- **Das Netzwerk hat noch nie ein echter Musiker benutzt.** Alles bisher sind
+  Testkonten. Das ist die größte offene Unbekannte im ganzen Projekt.
 - Legacy, funktioniert aber: Gradio-UI (frontend/app.py), alte ffmpeg-
   Effekte (effects_grading.py — durch FreeCut-Styles überholt, aber von
   Gradio + Tests noch genutzt). UploadModal im web/ wurde entfernt (durch
@@ -328,18 +385,32 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-1. **Beat-Effekte beim Nutzer end-to-end bestätigen** (Backend + Tests grün,
-   Chrome-Render geht nur beim Nutzer). Danach ggf. Intensität/Stride
-   feinjustieren (beat_pulse.py hat stride=2/4 schon, UI bewusst nur Toggle).
-2. Style-Intensitäten nach Nutzer-Feedback feinjustieren.
-3. Hosting: Fundament steht (config/lifespan/WAL/health + Render-Vertrag,
-   siehe oben). Nächster Block: echtes Deployment + lokaler Render-Agent +
-   Stripe + Smart Link/EPK (Details im Roadmap-Abschnitt oben).
-4. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
-5. Roadmap-Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
-   beachten), Wort-Karaoke-Highlight. (Batch/Wochen-Content und Spotify Canvas
-   sind umgesetzt.)
-   (Multi-Plattform-Presets sind umgesetzt, warten auf Nutzer-Test.)
+**Als Nächstes:** Phase 2 (live stellen) — Details im Fahrplan oben.
+
+**Warten auf den Besitzer** (nur sein Rechner kann das prüfen):
+1. Beat-Effekte, Multi-Plattform-Export, Wochen-Content und Spotify Canvas
+   im echten Render bestätigen. Danach ggf. Beat-Intensität/Stride
+   feinjustieren (beat_pulse.py hat stride=2/4, UI bewusst nur Toggle) und
+   Style-Intensitäten nachziehen.
+2. Das Netzwerk selbst ausprobieren und sagen, ob sich der Ablauf richtig
+   anfühlt (posten → finden → Interesse → Kontakt).
+
+**Bewusst zurückgestellt** (mit Begründung, nicht vergessen):
+3. Benachrichtigungen (Glöckchen) — kommen direkt nach Phase 1, damit Leute
+   zurückkommen.
+4. Direktnachrichten — Kontakt läuft vorerst über die Profillinks
+   (Instagram/Spotify) der Interessenten. Erst bauen, wenn sich zeigt, dass
+   es wirklich fehlt.
+5. Bilder an Beiträgen — erst wenn der Object Storage steht; die lokale
+   Platte ist dafür der falsche Ort.
+6. Blockieren/Stummschalten von Nutzern.
+7. `backend/main.py` ist auf ~1.350 Zeilen gewachsen (Werkzeug UND Netzwerk
+   in einer Datei). Funktioniert und folgt dem bestehenden Aufbau, wird aber
+   unübersichtlich — das Netzwerk könnte in ein eigenes Modul. Reines
+   Aufräumen ohne sichtbaren Nutzen, deshalb nicht eigenmächtig gemacht.
+8. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
+9. Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
+   beachten), Wort-Karaoke-Highlight.
 
 ## Stil der Zusammenarbeit mit dem Besitzer
 
