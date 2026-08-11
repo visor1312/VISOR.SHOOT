@@ -1215,6 +1215,15 @@ def _feed_eintrag(zeile: dict) -> dict:
     return _post_public(zeile, autor)
 
 
+def _mit_zaehlern(eintraege: list[dict]) -> list[dict]:
+    """Interesse-/Kommentarzahlen fuer die ganze Liste in EINEM Rutsch
+    nachtragen - pro Beitrag zu zaehlen waere im Feed eine unnoetige Bremse."""
+    zaehler = db.post_counts([e["id"] for e in eintraege])
+    for e in eintraege:
+        e.update(zaehler[e["id"]])
+    return eintraege
+
+
 def _feed_kategorien(categories: str) -> list[str]:
     """Kategorie-Filter aus der URL - Unbekanntes wird still verworfen,
     damit ein Tippfehler nicht die ganze Seite scheitern laesst."""
@@ -1230,7 +1239,7 @@ def feed_discover(categories: str = "", genre: str = "", open_only: bool = True,
     zeilen = db.list_feed(user["id"], only_following=False,
                           categories=_feed_kategorien(categories), genre=genre,
                           open_only=open_only, before=before, limit=limit)
-    return [_feed_eintrag(z) for z in zeilen]
+    return _mit_zaehlern([_feed_eintrag(z) for z in zeilen])
 
 
 @app.get("/feed")
@@ -1241,7 +1250,7 @@ def feed_following(categories: str = "", genre: str = "", open_only: bool = True
     zeilen = db.list_feed(user["id"], only_following=True,
                           categories=_feed_kategorien(categories), genre=genre,
                           open_only=open_only, before=before, limit=limit)
-    return [_feed_eintrag(z) for z in zeilen]
+    return _mit_zaehlern([_feed_eintrag(z) for z in zeilen])
 
 
 @app.get("/profiles/{handle}/posts")
@@ -1252,4 +1261,86 @@ def posts_by_profile(handle: str, limit: int = 50,
     profil = db.get_profile_by_handle(handle.strip().lower())
     if not profil:
         raise HTTPException(404, "Profil nicht gefunden")
-    return [_post_public(p) for p in db.list_posts_by_user(profil["user_id"], limit=limit)]
+    return _mit_zaehlern(
+        [_post_public(p) for p in db.list_posts_by_user(profil["user_id"], limit=limit)])
+
+
+COMMENT_MAX = 1000
+
+
+def _kommentar_public(zeile: dict) -> dict:
+    autor = {
+        "user_id": zeile["user_id"], "handle": zeile["handle"],
+        "artist_name": zeile["artist_name"], "bio": zeile["bio"],
+        "city": zeile["city"], "genres": zeile["author_genres"],
+        "links_json": zeile["links_json"], "avatar_path": zeile["avatar_path"],
+        "created_at": zeile["author_created_at"],
+    }
+    return {"id": zeile["id"], "post_id": zeile["post_id"], "body": zeile["body"],
+            "created_at": zeile["created_at"], "author": auth.public_profile(autor)}
+
+
+@app.post("/posts/{post_id}/interest")
+def add_interest(post_id: str, user: dict = Depends(auth.get_current_user)):
+    post = _sichtbarer_post(post_id)
+    if post["user_id"] == user["id"]:
+        raise HTTPException(422, "Am eigenen Projekt kannst du kein Interesse zeigen.")
+    db.add_interest(post_id, user["id"])
+    return {"ok": True, "interested": True}
+
+
+@app.delete("/posts/{post_id}/interest")
+def remove_interest(post_id: str, user: dict = Depends(auth.get_current_user)):
+    _sichtbarer_post(post_id)
+    db.remove_interest(post_id, user["id"])
+    return {"ok": True, "interested": False}
+
+
+@app.get("/posts/{post_id}/interest")
+def list_interest(post_id: str, user: dict = Depends(auth.get_current_user)):
+    """Wer hat Interesse - mit Profil.
+
+    Das IST der Kontaktweg: Direktnachrichten gibt es (noch) nicht, aber die
+    Profile tragen die Links zu Instagram, Spotify & Co. Der Autor sieht also,
+    wer helfen will, und erreicht die Person ueber ihre eigenen Kanaele.
+    """
+    _sichtbarer_post(post_id)
+    return {
+        "interested": db.has_interest(post_id, user["id"]),
+        "people": [auth.public_profile(p) for p in db.list_interested(post_id)],
+    }
+
+
+@app.get("/posts/{post_id}/comments")
+def list_comments(post_id: str, _: dict = Depends(auth.get_current_user)):
+    _sichtbarer_post(post_id)
+    return [_kommentar_public(z) for z in db.list_comments(post_id)]
+
+
+@app.post("/posts/{post_id}/comments")
+def create_comment(post_id: str, body: str = Form(...),
+                   user: dict = Depends(auth.get_current_user)):
+    _sichtbarer_post(post_id)
+    text = body.strip()
+    if not text:
+        raise HTTPException(422, "Bitte einen Text eingeben.")
+    auth.ensure_profile(user)  # der JOIN in list_comments verlaesst sich darauf
+    comment_id = db.create_comment(post_id, user["id"], text[:COMMENT_MAX])
+    return next(k for k in (_kommentar_public(z) for z in db.list_comments(post_id))
+                if k["id"] == comment_id)
+
+
+@app.delete("/comments/{comment_id}")
+def delete_comment(comment_id: str, user: dict = Depends(auth.get_current_user)):
+    """Loeschen darf der Verfasser - UND der Eigentuemer des Beitrags: im
+    eigenen Projekt aufraeumen zu koennen ist die einfachste Form von
+    Hausrecht."""
+    kommentar = db.get_comment(comment_id)
+    if not kommentar:
+        raise HTTPException(404, "Kommentar nicht gefunden")
+    post = db.get_post(kommentar["post_id"])
+    darf = kommentar["user_id"] == user["id"] or (post and post["user_id"] == user["id"])
+    if not darf:
+        raise HTTPException(403, "Das ist nicht dein Kommentar.")
+    db.delete_comment(comment_id)
+    return {"ok": True}

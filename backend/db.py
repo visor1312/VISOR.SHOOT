@@ -161,6 +161,26 @@ CREATE TABLE IF NOT EXISTS follows (
 
 CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id);
 
+-- "Ich kann helfen" an einem offenen Projekt. Beide Spalten als Schluessel:
+-- zweimal draufdruecken kann keinen Doppeleintrag erzeugen.
+CREATE TABLE IF NOT EXISTS post_interests (
+    post_id TEXT NOT NULL REFERENCES posts(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL REFERENCES posts(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, created_at);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -719,6 +739,99 @@ def list_posts_by_user(user_id: str, limit: int = 50,
                     (b["id"],)).fetchall()
             ]
         return beitraege
+
+
+# --- Interesse & Kommentare -------------------------------------------------
+
+def add_interest(post_id: str, user_id: str,
+                 db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Idempotent - zweimal draufdruecken ist kein Fehler."""
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO post_interests (post_id, user_id, created_at) "
+            "VALUES (?, ?, ?)", (post_id, user_id, _now()))
+
+
+def remove_interest(post_id: str, user_id: str,
+                    db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM post_interests WHERE post_id = ? AND user_id = ?",
+                     (post_id, user_id))
+
+
+def list_interested(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Wer hat Interesse - MIT Profil. Das ist der Kontaktweg: der Autor sieht
+    die Profile und erreicht die Leute ueber deren hinterlegte Links."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT pr.* FROM post_interests i "
+            "JOIN profiles pr ON pr.user_id = i.user_id "
+            "WHERE i.post_id = ? ORDER BY i.created_at",
+            (post_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def has_interest(post_id: str, user_id: str,
+                 db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    with _connect(db_path) as conn:
+        return conn.execute(
+            "SELECT 1 FROM post_interests WHERE post_id = ? AND user_id = ?",
+            (post_id, user_id)).fetchone() is not None
+
+
+def create_comment(post_id: str, user_id: str, body: str,
+                   db_path: str | Path = DEFAULT_DB_PATH) -> str:
+    comment_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO comments (id, post_id, user_id, body, created_at) "
+            "VALUES (?, ?, ?, ?, ?)", (comment_id, post_id, user_id, body, _now()))
+    return comment_id
+
+
+def get_comment(comment_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_comments(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Kommentare mit Autorenprofil (JOIN statt einer Abfrage pro Kommentar)."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT c.*, pr.handle, pr.artist_name, pr.bio, pr.city, pr.links_json, "
+            "       pr.avatar_path, pr.genres AS author_genres, "
+            "       pr.created_at AS author_created_at "
+            "FROM comments c JOIN profiles pr ON pr.user_id = c.user_id "
+            "WHERE c.post_id = ? AND c.status = 'active' ORDER BY c.created_at",
+            (post_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_comment(comment_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
+
+
+def post_counts(post_ids: Sequence[str],
+                db_path: str | Path = DEFAULT_DB_PATH) -> dict[str, dict]:
+    """Interesse- und Kommentarzahlen fuer VIELE Beitraege auf einmal -
+    im Feed waere je eine Abfrage pro Beitrag eine unnoetige Bremse."""
+    zaehler = {pid: {"interest_count": 0, "comment_count": 0} for pid in post_ids}
+    if not post_ids:
+        return zaehler
+    platzhalter = ",".join("?" for _ in post_ids)
+    with _connect(db_path) as conn:
+        for r in conn.execute(
+                f"SELECT post_id, COUNT(*) AS n FROM post_interests "
+                f"WHERE post_id IN ({platzhalter}) GROUP BY post_id", list(post_ids)):
+            zaehler[r["post_id"]]["interest_count"] = int(r["n"])
+        for r in conn.execute(
+                f"SELECT post_id, COUNT(*) AS n FROM comments "
+                f"WHERE post_id IN ({platzhalter}) AND status = 'active' GROUP BY post_id",
+                list(post_ids)):
+            zaehler[r["post_id"]]["comment_count"] = int(r["n"])
+    return zaehler
 
 
 # --- Folgen -----------------------------------------------------------------
