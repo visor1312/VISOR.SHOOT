@@ -70,9 +70,24 @@ tests/            pytest
 - **Neue Anzeige-Helfer** (Datum, Status-Ampel …) gehören in
   `web/src/lib/format.ts`, nicht als Kopie in einzelne Seiten.
 - **Datenrouten** brauchen immer `user: dict = Depends(auth.get_current_user)`.
-  Fremde Ressourcen geben **404** (nicht 403) über `_own()` — so verrät die
-  API nicht, ob eine fremde ID existiert. Offen sind nur die statischen
-  Kataloge (`/styles`, `/platforms`, `/presets`, `/health`).
+  Offen sind nur die statischen Kataloge (`/styles`, `/platforms`, `/presets`,
+  `/post-categories`, `/health`, `/auth/config`).
+- **Zwei Sichtbarkeits-Regeln — nicht verwechseln:**
+
+  | | Lesen | Ändern / Löschen |
+  |---|---|---|
+  | **Privates** (Projekte, Jobs, Packs, Canvas) | nur Besitzer → **404** via `_own()` | nur Besitzer → **404** |
+  | **Soziales** (Beiträge, Kommentare) | jedes angemeldete Mitglied | nur Autor → **403** via `_own_public()` |
+
+  Die 404-Regel schützt davor, dass jemand die *Existenz* fremder Daten
+  herausfindet. Bei einem Beitrag im Feed ist die Existenz ohnehin öffentlich —
+  dort wäre 404 gelogen, deshalb 403. **Neue private Route ⇒ `_own()`, neue
+  soziale Route ⇒ `_own_public()`.** Falsch gewählt heißt Datenleck oder
+  kaputter Feed.
+- **Uploads von Fremden** (alles im Netzwerk) gehen über
+  `_save_upload_capped()` mit Größengrenze, Endungs-Positivliste und
+  Längenprüfung. Das alte `_save_upload()` ist ungedeckelt und nur noch für
+  die lokalen Werkzeug-Flows gedacht.
 - **`db.py`-Funktionen** immer mit `db_path=`-Keyword (Tests nutzen
   eigene DBs über `HOOKCUT_DB`).
 - **Einstellbares Verhalten** gehört in `backend/config.py` (Env-Variable mit

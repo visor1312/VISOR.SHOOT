@@ -13,6 +13,8 @@ import ProjektePage from "./pages/ProjektePage";
 import EinstellungenPage from "./pages/EinstellungenPage";
 import ProfilPage from "./pages/ProfilPage";
 import FeedPage from "./pages/FeedPage";
+import PostDetailPage from "./pages/PostDetailPage";
+import ProfilAnsichtPage from "./pages/ProfilAnsichtPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import { getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
@@ -91,6 +93,8 @@ function App() {
         <Route path="wochen-content/:id" element={<PackDetailPage />} />
         <Route path="projekte" element={<ProjektePage />} />
         <Route path="projekte-feed" element={<FeedPage />} />
+        <Route path="projekt/:postId" element={<PostDetailPage />} />
+        <Route path="musiker/:handle" element={<ProfilAnsichtPage />} />
         <Route path="profil" element={<ProfilPage />} />
         <Route path="einstellungen" element={<EinstellungenPage />} />
         <Route path="spotify" element={<ComingSoonPage title="Spotify Streaming Dashboard" />} />

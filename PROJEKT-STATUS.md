@@ -90,11 +90,52 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
   - **Links werden geprüft** (`auth.clean_link`): nur http(s), feste Liste
     erlaubter Arten. Ohne das könnte jemand einen `javascript:`-Link im Profil
     hinterlegen, den andere anklicken.
+## Das Netzwerk (Phase 1, August 2026)
+
+Aus dem Einzelplatz-Werkzeug wird eine Plattform für Musiker: „offene
+Projekte" posten („mir fehlt noch ein Refrain"), im Feed finden, folgen,
+Interesse zeigen, kommentieren.
+
+- **Tabellen:** `posts` (+ `post_categories` als eigene indizierte Tabelle,
+  weil danach GEFILTERT wird — in einer Textspalte träfe „beat" auch
+  „boombeat" und kein Index griffe), `follows`, `post_interests`, `comments`.
+- **`open_state`** (offen/erledigt) ist bewusst getrennt vom Moderations-
+  `status`. Ohne den Erledigt-Schalter füllt sich der Feed mit Anfragen, auf
+  die längst geantwortet wurde.
+- **Feed:** `GET /feed/discover` (alle, mit Kategorie-/Genre-Filter) ist die
+  Startansicht — wer neu ist, folgt niemandem und sähe sonst nichts.
+  `GET /feed` zeigt eigene + gefolgte. Autorenprofil kommt per JOIN mit,
+  Kategorien und Zähler werden für die ganze Liste in je einer Abfrage
+  geholt (kein N+1).
+- **Kontaktweg statt Direktnachrichten:** `GET /posts/{id}/interest` liefert
+  die Interessenten MIT Profil; dort liegen die Links zu Instagram, Spotify
+  & Co. Der Autor erreicht die Leute also über deren eigene Kanäle. Spart
+  ein komplettes Nachrichtensystem.
+- **Upload-Grenzen für Hörproben:** 8 MB (30 s WAV ≈ 5,3 MB), 30 s,
+  Endungs-Positivliste, geprüft über `_probe_duration_sec`. Scheitert
+  ffprobe → 422 (Nutzereingabe), nicht 500. Bei Fehlschlag werden Datei UND
+  Beitragszeile zurückgebaut.
+- **Spam-Bremse:** 10 Beiträge/Stunde. **Notaus:**
+  `POST /admin/posts/{id}/hide` (nur Admin). Der vollständige Melde-Ablauf
+  für Nutzer kommt in Phase 2.
+- **Frontend:** `pages/FeedPage.tsx` (Reiter Entdecken/Folge ich + Filter),
+  `PostDetailPage.tsx`, `ProfilAnsichtPage.tsx` (`/musiker/:handle`),
+  `components/CreatePostWizard.tsx`, `components/BeitragsKarte.tsx`.
+  Die alte Seite „Offene Projekte" (eigene Aufnahmen) heißt jetzt
+  **„Meine Aufnahmen"** — sonst gäbe es den Namen zweimal.
+
 - **Ownership-Regel (WICHTIG):** jede Daten-Route hat
   `Depends(auth.get_current_user)`; Listen filtern `WHERE user_id = ?`,
   Einzel-/Download-Routen werfen über den `_own()`-Helper **404** bei fremden
   Ressourcen (kein 403 = kein Existenz-Orakel). Nur `/styles`, `/platforms`,
-  `/presets` sind öffentlich. Neue Daten-Route ⇒ IMMER scopen, sonst Datenleck.
+  `/presets`, `/post-categories`, `/health`, `/auth/config` sind öffentlich.
+  Neue Daten-Route ⇒ IMMER scopen, sonst Datenleck.
+- **ACHTUNG, zweite Regel seit dem Netzwerk:** für SOZIALE Inhalte
+  (Beiträge, Kommentare) gilt `_own_public()` statt `_own()` — lesen darf
+  jedes angemeldete Mitglied (sonst gäbe es keinen Feed), ändern/löschen nur
+  der Autor, und zwar mit **403**. Bei einem Beitrag im Feed ist die Existenz
+  ohnehin öffentlich; ein 404 wäre dort schlicht gelogen. Neue private Route
+  ⇒ `_own()`, neue soziale Route ⇒ `_own_public()`.
 - **Erstes Konto = Admin** und übernimmt per `claim_orphan_rows` alle Altdaten
   (user_id NULL). Danach gibt es keine besitzerlosen Zeilen mehr.
 - **DB:** neue Tabellen users/sessions/invite_codes/login_attempts + user_id

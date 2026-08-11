@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Plus, Music2, Users } from "lucide-react";
 import {
   getDiscoverFeed, getFollowingFeed, getPostCategories,
@@ -124,7 +125,10 @@ export default function FeedPage() {
       {beitraege && beitraege.length > 0 && (
         <div className="mt-6 space-y-3">
           {beitraege.map((p) => (
-            <BeitragsKarte key={p.id} post={p} labels={labels} />
+            <Link key={p.id} to={`/projekt/${p.id}`}
+              className="block hover:brightness-110 transition-all">
+              <BeitragsKarte post={p} labels={labels} />
+            </Link>
           ))}
         </div>
       )}
