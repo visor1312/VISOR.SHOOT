@@ -261,22 +261,46 @@ kostenloses Netzwerk mit offenen Projekten, darauf ein Premium-Abo
 | 3 | Premium-Abo (Stripe) + Render-Agent für den PC | offen |
 | 4 | Apps für iOS und Android (Expo/React Native, NativeWind) | offen |
 
-**Phase 2 im Detail** (das ist der nächste Block):
-1. PostgreSQL statt SQLite — gehostete Server haben keinen dauerhaften
-   Speicher. `db.py` nutzt reines SQL ohne ORM, die Umstellung ist
-   überschaubar, aber echte Arbeit.
-2. Object Storage für Hörproben/Bilder (z.B. Cloudflare R2, 10 GB gratis) —
-   Dateien dürfen nicht auf dem Server-Dateisystem liegen.
-3. Deployment (Fly.io / Railway / Render) + eigene Domain,
-   `HOOKCUT_SECURE_COOKIES=1`, `HOOKCUT_CORS_ORIGINS`, `HOOKCUT_INVITE_ONLY=0`.
-4. **Pflichtseiten und Meldeknopf — nicht verhandelbar:** Impressum,
-   Datenschutzerklärung, AGB, Meldefunktion an jedem Beitrag, Löschweg.
-   Sobald Fremde hochladen, gelten Pflichten (DSA; Art. 17 für fremde
-   Rechte an Beats/Samples). Der Admin-Notaus
-   (`POST /admin/posts/{id}/hide`) ist nur das Minimum für den Betreiber.
-5. Rate-Limit auf die Registrierung + E-Mail-Bestätigung (siehe „Sicherheit").
-6. **Echte Musiker einladen und zuschauen, was sie tun.** Der Moment der
-   Wahrheit — bis dahin ist alles Vermutung.
+**Phase 2 im Detail — sieben Schritte** (Stand: 3 von 7 erledigt)
+
+Die Reihenfolge ist Absicht: **erst deployen, solange der Einladungscode noch
+schützt.** So platzen Server-Überraschungen früh und ohne Publikum; das Öffnen
+ist der letzte, bewusste Schritt.
+
+| # | Schritt | Zustand |
+|---|---|---|
+| 1 | Ein Dienst: Backend liefert die Oberfläche mit aus | **fertig** (`f4c4a97`) |
+| 2 | Video-Werkzeuge online abschaltbar (`HOOKCUT_TOOLS_ENABLED`) | **fertig** (`b91ce1e`) |
+| 3 | Schlanker Server (schwere Importe faul, `requirements-server.txt`) | **fertig** |
+| 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | als Nächstes |
+| 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | offen |
+| 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | offen |
+| 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | offen |
+
+**Zwei Entscheidungen, die diesen Plan von der alten Fassung unterscheiden:**
+
+- **Kein PostgreSQL.** Der ältere Fahrplan sah SQLite → PostgreSQL vor. Das
+  entfällt und spart Wochen: SQLite ist für ein leselastiges Netzwerk mit den
+  ersten hundert Nutzern produktionstauglich, WAL läuft bereits.
+  **Bedingung:** eine *dauerhafte Festplatte* — auf einer Gratis-Stufe mit
+  flüchtigem Dateisystem wären Datenbank *und* Hörproben nach jedem Neustart
+  weg. Deshalb bezahltes Hosting (~9 €/Monat, mit dem Besitzer entschieden).
+  Sicherheitsnetz: Litestream spiegelt die Datenbank laufend nach
+  Cloudflare R2. **Ehrlich dazu:** Litestream sichert nur die Datenbank, nicht
+  die Hörproben — bei einem Plattenschaden wären Konten und Beiträge zurück,
+  die Audiodateien nicht.
+- **Kein Object Storage zum Start.** Hörproben liegen mit auf der Platte.
+  Nachrüstbar, aber kein Startblocker.
+
+**Was in Schritt 5 nicht verhandelbar ist:** Impressum nach § 5 DDG (löste 2024
+das TMG ab; ladungsfähige Anschrift, Postfach genügt **nicht**),
+Datenschutzerklärung getrennt davon, AGB, Meldefunktion an jedem Beitrag (DSA)
+und Konto löschen (DSGVO Art. 17 — fehlt bisher komplett). Der Admin-Notaus
+(`POST /admin/posts/{id}/hide`) ist nur das Minimum für den Betreiber.
+Betreiberdaten kommen an **eine einzige Stelle**, damit die Privatadresse
+später ohne Programmieren gegen eine Geschäftsadresse tauschbar ist.
+Die Texte gehören vor dem Livegang einmal vom Besitzer geprüft — besonders die
+AGB, weil es dort um fremde Rechte an Beats und Samples geht.
 
 **Danach (Phase 3+):** Render-Agent (Companion, der pending-Items zieht,
 lokal rendert und per `/render/{item}/result` hochlädt) · Stripe ·
@@ -372,7 +396,12 @@ Behoben in diesem Durchgang:
   eben angelegte Konto wieder entfernt.
 
 Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
-- Kein Größenlimit für Uploads — lokal egal, online ein Füll-die-Platte-Risiko.
+- Kein Größenlimit für die **Werkzeug**-Uploads (`_save_upload` in `main.py`:
+  Video/Song für Sync, Hook, Packs, Canvas) — lokal egal. Online entschärft,
+  seit diese Routen mit `HOOKCUT_TOOLS_ENABLED=0` gar nicht mehr erreichbar
+  sind (503, Phase 2 Schritt 2). Werden sie je online freigeschaltet, braucht
+  es vorher eine Grenze. Die **Netzwerk**-Uploads (Hörproben) sind gedeckelt
+  (`_save_upload_capped`, 8 MB + Endungs-Positivliste + Längenprüfung).
 - Nach einer abgelaufenen Sperre bleibt fail_count stehen: der nächste
   Fehlversuch sperrt sofort wieder für 15 min. Für den Besitzer harmlos
   (hookcut-passwort-reset.bat), online aber ein Ärgernis-Hebel gegen fremde
@@ -391,7 +420,8 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-**Als Nächstes:** Phase 2 (live stellen) — Details im Fahrplan oben.
+**Als Nächstes:** Phase 2, Schritt 4 — `Dockerfile` + `render.yaml` und der
+erste Livegang, noch mit Einladungscode. Details im Fahrplan oben.
 
 **Warten auf den Besitzer** (nur sein Rechner kann das prüfen):
 1. Beat-Effekte, Multi-Plattform-Export, Wochen-Content und Spotify Canvas

@@ -1,0 +1,29 @@
+# Pakete fuer den GEHOSTETEN Server (nur das Netzwerk).
+#
+# Bewusst NICHT dasselbe wie requirements.txt: die grosse Liste ist fuer den
+# Rechner des Besitzers gedacht, wo die Video-Werkzeuge laufen. Sie zieht
+# librosa, numpy, scipy, faster_whisper und demucs herein - zusammen deutlich
+# ueber ein Gigabyte, und demucs laesst sich auf einem schlanken Server gar
+# nicht bauen (hier nachgewiesen). Online braucht das niemand: dort ist
+# HOOKCUT_TOOLS_ENABLED=0, es wird nichts gerendert und nichts analysiert.
+#
+# Damit das so bleibt, stehen die Importe der schweren Module IN den
+# Funktionen von backend/main.py, nicht am Dateikopf. Wandert einer davon
+# wieder nach oben, startet der Server hier nicht mehr -
+# tests/test_schlanker_server.py schlaegt dann Alarm.
+#
+# Versionen exakt wie in requirements.txt - zwei Listen, die auseinander
+# driften, sind schlimmer als eine grosse.
+
+fastapi==0.139.0
+uvicorn==0.51.0
+
+# Datei-Uploads per Formular (Hoerproben an Beitraegen).
+python-multipart==0.0.32
+
+# Passwort-Hashing fuer Registrierung und Login.
+bcrypt==5.0.0
+
+# Nicht als Python-Paket, aber trotzdem noetig: ffmpeg/ffprobe muessen im
+# Image liegen. Ohne ffprobe wird JEDE hochgeladene Hoerprobe abgelehnt
+# (backend/network.py, _hoerprobe_speichern).

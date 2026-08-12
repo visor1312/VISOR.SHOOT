@@ -29,10 +29,10 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Werkzeug (Reels, Hook, Canvas, Wochen-Content) | fertig, läuft beim Besitzer |
 | Benutzersystem (Login, Profile) | fertig |
 | Netzwerk (posten, Feed, folgen, Interesse, Kommentare) | **fertig, aber noch nie von echten Musikern benutzt** |
-| Live stellen (Hosting, Pflichtseiten, Meldeknopf) | **als Nächstes** |
+| Live stellen (Phase 2) | **läuft** — 3 von 7 Schritten fertig |
 | Premium-Abo, Apps für iOS/Android | später |
 
-231 pytest-Tests grün, Web-Build und oxlint grün.
+238 pytest-Tests grün, Web-Build und oxlint grün.
 Der genaue Fahrplan steht in `PROJEKT-STATUS.md`, Abschnitt „Fahrplan".
 
 ## Grundregeln
@@ -101,6 +101,9 @@ web/src/          React 19 + Vite + Tailwind v4 + react-router-dom
 editor/           FreeCut-Fork, rendert per Chrome/WebGPU
 tests/            pytest
 *.bat             Doppelklick-Einstiege für den Besitzer
+
+requirements.txt          alles — für den Rechner des Besitzers
+requirements-server.txt   nur das Netzwerk — für den gehosteten Server
 ```
 
 ## Konventionen
@@ -156,5 +159,18 @@ tests/            pytest
   sicherem Standard), nicht als `os.environ`-Abfrage quer im Code. Beispiel:
   `HOOKCUT_INVITE_ONLY` — Standard `1` (lokal nur mit Einladung), die offene
   Plattform setzt `0`.
+- **Der gehostete Server ist schlank — schwere Importe gehören in die
+  Funktion.** `librosa`, `numpy`, `scipy`, `faster_whisper` und `demucs` sind
+  zusammen ~1,5 GB und online **gar nicht installiert**
+  (`requirements-server.txt`: fastapi, uvicorn, bcrypt, python-multipart).
+  Deshalb stehen in `backend/main.py` die Importe von `beat_detect`,
+  `hook_detect`, `sync_offset`, `transcribe` und `subtitles` **in den
+  Funktionen**, nicht am Dateikopf. Wandert einer davon nach oben, startet der
+  Server online nicht mehr — `tests/test_schlanker_server.py` fängt genau das
+  ab (eigener Prozess mit Import-Sperre, plus Gegenprobe, dass die Sperre
+  wirkt). Am Kopf bleiben dürfen `extract_audio`, `presets`, `render_sync` und
+  `vocal_separation`: die brauchen nur ffmpeg bzw. die Standardbibliothek.
 - **Neue Python-Pakete** brauchen Windows-Wheels und gehören gepinnt in
-  `requirements.txt` mit deutschem Kommentar, warum sie da sind.
+  `requirements.txt` mit deutschem Kommentar, warum sie da sind. Wird ein Paket
+  auch **online** gebraucht, muss es zusätzlich in `requirements-server.txt` —
+  mit derselben Version, sonst driften die beiden Listen auseinander.

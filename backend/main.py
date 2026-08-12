@@ -19,15 +19,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend import auth, config, db, network, storage
-from backend.pipeline.beat_detect import detect_beats
 from backend.pipeline.extract_audio import extract_audio
-from backend.pipeline.hook_detect import detect_hook
 from backend.pipeline.presets import PRESETS, apply_preset, preset_catalog, preset_is_noop
 from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
-from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
-from backend.pipeline.sync_offset import compute_offset
-from backend.pipeline.transcribe import transcribe
 from backend.pipeline.vocal_separation import separate_vocals
+
+# BEWUSST NICHT hier oben: beat_detect, hook_detect, sync_offset, transcribe
+# und subtitles. Diese fuenf ziehen librosa, numpy, scipy und faster_whisper
+# herein - hier gemessen rund 1,5 GB, die sonst bei JEDEM Serverstart geladen
+# wuerden, auch wenn nie ein Video gerendert wird. Der gehostete
+# Server betreibt nur das Netzwerk (HOOKCUT_TOOLS_ENABLED=0) und hat diese
+# Pakete gar nicht installiert (requirements-server.txt) - stuenden die
+# Importe hier, wuerde er nicht einmal starten.
+# Ihre Importe stehen deshalb in den Funktionen, die sie wirklich brauchen -
+# dasselbe Muster benutzt die Datei schon fuer freecut_workspace,
+# render_pipeline, content_pack und styles.
+# Die vier oben sind absichtlich geblieben: sie kommen mit ffmpeg bzw. der
+# Standardbibliothek aus, und /presets ist ein oeffentlicher Katalog, der
+# auch online antworten muss.
 
 # Whisper-Modell fuer die automatischen Untertitel im Web-Flow. "small" ist
 # der Kompromiss aus Qualitaet und Tempo auf CPU (~460 MB einmaliger
@@ -163,6 +172,11 @@ def _run_sync_job(
     processing -> effects -> subtitles -> done, damit das Frontend den
     Fortschritt anzeigen kann. Effekt- und Untertitel-Stufe werden nur
     durchlaufen, wenn sie tatsaechlich etwas tun."""
+    from backend.pipeline.beat_detect import detect_beats
+    from backend.pipeline.subtitles import burn_subtitles, group_words_into_lines, write_ass
+    from backend.pipeline.sync_offset import compute_offset
+    from backend.pipeline.transcribe import transcribe
+
     project = db.get_project(project_id)
     take = db.get_take(take_id)
     if not project or not take:
@@ -274,6 +288,8 @@ def _run_hook_job(job_id: str) -> None:
     ist optional - schlaegt sie fehl (demucs fehlt, Modell-Download
     blockiert), liefert separate_vocals None und es wird ohne
     Vocal-Features bewertet."""
+    from backend.pipeline.hook_detect import detect_hook
+
     job = db.get_hook_job(job_id)
     if not job:
         return
@@ -374,6 +390,9 @@ def _run_analyze_job(job_id: str) -> None:
     selbst im Browser - er braucht von uns nur Sync-Versatz, Hook-Fenster und
     Dauern, um die Timeline vorzubereiten.
     """
+    from backend.pipeline.hook_detect import detect_hook
+    from backend.pipeline.sync_offset import compute_offset
+
     job = db.get_analyze_job(job_id)
     if not job:
         return
@@ -435,6 +454,8 @@ def list_styles():
 
 def _run_edit_analyze(job_id: str) -> None:
     """Schritt 1: ganzes Video gegen Song synchronisieren (nur Zahlen)."""
+    from backend.pipeline.sync_offset import compute_offset
+
     job = db.get_edit_job(job_id)
     if not job:
         return
@@ -468,7 +489,9 @@ def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...
 
 def _run_edit_hook(job_id: str) -> None:
     """Schritt 2 (optional): viralsten Hook suchen + auf Video zuschneiden."""
+    from backend.pipeline.hook_detect import detect_hook
     from backend.pipeline.render_pipeline import _choose_hook
+
     job = db.get_edit_job(job_id)
     if not job:
         return
@@ -502,6 +525,9 @@ def _subtitle_cues_for(song_path: str, lyrics: str | None) -> list:
     drastisch genauer, Deutsch erzwungen. Liegt Nutzertext vor, gilt dieser als
     Wahrheit (exakt seine Woerter, Timing aus der Erkennung via lyrics_align)."""
     from backend.pipeline.freecut_workspace import SubtitleCue
+    from backend.pipeline.subtitles import group_words_into_lines
+    from backend.pipeline.transcribe import transcribe
+
     vocals = separate_vocals(song_path)
     transcribe_src = str(vocals) if vocals else song_path
     words = transcribe(transcribe_src, language="de",
@@ -664,8 +690,10 @@ def _run_content_pack(pack_id: str, style_keys: list[str], hook_count: int,
                       platform_keys: list[str], beat_effects: bool) -> None:
     from backend.pipeline.content_pack import build_item_matrix, select_hook_windows
     from backend.pipeline.freecut_workspace import build_workspace
+    from backend.pipeline.hook_detect import detect_hook
     from backend.pipeline.platforms import get_platform
     from backend.pipeline.render_pipeline import run_headless_render
+    from backend.pipeline.sync_offset import compute_offset
 
     pack = db.get_content_pack(pack_id)
     if not pack:
@@ -887,7 +915,9 @@ def render_result(item_id: str, video: UploadFile = File(...),
 def _run_canvas_job(job_id: str, use_hook: bool) -> None:
     from backend.pipeline.content_pack import canvas_window
     from backend.pipeline.freecut_workspace import build_workspace
+    from backend.pipeline.hook_detect import detect_hook
     from backend.pipeline.render_pipeline import run_headless_render
+    from backend.pipeline.sync_offset import compute_offset
 
     job = db.get_canvas_job(job_id)
     if not job:
