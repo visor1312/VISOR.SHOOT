@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
-import { Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy, Flag,
+} from "lucide-react";
 import {
   updateDisplayName, changePassword, listInvites, createInvite, listUsers,
-  type InviteCode, type AdminUser,
+  listReports, handleReport,
+  type InviteCode, type AdminUser, type Meldung,
 } from "../api";
 import { useApp } from "../components/app-context";
 import { formatDate } from "../lib/format";
@@ -148,6 +152,10 @@ function AdminSection() {
 
   return (
     <>
+      {/* Meldungen zuerst: das ist die einzige Liste hier, bei der Warten
+          echte Folgen hat. */}
+      <MeldungenCard />
+
       <Card title="Einladungscodes" icon={<Ticket size={18} className="text-brand-400" />}>
         <p className="text-sm text-muted">
           Neue Konten können sich nur mit einem Einladungscode registrieren.
@@ -194,5 +202,95 @@ function AdminSection() {
         </div>
       </Card>
     </>
+  );
+}
+
+/** Gemeldete Inhalte - die Arbeitsliste des Betreibers.
+ *
+ * Bewusst mit Vorschau und Sprung zum Beitrag: eine Meldung ohne den
+ * Zusammenhang zu sehen laesst sich nicht entscheiden. Beide Knoepfe sind
+ * gleichwertig - "ist in Ordnung" ist genauso eine Entscheidung wie
+ * "ausblenden", und beide raeumen die Meldung aus der Liste.
+ */
+function MeldungenCard() {
+  const [meldungen, setMeldungen] = useState<Meldung[]>([]);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+
+  const laden = useCallback(() => {
+    listReports("open")
+      .then(setMeldungen)
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  useEffect(laden, [laden]);
+
+  async function entscheiden(id: string, aktion: "ausblenden" | "behalten") {
+    setBusy(id); setErr("");
+    try {
+      await handleReport(id, aktion);
+      laden();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <Card title={`Gemeldete Inhalte (${meldungen.length})`}
+      icon={<Flag size={18} className={meldungen.length ? "text-red-400" : "text-brand-400"} />}>
+      {err && <p className="text-sm text-red-400 mb-2">{err}</p>}
+      {meldungen.length === 0 && (
+        <p className="text-sm text-muted">Nichts offen. Gut so.</p>
+      )}
+      <div className="space-y-2">
+        {meldungen.map((m) => (
+          <div key={m.id} className="bg-ink-800 rounded-lg px-3 py-2.5 text-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400">
+                {m.reason_label}
+              </span>
+              <span className="text-xs text-muted">
+                {m.target_type === "post" ? "Beitrag" : "Kommentar"} · gemeldet von {m.reporter_name}
+              </span>
+              <span className="text-xs text-ink-600 ml-auto">
+                {formatDate(m.created_at, { year: true })}
+              </span>
+            </div>
+
+            {m.vorschau === null ? (
+              <p className="text-sm text-ink-600 italic mt-1.5">
+                Inhalt wurde inzwischen gelöscht.
+              </p>
+            ) : (
+              <p className="mt-1.5 line-clamp-2">{m.vorschau}</p>
+            )}
+            {m.note && (
+              <p className="text-xs text-muted mt-1 italic">„{m.note}"</p>
+            )}
+
+            <div className="flex items-center gap-2 mt-2.5">
+              {m.post_id && (
+                <Link to={`/projekt/${m.post_id}`}
+                  className="text-xs text-brand-400 hover:underline">
+                  Ansehen
+                </Link>
+              )}
+              <button disabled={busy === m.id}
+                onClick={() => entscheiden(m.id, "ausblenden")}
+                className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 disabled:opacity-40 transition-colors">
+                Ausblenden
+              </button>
+              <button disabled={busy === m.id}
+                onClick={() => entscheiden(m.id, "behalten")}
+                className="text-xs px-3 py-1.5 rounded-lg bg-ink-700 hover:bg-ink-600 disabled:opacity-40 transition-colors">
+                Ist in Ordnung
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

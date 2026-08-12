@@ -88,6 +88,23 @@ POST_GENRES_MAX = 5
 # Spam-Bremse: ohne die ist ein kleines Netzwerk an einem Nachmittag zu.
 POST_MAX_PER_HOUR = 10
 
+# Meldegruende. Feste Liste statt Freitext, damit der Betreiber die Meldungen
+# sortieren kann - der Freitext kommt zusaetzlich als Notiz dazu.
+# "rechte" steht bewusst oben: das ist bei einem Musiker-Netzwerk der
+# haeufigste Fall (fremder Beat, fremdes Sample).
+REPORT_REASONS = {
+    "rechte": "Verletzt meine Rechte (Beat, Sample, Text, Aufnahme)",
+    "beleidigung": "Beleidigung, Bedrohung oder Hetze",
+    "spam": "Spam oder Werbung",
+    "illegal": "Strafbarer oder jugendgefährdender Inhalt",
+    "sonstiges": "Etwas anderes",
+}
+
+REPORT_NOTE_MAX = 1000
+# Auch Melden laesst sich missbrauchen (jemanden zuschuetten). 20 pro Stunde
+# reicht fuer jede ehrliche Nutzung deutlich aus.
+REPORT_MAX_PER_HOUR = 20
+
 
 def _post_public(post: dict, autor_profil: dict | None = None) -> dict:
     """Beitrag so, wie ihn andere Mitglieder sehen. Der Dateipfad der
@@ -411,3 +428,117 @@ def delete_comment(comment_id: str, user: dict = Depends(auth.get_current_user))
         raise HTTPException(403, "Das ist nicht dein Kommentar.")
     db.delete_comment(comment_id)
     return {"ok": True}
+
+
+# --- Melden (DSA) ----------------------------------------------------------
+# Ein auffindbarer Weg, Inhalte zu melden, UND eine Reaktion darauf sind
+# Pflicht, sobald Fremde Inhalte hochladen. Der Admin-Notaus
+# (/admin/posts/{id}/hide) allein reicht dafuer nicht: er setzt voraus, dass
+# der Betreiber selbst etwas bemerkt.
+
+@router.get("/report-reasons")
+def list_report_reasons():
+    """Katalog fuer die Auswahl im Melden-Dialog. Ohne Anmeldung lesbar wie
+    die anderen statischen Kataloge auch."""
+    return [{"key": k, "label": v} for k, v in REPORT_REASONS.items()]
+
+
+def _meldeziel_pruefen(target_type: str, target_id: str) -> dict:
+    """Gibt es das ueberhaupt? Meldungen auf Luft wuerden die Liste des
+    Betreibers mit Karteileichen fuellen."""
+    if target_type == "post":
+        ziel = db.get_post(target_id)
+    elif target_type == "comment":
+        ziel = db.get_comment(target_id)
+    else:
+        raise HTTPException(422, "Es lassen sich nur Beiträge und Kommentare melden.")
+    if not ziel:
+        raise HTTPException(404, "Der gemeldete Inhalt existiert nicht (mehr).")
+    return ziel
+
+
+@router.post("/reports")
+def create_report(target_type: str = Form(...), target_id: str = Form(...),
+                  reason: str = Form(...), note: str = Form(""),
+                  user: dict = Depends(auth.get_current_user)):
+    if reason not in REPORT_REASONS:
+        raise HTTPException(422, "Bitte einen Grund aus der Liste wählen.")
+    ziel = _meldeziel_pruefen(target_type, target_id)
+    if ziel["user_id"] == user["id"]:
+        raise HTTPException(422, "Eigene Inhalte kannst du löschen statt melden.")
+
+    seit = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    if db.count_recent_reports(user["id"], seit) >= REPORT_MAX_PER_HOUR:
+        raise HTTPException(
+            429, "Du hast gerade sehr viel gemeldet. Bitte versuch es später noch mal.")
+
+    report_id = db.create_report(target_type, target_id, user["id"], reason,
+                                 note.strip()[:REPORT_NOTE_MAX])
+    # Doppelt gemeldet ist kein Fehler: fuer die meldende Person sieht es
+    # genauso aus wie beim ersten Mal, und die Liste bleibt sauber.
+    return {"ok": True, "neu": report_id is not None}
+
+
+@router.get("/admin/reports")
+def admin_list_reports(status: str = "open", _: dict = Depends(auth.get_admin_user)):
+    """Arbeitsliste des Betreibers. Der gemeldete Inhalt kommt gleich mit -
+    sonst muesste man fuer jede Meldung erst nachschlagen, worum es geht."""
+    if status not in ("open", "hidden", "kept", "alle"):
+        raise HTTPException(422, "Unbekannter Status.")
+    meldungen = db.list_reports(None if status == "alle" else status)
+
+    ergebnis = []
+    for m in meldungen:
+        if m["target_type"] == "post":
+            ziel = db.get_post(m["target_id"])
+            vorschau = ziel["title"] if ziel else None
+        else:
+            ziel = db.get_comment(m["target_id"])
+            vorschau = ziel["body"][:200] if ziel else None
+        melder = db.get_user_by_id(m["reporter_id"])
+        ergebnis.append({
+            "id": m["id"],
+            "target_type": m["target_type"],
+            "target_id": m["target_id"],
+            "reason": m["reason"],
+            "reason_label": REPORT_REASONS.get(m["reason"], m["reason"]),
+            "note": m["note"],
+            "status": m["status"],
+            "created_at": m["created_at"],
+            "reporter_name": melder["display_name"] if melder else "(gelöscht)",
+            # None heisst: der Inhalt ist inzwischen weg (geloescht).
+            "vorschau": vorschau,
+            "ziel_sichtbar": bool(ziel) and ziel.get("status") == "active",
+            # Zu welchem Beitrag gehoert das? Fuer den Sprung in die Ansicht.
+            "post_id": m["target_id"] if m["target_type"] == "post"
+                       else (ziel["post_id"] if ziel else None),
+        })
+    return ergebnis
+
+
+@router.post("/admin/reports/{report_id}/handle")
+def admin_handle_report(report_id: str, aktion: str = Form(...),
+                        admin: dict = Depends(auth.get_admin_user)):
+    """Entscheidung des Betreibers: Inhalt ausblenden oder Meldung ablegen.
+
+    Die Entscheidung schliesst ALLE offenen Meldungen zu diesem Inhalt -
+    haben drei Leute denselben Beitrag gemeldet, ist das eine Entscheidung
+    und nicht drei.
+    """
+    if aktion not in ("ausblenden", "behalten"):
+        raise HTTPException(422, "Aktion muss 'ausblenden' oder 'behalten' sein.")
+    meldung = db.get_report(report_id)
+    if not meldung:
+        raise HTTPException(404, "Meldung nicht gefunden")
+
+    if aktion == "ausblenden":
+        if meldung["target_type"] == "post":
+            if db.get_post(meldung["target_id"]):
+                db.update_post(meldung["target_id"], status="hidden")
+        elif db.get_comment(meldung["target_id"]):
+            db.update_comment_status(meldung["target_id"], "hidden")
+
+    neuer_status = "hidden" if aktion == "ausblenden" else "kept"
+    db.close_reports_for_target(meldung["target_type"], meldung["target_id"],
+                                neuer_status, admin["id"])
+    return {"ok": True, "status": neuer_status}

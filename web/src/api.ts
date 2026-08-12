@@ -145,6 +145,64 @@ export async function getAuthConfig(): Promise<ServerConfig> {
   return jsonOrThrow<ServerConfig>(res);
 }
 
+// --- Melden (DSA) ---------------------------------------------------------
+
+export interface Meldegrund {
+  key: string;
+  label: string;
+}
+
+export async function getReportReasons(): Promise<Meldegrund[]> {
+  const res = await requestOrExplain(`${BASE}/report-reasons`);
+  return jsonOrThrow<Meldegrund[]>(res);
+}
+
+/** Meldet einen Beitrag oder Kommentar. `neu` ist false, wenn dieselbe
+ *  Person denselben Inhalt schon gemeldet hatte - kein Fehler. */
+export async function meldeInhalt(
+  targetType: "post" | "comment", targetId: string,
+  reason: string, note: string,
+): Promise<{ ok: boolean; neu: boolean }> {
+  const daten = new FormData();
+  daten.append("target_type", targetType);
+  daten.append("target_id", targetId);
+  daten.append("reason", reason);
+  daten.append("note", note);
+  const res = await requestOrExplain(`${BASE}/reports`, { method: "POST", body: daten });
+  return jsonOrThrow<{ ok: boolean; neu: boolean }>(res);
+}
+
+export interface Meldung {
+  id: string;
+  target_type: "post" | "comment";
+  target_id: string;
+  reason: string;
+  reason_label: string;
+  note: string;
+  status: string;
+  created_at: string;
+  reporter_name: string;
+  /** null = der Inhalt ist inzwischen geloescht. */
+  vorschau: string | null;
+  ziel_sichtbar: boolean;
+  post_id: string | null;
+}
+
+export async function listReports(status = "open"): Promise<Meldung[]> {
+  const res = await requestOrExplain(`${BASE}/admin/reports?status=${status}`);
+  return jsonOrThrow<Meldung[]>(res);
+}
+
+export async function handleReport(
+  reportId: string, aktion: "ausblenden" | "behalten",
+): Promise<void> {
+  const daten = new FormData();
+  daten.append("aktion", aktion);
+  const res = await requestOrExplain(
+    `${BASE}/admin/reports/${reportId}/handle`, { method: "POST", body: daten });
+  await jsonOrThrow(res);
+}
+
 /** Betreiberangaben fuer Impressum, Datenschutz und AGB. Kommen aus
  *  backend/betreiber.py, damit sie an genau EINER Stelle gepflegt werden
  *  und ein Adresswechsel nicht durch drei Seiten gesucht werden muss. */

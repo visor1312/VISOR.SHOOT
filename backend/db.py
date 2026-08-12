@@ -186,6 +186,27 @@ CREATE TABLE IF NOT EXISTS comments (
 
 CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, created_at);
 
+-- Meldungen: jeder kann einen Beitrag oder Kommentar melden, der Betreiber
+-- sieht die offenen Meldungen und entscheidet. Pflicht, sobald Fremde
+-- Inhalte hochladen (DSA) - der Admin-Notaus allein reicht nicht.
+-- UNIQUE(target_type, target_id, reporter_id): dieselbe Person meldet
+-- denselben Inhalt nur einmal, sonst laesst sich die Liste zuspammen.
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    reporter_id TEXT NOT NULL REFERENCES users(id),
+    reason TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL,
+    handled_at TEXT,
+    handled_by TEXT REFERENCES users(id),
+    UNIQUE(target_type, target_id, reporter_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -818,6 +839,15 @@ def delete_comment(comment_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> No
         conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
 
 
+def update_comment_status(comment_id: str, status: str,
+                          db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Moderation: 'hidden' nimmt den Kommentar aus der Ansicht, ohne ihn zu
+    loeschen - list_comments zeigt nur 'active'. Bewusst nicht loeschen: bei
+    einer Beschwerde muss nachvollziehbar bleiben, worum es ging."""
+    with _connect(db_path) as conn:
+        conn.execute("UPDATE comments SET status = ? WHERE id = ?", (status, comment_id))
+
+
 def post_counts(post_ids: Sequence[str],
                 db_path: str | Path = DEFAULT_DB_PATH) -> dict[str, dict]:
     """Interesse- und Kommentarzahlen fuer VIELE Beitraege auf einmal -
@@ -1177,3 +1207,74 @@ def list_canvas_jobs(user_id: str, limit: int = 50,
             (user_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# --- Meldungen (DSA: Nutzer melden, Betreiber entscheidet) ------------------
+
+def create_report(target_type: str, target_id: str, reporter_id: str,
+                  reason: str, note: str = "",
+                  db_path: str | Path = DEFAULT_DB_PATH) -> Optional[str]:
+    """Legt eine Meldung an. Gibt None zurueck, wenn dieselbe Person denselben
+    Inhalt schon gemeldet hat (UNIQUE) - das ist kein Fehler, sondern der
+    Normalfall beim zweiten Klick."""
+    report_id = str(uuid.uuid4())
+    try:
+        with _connect(db_path) as conn:
+            conn.execute(
+                "INSERT INTO reports (id, target_type, target_id, reporter_id, "
+                "reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (report_id, target_type, target_id, reporter_id, reason, note, _now()))
+    except sqlite3.IntegrityError:
+        return None
+    return report_id
+
+
+def get_report(report_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_reports(status: str | None = "open", limit: int = 100,
+                 db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Offene Meldungen zuerst - das ist die Arbeitsliste des Betreibers."""
+    with _connect(db_path) as conn:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM reports WHERE status = ? ORDER BY created_at DESC LIMIT ?",
+                (status, limit)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM reports ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def set_report_status(report_id: str, status: str, handled_by: str,
+                      db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute(
+            "UPDATE reports SET status = ?, handled_at = ?, handled_by = ? WHERE id = ?",
+            (status, _now(), handled_by, report_id))
+
+
+def count_recent_reports(reporter_id: str, since_iso: str,
+                         db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Spam-Bremse: auch das Melden selbst laesst sich missbrauchen."""
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM reports WHERE reporter_id = ? AND created_at > ?",
+            (reporter_id, since_iso)).fetchone()
+        return int(row["n"])
+
+
+def close_reports_for_target(target_type: str, target_id: str, status: str,
+                             handled_by: str,
+                             db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Eine Entscheidung gilt fuer ALLE Meldungen zu diesem Inhalt - sonst
+    bleiben nach dem Ausblenden die Meldungen der anderen offen liegen."""
+    with _connect(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE reports SET status = ?, handled_at = ?, handled_by = ? "
+            "WHERE target_type = ? AND target_id = ? AND status = 'open'",
+            (status, _now(), handled_by, target_type, target_id))
+        return cur.rowcount

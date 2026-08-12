@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Loader2, Heart, MessageCircle, Trash2, CheckCircle2, RotateCcw, ArrowLeft, ExternalLink,
+  Flag,
 } from "lucide-react";
+import MeldenDialog from "../components/MeldenDialog";
 import {
   getPost, getPostCategories, getInterest, setInterest, getComments, addComment,
   deleteComment, setPostOpenState, deletePost, postAudioUrl,
@@ -25,6 +27,8 @@ export default function PostDetailPage() {
   const [neuerText, setNeuerText] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
+  // Was gerade gemeldet wird (null = kein Dialog offen).
+  const [melden, setMelden] = useState<{ art: "post" | "comment"; id: string } | null>(null);
 
   const istAutor = post?.user_id === user.id;
 
@@ -178,6 +182,14 @@ export default function PostDetailPage() {
               {interesse?.interested ? "Interesse zurückziehen" : "Ich hab Interesse"}
             </button>
           )}
+          {/* Melden: nur bei fremden Beitraegen sinnvoll - eigene loescht man.
+              Unauffaellig, aber ohne Suchen auffindbar (DSA). */}
+          {!istAutor && (
+            <button onClick={() => setMelden({ art: "post", id: post.id })}
+              className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors ml-auto">
+              <Flag size={16} /> Melden
+            </button>
+          )}
           {istAutor && (
             <>
               <button onClick={erledigtUmschalten}
@@ -251,6 +263,13 @@ export default function PostDetailPage() {
                         <Trash2 size={14} />
                       </button>
                     )}
+                    {k.author.user_id !== user.id && (
+                      <button onClick={() => setMelden({ art: "comment", id: k.id })}
+                        title="Kommentar melden"
+                        className="text-muted hover:text-red-400">
+                        <Flag size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-sm mt-1.5 whitespace-pre-wrap">{k.body}</p>
@@ -267,6 +286,11 @@ export default function PostDetailPage() {
         <div className="mt-5 bg-red-500/10 border border-red-500/40 text-red-400 text-sm rounded-xl px-4 py-3">
           {fehler}
         </div>
+      )}
+
+      {melden && (
+        <MeldenDialog art={melden.art} zielId={melden.id}
+          onClose={() => setMelden(null)} />
       )}
     </main>
   );
