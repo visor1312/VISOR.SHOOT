@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-PROJECTS_ROOT = Path(__file__).resolve().parent.parent / "projects"
+from backend import config
+
+# Beim Hosting zeigt das auf die dauerhafte Festplatte (HOOKCUT_PROJECTS_DIR),
+# lokal auf den projects/-Ordner im Projekt - siehe backend/config.py.
+PROJECTS_ROOT: Path = config.PROJECTS_DIR
 
 
 def project_dir(project_id: str) -> Path:

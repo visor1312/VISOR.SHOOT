@@ -1,0 +1,73 @@
+# Bauplan fuer Render (render.com). Beschreibt den Dienst so, dass er sich
+# aus dieser Datei heraus anlegen laesst - nichts muss von Hand geklickt
+# werden ausser den Geheimnissen.
+#
+# Wichtig zum Verstaendnis: HOOKCUT laeuft hier als EIN Dienst. Das Backend
+# liefert die gebaute Oberflaeche gleich mit aus (siehe Dockerfile), deshalb
+# gibt es keinen zweiten "Static Site"-Dienst und kein CORS-Problem.
+
+services:
+  - type: web
+    name: hookcut
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: frankfurt          # naeher an Deutschland = spuerbar schneller
+    # Bezahlter Plan mit Absicht: die Gratis-Stufe schlaeft nach 15 Minuten
+    # ein (der naechste Besucher wartet ~1 Minute auf eine weisse Seite) und
+    # kann vor allem KEINE dauerhafte Festplatte einbinden - Datenbank und
+    # Hoerproben waeren nach jedem Neustart weg.
+    plan: starter
+    healthCheckPath: /health
+
+    # Die dauerhafte Festplatte. Hier liegen Datenbank UND Hoerproben.
+    # ACHTUNG: Mit angehaengter Platte rollt Render nicht unterbrechungsfrei
+    # aus - bei jedem Update ist die Seite kurz weg. Das ist der Preis dafuer,
+    # dass die Daten ein Update ueberleben.
+    disk:
+      name: hookcut-daten
+      mountPath: /var/hookcut
+      sizeGB: 5
+
+    envVars:
+      # --- Betriebsmodus -------------------------------------------------
+      # Video-Werkzeuge aus: brauchen Chrome/WebGPU, ffmpeg und mehrere GB
+      # Modelle. Sie verschwinden aus der Oberflaeche, ihre Routen antworten
+      # mit 503 statt still zu scheitern.
+      - key: HOOKCUT_TOOLS_ENABLED
+        value: "0"
+      # Dieser Server rendert nichts selbst.
+      - key: HOOKCUT_LOCAL_RENDER
+        value: "0"
+      # Session-Cookie nur ueber HTTPS.
+      - key: HOOKCUT_SECURE_COOKIES
+        value: "1"
+      # NOCH ZU: Registrierung nur mit Einladungscode. Das ist Absicht -
+      # erst deployen und alles am echten Server pruefen, dann oeffnen
+      # (Phase 2, Schritt 7). Zum Oeffnen hier auf "0" stellen.
+      - key: HOOKCUT_INVITE_ONLY
+        value: "1"
+
+      # --- Daten ----------------------------------------------------------
+      # Muss auf die Platte oben zeigen. Die Datenbank landet automatisch
+      # darunter (backend/config.py -> backend/db.py).
+      - key: HOOKCUT_PROJECTS_DIR
+        value: /var/hookcut
+
+      # --- Sicherung (spaeter) --------------------------------------------
+      # Sobald ein Cloudflare-R2-Zugang existiert, hier eintragen - dann
+      # spiegelt Litestream die Datenbank laufend dorthin. Ohne diese Werte
+      # laeuft der Dienst normal, aber OHNE Sicherung.
+      # Ehrlich dazu: Litestream sichert nur die Datenbank, NICHT die
+      # Hoerproben. Bei einem Plattenschaden waeren Konten und Beitraege
+      # zurueckholbar, die Audiodateien nicht.
+      - key: LITESTREAM_REPLICA_URL
+        sync: false            # in der Render-Oberflaeche eintragen
+      - key: LITESTREAM_ACCESS_KEY_ID
+        sync: false
+      - key: LITESTREAM_SECRET_ACCESS_KEY
+        sync: false
+
+    # CORS bleibt bewusst ungesetzt: Oberflaeche und API kommen von derselben
+    # Adresse, es gibt also keine fremde Herkunft zu erlauben. Kaeme spaeter
+    # eine eigene Domain fuer eine App dazu, gehoert sie in
+    # HOOKCUT_CORS_ORIGINS.

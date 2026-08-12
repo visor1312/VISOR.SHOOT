@@ -272,7 +272,7 @@ ist der letzte, bewusste Schritt.
 | 1 | Ein Dienst: Backend liefert die Oberfläche mit aus | **fertig** (`f4c4a97`) |
 | 2 | Video-Werkzeuge online abschaltbar (`HOOKCUT_TOOLS_ENABLED`) | **fertig** (`b91ce1e`) |
 | 3 | Schlanker Server (schwere Importe faul, `requirements-server.txt`) | **fertig** |
-| 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | als Nächstes |
+| 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | **Dateien fertig**, Livegang liegt beim Besitzer → `HOSTING.md` |
 | 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | offen |
 | 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | offen |
 | 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | offen |
@@ -420,8 +420,9 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-**Als Nächstes:** Phase 2, Schritt 4 — `Dockerfile` + `render.yaml` und der
-erste Livegang, noch mit Einladungscode. Details im Fahrplan oben.
+**Als Nächstes:** Phase 2, Schritt 5 — Impressum, Datenschutz, AGB,
+Meldeknopf und „Konto löschen". Parallel dazu kann der Besitzer den Livegang
+aus Schritt 4 durchführen (`HOSTING.md`); die Tür bleibt dabei zu.
 
 **Warten auf den Besitzer** (nur sein Rechner kann das prüfen):
 1. Beat-Effekte, Multi-Plattform-Export, Wochen-Content und Spotify Canvas

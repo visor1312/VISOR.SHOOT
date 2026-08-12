@@ -8,9 +8,15 @@ client/auth_client/second_auth_client aus conftest.py.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
+from pathlib import Path
 
 from backend import config, db
+
+PROJEKT = Path(__file__).resolve().parent.parent
 
 
 # --- Config (Env-Parsing) -------------------------------------------------
@@ -29,6 +35,46 @@ def test_env_list(monkeypatch):
     assert config._env_list("HOOKCUT_Y", []) == ["https://a.de", "https://b.de"]
     monkeypatch.delenv("HOOKCUT_Y", raising=False)
     assert config._env_list("HOOKCUT_Y", ["x"]) == ["x"]
+
+
+def test_datenordner_folgt_der_umgebungsvariablen(tmp_path):
+    """HOOKCUT_PROJECTS_DIR verschiebt Datenbank UND Dateien.
+
+    Beim Hosting ist das der Unterschied zwischen "Konten ueberleben ein
+    Update" und "alles weg": der Container ist fluechtig, nur die
+    angehaengte Platte bleibt. Die Pfade werden beim Import festgelegt,
+    deshalb ein eigener Prozess statt monkeypatch.
+    """
+    ziel = tmp_path / "platte"
+    ergebnis = subprocess.run(
+        [sys.executable, "-c",
+         "from backend import config, db, storage\n"
+         "print(storage.PROJECTS_ROOT)\n"
+         "print(db.DEFAULT_DB_PATH)\n"
+         "print(storage.post_dir('abc'))\n"],
+        cwd=PROJEKT, capture_output=True, text=True,
+        # HOOKCUT_DB muss weg, sonst gewinnt der Test-Pfad aus conftest.py.
+        env={**{k: v for k, v in os.environ.items() if k != "HOOKCUT_DB"},
+             "PYTHONPATH": str(PROJEKT), "HOOKCUT_PROJECTS_DIR": str(ziel)})
+    assert ergebnis.returncode == 0, ergebnis.stderr
+    wurzel, dbpfad, beitrag = ergebnis.stdout.strip().splitlines()
+    assert wurzel == str(ziel)
+    assert dbpfad == str(ziel / "state.db")
+    assert beitrag == str(ziel / "posts" / "abc")
+
+
+def test_datenordner_ohne_variable_bleibt_lokal():
+    """Ohne die Variable liegt alles wie bisher im Projektordner - der
+    Rechner des Besitzers darf von der Hosting-Umstellung nichts merken."""
+    ergebnis = subprocess.run(
+        [sys.executable, "-c",
+         "from backend import storage\nprint(storage.PROJECTS_ROOT)\n"],
+        cwd=PROJEKT, capture_output=True, text=True,
+        env={**{k: v for k, v in os.environ.items()
+                if k not in ("HOOKCUT_DB", "HOOKCUT_PROJECTS_DIR")},
+             "PYTHONPATH": str(PROJEKT)})
+    assert ergebnis.returncode == 0, ergebnis.stderr
+    assert ergebnis.stdout.strip() == str(PROJEKT / "projects")
 
 
 # --- Health + WAL ---------------------------------------------------------

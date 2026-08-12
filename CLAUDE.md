@@ -104,6 +104,10 @@ tests/            pytest
 
 requirements.txt          alles — für den Rechner des Besitzers
 requirements-server.txt   nur das Netzwerk — für den gehosteten Server
+Dockerfile                Node baut die Oberfläche, Python liefert sie aus
+docker-start.sh           Start im Container (optional unter Litestream)
+render.yaml               Bauplan für Render inkl. dauerhafter Festplatte
+HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
 ```
 
 ## Konventionen
@@ -155,6 +159,12 @@ requirements-server.txt   nur das Netzwerk — für den gehosteten Server
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Nutzerdaten gehören unter `config.PROJECTS_DIR`** (`HOOKCUT_PROJECTS_DIR`),
+  nie fest ins Projektverzeichnis. `storage.py` und `db.DEFAULT_DB_PATH`
+  hängen daran, ein Schalter verschiebt beides. Online zeigt er auf die
+  dauerhafte Festplatte — alles andere im Container ist nach dem nächsten
+  Ausrollen weg. **Neuer Ablageort ⇒ über `storage.py`**, nicht mit
+  `Path(__file__)` neu gebaut.
 - **Einstellbares Verhalten** gehört in `backend/config.py` (Env-Variable mit
   sicherem Standard), nicht als `os.environ`-Abfrage quer im Code. Beispiel:
   `HOOKCUT_INVITE_ONLY` — Standard `1` (lokal nur mit Einladung), die offene

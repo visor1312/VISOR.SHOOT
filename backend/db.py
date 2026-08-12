@@ -13,12 +13,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
 
+from backend import config
+
 # HOOKCUT_DB uebersteuert den DB-Pfad (wird beim Import gelesen). Genutzt von
 # den Tests (tests/conftest.py), damit API-Tests NIE in die echte state.db
 # schreiben - sonst wuerde z.B. der erste Test-User die Altdaten uebernehmen.
+# Ohne diese Variable liegt die DB im Datenordner (config.PROJECTS_DIR): beim
+# Hosting zeigt der auf die dauerhafte Festplatte, damit Konten und Beitraege
+# ein Ausrollen ueberleben.
 DEFAULT_DB_PATH = Path(
     os.environ.get("HOOKCUT_DB")
-    or Path(__file__).resolve().parent.parent / "projects" / "state.db"
+    or config.PROJECTS_DIR / "state.db"
 )
 
 SCHEMA = """

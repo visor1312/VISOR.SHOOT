@@ -1,0 +1,31 @@
+# Was NICHT ins Image gehoert. Ohne diese Liste wandern der komplette
+# editor/-Ordner, node_modules und - schlimmer - die echten Nutzerdaten aus
+# projects/ mit in das Image, das online laeuft.
+
+# Nutzerdaten: liegen beim Hosting auf der dauerhaften Festplatte
+# (HOOKCUT_PROJECTS_DIR), niemals im Image.
+projects/
+
+# Wird im Container frisch installiert bzw. gebaut.
+web/node_modules/
+web/dist/
+node_modules/
+editor/node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Fuer den Server ohne Bedeutung (Video-Werkzeuge laufen nur lokal).
+editor/
+frontend/
+eval/
+tests/
+*.bat
+
+# Entwicklung
+.git/
+.github/
+.claude/
+*.md
