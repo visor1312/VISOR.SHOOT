@@ -32,10 +32,10 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Live stellen (Phase 2) | **läuft** — 6 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
 | Premium-Abo, Apps für iOS/Android | später |
 
-387 pytest-Tests grün, Web-Build und oxlint grün.
+416 pytest-Tests grün, Web-Build und oxlint grün.
 (Die Zahl wirkt hoch, weil drei Wächter je Datei bzw. je Route einen Fall
-erzeugen: `test_routen_schutz.py` ~76, `test_keine_doppelten_namen.py` ~29,
-`test_deployment_dateien.py` 14.)
+erzeugen: `test_routen_schutz.py` ~78, `test_keine_doppelten_namen.py` ~30,
+`test_deployment_dateien.py` 16.)
 Der genaue Fahrplan steht in `PROJEKT-STATUS.md`, Abschnitt „Fahrplan".
 
 ## Grundregeln
