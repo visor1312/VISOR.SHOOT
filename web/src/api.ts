@@ -114,6 +114,24 @@ export interface User {
   email: string;
   display_name: string;
   is_admin: boolean;
+  /** Ist die E-Mail-Adresse bestaetigt? Ohne eingeschaltete Pruefung
+   *  immer true - dann gibt es auch keinen Hinweis zu zeigen. */
+  email_verified: boolean;
+}
+
+/** Bestaetigungslink einloesen. Braucht KEINE Anmeldung - der Link wird oft
+ *  auf dem Handy geoeffnet. */
+export async function verifyEmail(token: string): Promise<void> {
+  const res = await requestOrExplain(
+    `${BASE}/auth/verify-email`, jsonPost({ token }), { authRequest: true });
+  await jsonOrThrow(res);
+}
+
+/** Neuen Bestaetigungslink anfordern (fuer den angemeldeten Nutzer). */
+export async function resendVerification(): Promise<{ bereits_bestaetigt: boolean }> {
+  const res = await requestOrExplain(
+    `${BASE}/auth/resend-verification`, { method: "POST" });
+  return jsonOrThrow<{ bereits_bestaetigt: boolean }>(res);
 }
 
 function jsonPost(body: unknown): RequestInit {

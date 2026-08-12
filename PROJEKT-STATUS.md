@@ -295,7 +295,7 @@ ist der letzte, bewusste Schritt.
 | 3 | Schlanker Server (schwere Importe faul, `requirements-server.txt`) | **fertig** |
 | 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | **Dateien fertig**, Livegang liegt beim Besitzer → `HOSTING.md` |
 | 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | **fertig** |
-| 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | offen |
+| 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | **fertig** (Bestätigung standardmäßig aus, siehe unten) |
 | 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | offen |
 
 **Zwei Entscheidungen, die diesen Plan von der alten Fassung unterscheiden:**
@@ -453,12 +453,27 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-**Als Nächstes:** Phase 2, Schritt 6 — E-Mail-Bestätigung (abschaltbar) und
-Rate-Limit auf die Registrierung. **Zwei Fallstricke, die dort zählen:**
-hinter Renders Proxy ist `request.client.host` immer dieselbe Adresse (die
-echte steht in `X-Forwarded-For`), sonst sperrt das Limit alle gemeinsam aus;
-und der Versand von der eigenen Domain braucht SPF/DKIM, geht also erst mit
-Domain — bis dahin bleibt die Bestätigung abschaltbar.
+**Schritt 6 ist erledigt.**
+
+- **Rate-Limit:** höchstens 5 neue Konten pro Stunde und Adresse
+  (`HOOKCUT_REGISTER_MAX_PER_HOUR`). Gezählt werden nur *erfolgreiche*
+  Registrierungen — ein Tippfehler beim Einladungscode soll niemanden
+  aussperren. Die Adresse kommt aus `auth.client_ip`: hinter dem Proxy der
+  **letzte** Eintrag aus `X-Forwarded-For` (der erste ist fälschbar), und nur
+  bei `HOOKCUT_TRUST_PROXY=1`. Die Adresse steht höchstens eine Stunde in der
+  DB und wird danach weggeräumt.
+- **E-Mail-Bestätigung:** gebaut, aber `HOOKCUT_EMAIL_VERIFICATION` ist
+  **standardmäßig aus** — ohne Domain mit SPF/DKIM käme die Mail nicht an.
+  `backend/mailer.py` hat drei Zustellarten; `log` schreibt die Mail ins
+  Serverfenster, sodass sich der ganze Ablauf ohne Domain durchspielen lässt.
+  Unbestätigte Konten dürfen lesen und ihr Profil pflegen, aber nicht posten
+  oder kommentieren. Das erste Konto (der Betreiber) ist ausgenommen.
+  Anleitung zum Einschalten: `HOSTING.md`, Abschnitt 6.
+
+**Als Nächstes:** Phase 2, Schritt 7 — ein Sicherheits-Durchgang über alles
+Neue, dann `HOOKCUT_INVITE_ONLY=0` und **fünf bis zehn echte Musiker
+einladen und zuschauen, was sie tun**. Das ist der Moment der Wahrheit; bis
+dahin ist alles Vermutung.
 
 Parallel dazu kann der Besitzer jederzeit den Livegang aus Schritt 4
 durchführen (`HOSTING.md`); die Tür bleibt dabei zu.

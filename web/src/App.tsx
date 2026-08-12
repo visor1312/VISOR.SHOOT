@@ -20,6 +20,7 @@ import ComingSoonPage from "./pages/ComingSoonPage";
 import ImpressumPage from "./pages/ImpressumPage";
 import DatenschutzPage from "./pages/DatenschutzPage";
 import AgbPage from "./pages/AgbPage";
+import BestaetigenPage from "./pages/BestaetigenPage";
 import { getAuthConfig, getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
 type AuthPhase = "loading" | "loggedOut" | "loggedIn";
@@ -93,6 +94,9 @@ function App() {
           <Route path="/datenschutz" element={<DatenschutzPage />} />
           <Route path="/agb" element={<AgbPage />} />
         </Route>
+        {/* Der Bestaetigungslink aus der E-Mail wird meist geoeffnet, ohne
+            angemeldet zu sein - deshalb hier und nicht nur im Shell. */}
+        <Route path="/bestaetigen" element={<BestaetigenPage />} />
         <Route path="*" element={
           <AuthScreen
             onAuthed={(u) => {
@@ -134,6 +138,7 @@ function App() {
         <Route path="impressum" element={<ImpressumPage />} />
         <Route path="datenschutz" element={<DatenschutzPage />} />
         <Route path="agb" element={<AgbPage />} />
+        <Route path="bestaetigen" element={<BestaetigenPage />} />
         <Route path="spotify" element={<ComingSoonPage title="Spotify Streaming Dashboard" />} />
         <Route path="type-beats" element={<ComingSoonPage title="Type Beats Datenbank" />} />
         <Route path="tracks" element={<ComingSoonPage title="Angefangene Tracks Datenbank" />} />

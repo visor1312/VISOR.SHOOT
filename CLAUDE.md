@@ -29,7 +29,7 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Werkzeug (Reels, Hook, Canvas, Wochen-Content) | fertig, läuft beim Besitzer |
 | Benutzersystem (Login, Profile) | fertig |
 | Netzwerk (posten, Feed, folgen, Interesse, Kommentare) | **fertig, aber noch nie von echten Musikern benutzt** |
-| Live stellen (Phase 2) | **läuft** — 5 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
+| Live stellen (Phase 2) | **läuft** — 6 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
 | Premium-Abo, Apps für iOS/Android | später |
 
 387 pytest-Tests grün, Web-Build und oxlint grün.
@@ -180,6 +180,16 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `db.delete_post` und `db.delete_user_completely` räumen deshalb Kommentare,
   Interesse, Kategorien und Meldungen mit. **Neue Tabelle mit Verweis auf
   `posts` oder `users` ⇒ in beide Funktionen eintragen.**
+- **E-Mail-Versand geht über `backend/mailer.py`**, nie direkt. Die
+  Zustellart ist ein Schalter (`HOOKCUT_MAIL_BACKEND`): `log` schreibt die
+  Mail ins Serverfenster (Standard — so lässt sich der Ablauf ohne Domain
+  durchspielen), `resend` verschickt wirklich, `aus` tut nichts. **Ein
+  gescheiterter Versand darf den auslösenden Vorgang nie abbrechen** —
+  sonst hat jemand ein Konto, von dem er nichts weiß.
+- **Wer eine Adresse zählt (Rate-Limit), nimmt `auth.client_ip`.** Hinter
+  dem Proxy ist `request.client.host` für alle gleich, und
+  `X-Forwarded-For` ist eine Liste, deren **erster** Eintrag gefälscht sein
+  kann — es gilt der **letzte**, und nur bei `HOOKCUT_TRUST_PROXY=1`.
 - **Betreiberangaben stehen nur in `backend/betreiber.py`** (Name, Anschrift,
   E-Mail, Hoster). Impressum, Datenschutz und AGB holen sie über den
   öffentlichen Endpunkt `/betreiber` — **nie in die Oberfläche kopieren**,

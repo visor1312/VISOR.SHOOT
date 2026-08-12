@@ -99,6 +99,40 @@ sich neu hochladen), später nachrüstbar.
 
 ---
 
+## 6. E-Mail-Bestätigung einschalten (erst mit eigener Domain)
+
+Neue Konten können ihre E-Mail-Adresse bestätigen müssen. **Standardmäßig ist
+das aus**, und das aus einem guten Grund: Mails von einer Adresse zu
+verschicken, deren Domain dafür nicht eingerichtet ist, landen im Spam oder
+kommen gar nicht an — dann könnte sich niemand mehr anmelden.
+
+**Ausprobieren geht schon jetzt, ohne Domain.** Setz auf deinem Rechner
+`HOOKCUT_EMAIL_VERIFICATION=1`. Die Mail wird dann nicht verschickt, sondern
+**ins schwarze Backend-Fenster geschrieben** — inklusive Bestätigungslink. Den
+kopierst du heraus und rufst ihn im Browser auf. So siehst du den ganzen
+Ablauf, bevor irgendetwas online steht.
+
+**Wenn die Domain steht:**
+
+1. Bei <https://resend.com> anmelden (3.000 Mails/Monat gratis) und die Domain
+   dort eintragen. Resend zeigt dir die DNS-Einträge (SPF und DKIM), die du
+   beim Domain-Anbieter hinterlegen musst. **Ohne die kommt nichts an.**
+2. In Render unter **Environment** eintragen:
+   - `HOOKCUT_MAIL_BACKEND` = `resend`
+   - `RESEND_API_KEY` = dein Schlüssel von Resend
+   - `HOOKCUT_MAIL_FROM` = z. B. `HOOKCUT <noreply@deine-domain.de>`
+   - `HOOKCUT_PUBLIC_URL` = die echte Adresse der Seite (steht im Link!)
+3. Erst **danach** `HOOKCUT_EMAIL_VERIFICATION` auf `1` — und sofort selbst ein
+   Testkonto anlegen, um zu sehen, ob die Mail ankommt.
+
+Was ein unbestätigtes Konto darf: sich anmelden, alles lesen, das eigene
+Profil pflegen. Was nicht: posten und kommentieren. So trifft die Hürde genau
+das, wogegen sie hilft — Inhalte von Wegwerf-Adressen — und nicht den ersten
+Eindruck.
+
+**Du selbst bist ausgenommen:** Das erste Konto (deins) gilt immer als
+bestätigt. Sonst könntest du dich aus deiner eigenen Plattform aussperren.
+
 ## Was wo eingestellt wird
 
 Alle Schalter stehen in `render.yaml` und sind im Render-Dashboard unter
@@ -111,6 +145,7 @@ Alle Schalter stehen in `render.yaml` und sind im Render-Dashboard unter
 | `HOOKCUT_SECURE_COOKIES` | `1` | Session-Cookie nur über HTTPS |
 | `HOOKCUT_INVITE_ONLY` | `1` → später `0` | Tür zu / offen für alle |
 | `HOOKCUT_API_DOCS` | `0` | technische Schnittstellen-Doku aus (nur lokal sinnvoll) |
+| `HOOKCUT_TRUST_PROXY` | `1` | echte Besucher-Adresse aus dem Proxy lesen |
 | `HOOKCUT_PROJECTS_DIR` | `/var/hookcut` | **muss** auf die Festplatte zeigen |
 
 Die Datenbank landet automatisch unter `HOOKCUT_PROJECTS_DIR/state.db` — ein

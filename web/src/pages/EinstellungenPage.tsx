@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy, Flag,
-  Trash2,
+  Trash2, MailWarning,
 } from "lucide-react";
 import {
   updateDisplayName, changePassword, listInvites, createInvite, listUsers,
-  listReports, handleReport, deleteMe,
+  listReports, handleReport, deleteMe, resendVerification,
   type InviteCode, type AdminUser, type Meldung,
 } from "../api";
 import { useApp } from "../components/app-context";
@@ -20,6 +20,9 @@ export default function EinstellungenPage() {
       <p className="text-muted mt-1">Dein Konto{user.is_admin ? " und die Verwaltung" : ""}.</p>
 
       <div className="mt-6 space-y-4">
+        {/* Nur sichtbar, solange die Adresse unbestaetigt ist - ohne
+            eingeschaltete Pruefung sieht das niemand. */}
+        {!user.email_verified && <BestaetigungCard email={user.email} />}
         <NameCard user={user} onUpdated={setUser} />
         <PasswordCard />
         {user.is_admin && <AdminSection />}
@@ -27,6 +30,55 @@ export default function EinstellungenPage() {
         <KontoLoeschenCard />
       </div>
     </main>
+  );
+}
+
+/** Hinweis und Knopf, solange die E-Mail-Adresse unbestaetigt ist.
+ *
+ * Ohne diese Karte liefe der Hinweis aus der Fehlermeldung beim Posten
+ * ("unter Einstellungen kannst du ihn neu anfordern") ins Leere.
+ */
+function BestaetigungCard({ email }: { email: string }) {
+  const [laeuft, setLaeuft] = useState(false);
+  const [geschickt, setGeschickt] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function neuSchicken() {
+    setLaeuft(true); setErr("");
+    try {
+      await resendVerification();
+      setGeschickt(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLaeuft(false);
+    }
+  }
+
+  return (
+    <div className="bg-ink-900 border border-amber-500/30 rounded-2xl p-5">
+      <h2 className="flex items-center gap-2 font-semibold">
+        <MailWarning size={18} className="text-amber-400" />
+        E-Mail-Adresse noch nicht bestätigt
+      </h2>
+      <p className="text-sm text-muted mt-2 leading-relaxed">
+        Wir haben einen Link an <strong className="text-white">{email}</strong>{" "}
+        geschickt. Bis du ihn angeklickt hast, kannst du lesen und dein Profil
+        pflegen – aber noch nichts posten oder kommentieren.
+      </p>
+      {geschickt ? (
+        <p className="flex items-center gap-2 text-sm text-brand-400 mt-3">
+          <Check size={15} /> Neuer Link ist unterwegs.
+        </p>
+      ) : (
+        <button disabled={laeuft} onClick={neuSchicken}
+          className="mt-3 text-sm px-4 py-2 rounded-xl bg-ink-800 hover:bg-ink-700 disabled:opacity-40 transition-colors flex items-center gap-2">
+          {laeuft && <Loader2 size={15} className="animate-spin" />}
+          Link noch einmal schicken
+        </button>
+      )}
+      {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
+    </div>
   );
 }
 

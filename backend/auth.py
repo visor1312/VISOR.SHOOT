@@ -303,7 +303,10 @@ def check_login(email: str, password: str,
 def public_user(user: dict) -> dict:
     """Nur die Felder, die das Frontend sehen darf (nie der Passwort-Hash)."""
     return {"id": user["id"], "email": user["email"],
-            "display_name": user["display_name"], "is_admin": bool(user["is_admin"])}
+            "display_name": user["display_name"], "is_admin": bool(user["is_admin"]),
+            # Damit die Oberflaeche einen Hinweis zeigen kann, statt den
+            # Nutzer erst beim Posten in einen Fehler laufen zu lassen.
+            "email_verified": bool(user.get("email_verified", 1))}
 
 
 # Erlaubte Profil-Links. Bewusst eine feste Liste statt "irgendeine URL":
