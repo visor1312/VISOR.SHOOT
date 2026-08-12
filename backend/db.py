@@ -95,6 +95,10 @@ CREATE TABLE IF NOT EXISTS users (
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
+    -- Standard 1 mit Absicht: Konten aus der Zeit vor der E-Mail-Pruefung
+    -- (und alle, die ohne eingeschaltete Pruefung entstehen) gelten als
+    -- bestaetigt. Ist die Pruefung an, setzt register_user ausdruecklich 0.
+    email_verified INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
 
@@ -221,6 +225,19 @@ CREATE TABLE IF NOT EXISTS signup_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_signup_attempts ON signup_attempts(ip, created_at);
 
+-- Bestaetigungslinks fuer E-Mail-Adressen.
+-- Wie bei den Sitzungen liegt hier NUR der SHA-256-Hash des Tokens: wer die
+-- Datenbank in die Haende bekommt, kann damit keine fremde Adresse
+-- bestaetigen. Ein Token gilt 24 Stunden und genau einmal.
+CREATE TABLE IF NOT EXISTS email_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -310,6 +327,13 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         # Mini-Migration fuer bestehende DBs: CREATE IF NOT EXISTS ergaenzt
         # keine Spalten. ALTER TABLE wirft bei schon vorhandener Spalte einen
         # OperationalError - der ist dann erwartbar und wird ignoriert.
+        # Bestehende Konten gelten als bestaetigt: sie stammen aus der Zeit
+        # vor der Pruefung, und niemand soll sich ploetzlich nicht mehr
+        # anmelden koennen, nur weil eine Spalte dazugekommen ist.
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
         for column_def in ("preset TEXT", "subtitles INTEGER"):
             try:
                 conn.execute(f"ALTER TABLE takes ADD COLUMN {column_def}")
@@ -557,13 +581,15 @@ def list_edit_jobs(user_id: str, limit: int = 20,
 
 
 def create_user(email: str, display_name: str, password_hash: str,
-                is_admin: bool = False, db_path: str | Path = DEFAULT_DB_PATH) -> str:
+                is_admin: bool = False, email_verified: bool = True,
+                db_path: str | Path = DEFAULT_DB_PATH) -> str:
     user_id = str(uuid.uuid4())
     with _connect(db_path) as conn:
         conn.execute(
-            "INSERT INTO users (id, email, display_name, password_hash, is_admin, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, email, display_name, password_hash, 1 if is_admin else 0, _now()),
+            "INSERT INTO users (id, email, display_name, password_hash, is_admin, "
+            "email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, email, display_name, password_hash, 1 if is_admin else 0,
+             1 if email_verified else 0, _now()),
         )
     return user_id
 
@@ -1431,3 +1457,35 @@ def prune_signup_attempts(before_iso: str,
         cur = conn.execute("DELETE FROM signup_attempts WHERE created_at <= ?",
                            (before_iso,))
         return cur.rowcount
+
+
+# --- Bestaetigung der E-Mail-Adresse --------------------------------------
+
+def insert_email_token(token_hash: str, user_id: str, expires_at: str,
+                       db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Neuer Bestaetigungslink. Alte Links desselben Kontos verfallen dabei -
+    sonst blieben beliebig viele gueltige Links im Umlauf, wenn jemand
+    mehrfach auf "noch mal schicken" drueckt."""
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM email_tokens WHERE user_id = ?", (user_id,))
+        conn.execute(
+            "INSERT INTO email_tokens (token_hash, user_id, expires_at, created_at) "
+            "VALUES (?, ?, ?, ?)", (token_hash, user_id, expires_at, _now()))
+
+
+def get_email_token(token_hash: str,
+                    db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM email_tokens WHERE token_hash = ?",
+                           (token_hash,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_email_token(token_hash: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM email_tokens WHERE token_hash = ?", (token_hash,))
+
+
+def set_email_verified(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (user_id,))

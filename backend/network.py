@@ -188,7 +188,7 @@ def list_post_categories():
 def create_post(title: str = Form(...), categories: str = Form(...),
                 body: str = Form(""), genres: str = Form(""), bpm: int = Form(0),
                 audio: UploadFile | None = File(None),
-                user: dict = Depends(auth.get_current_user)):
+                user: dict = Depends(auth.require_verified_email)):
     titel = title.strip()
     if not titel:
         raise HTTPException(422, "Bitte einen Titel angeben.")
@@ -404,7 +404,7 @@ def list_comments(post_id: str, _: dict = Depends(auth.get_current_user)):
 
 @router.post("/posts/{post_id}/comments")
 def create_comment(post_id: str, body: str = Form(...),
-                   user: dict = Depends(auth.get_current_user)):
+                   user: dict = Depends(auth.require_verified_email)):
     _sichtbarer_post(post_id)
     text = body.strip()
     if not text:

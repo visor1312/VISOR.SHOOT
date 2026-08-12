@@ -33,6 +33,10 @@ BEWUSST_OFFEN = {
     ("GET", "/presets"): "statischer Katalog",
     ("GET", "/post-categories"): "statischer Katalog (Filter im Feed)",
     ("GET", "/report-reasons"): "Auswahl im Melden-Dialog",
+    # Der Bestaetigungslink wird oft auf dem Handy geoeffnet, waehrend man am
+    # Rechner angemeldet ist - eine Anmeldepflicht waere hier eine Sackgasse.
+    # Das Token selbst ist der Nachweis: zufaellig, 24 Stunden gueltig, einmalig.
+    ("POST", "/auth/verify-email"): "Bestaetigungslink wird ohne Anmeldung geoeffnet",
     # Die automatische API-Dokumentation. Sie laeuft NUR lokal - online ist
     # sie abgeschaltet (HOOKCUT_API_DOCS=0 in render.yaml und Dockerfile),
     # sonst bekaeme jeder Besucher eine Landkarte aller Routen samt der

@@ -31,7 +31,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from backend import config, db, storage
+from backend import config, db, mailer, storage
 
 SESSION_COOKIE = "hookcut_session"
 SESSION_TTL = timedelta(days=30)
@@ -246,8 +246,15 @@ def register_user(invite_code: str, email: str, display_name: str, password: str
 
     # Erstes Konto = Admin + uebernimmt alle Altdaten (user_id NULL).
     is_first = db.count_users(db_path=db_path) == 0
+    # Bei eingeschalteter Pruefung startet ein Konto als unbestaetigt. Das
+    # ERSTE Konto (der Betreiber) ist ausgenommen: er muesste sich sonst
+    # selbst eine Mail schicken koennen, bevor der Versand ueberhaupt
+    # eingerichtet ist - und koennte sich damit aus der eigenen Plattform
+    # aussperren.
+    bestaetigt = not config.EMAIL_VERIFICATION or is_first
     user_id = db.create_user(email, display_name, hash_password(password),
-                             is_admin=is_first, db_path=db_path)
+                             is_admin=is_first, email_verified=bestaetigt,
+                             db_path=db_path)
     # Der Code wird nur eingeloest, wenn er JETZT noch frei ist. Hat ihn
     # zwischenzeitlich jemand anderes verbraucht (zwei gleichzeitige
     # Registrierungen mit demselben Code), wird das eben angelegte Konto
@@ -440,6 +447,9 @@ def auth_register(body: RegisterBody, request: Request, response: Response):
     except RegisterError as e:
         raise HTTPException(e.status_code, e.message)
 
+    if config.EMAIL_VERIFICATION and not user.get("email_verified"):
+        bestaetigung_verschicken(user)
+
     db.record_signup(ip)
     # Bei Gelegenheit aufraeumen: Adressen sollen nicht laenger liegen
     # bleiben, als die Bremse sie braucht (siehe Kommentar am Schema).
@@ -508,6 +518,82 @@ def auth_change_password(body: ChangePasswordBody, response: Response,
     db.delete_sessions_for_user(user["id"])
     _set_session_cookie(response, create_session(user["id"]))
     return {"ok": True}
+
+
+# --- Bestaetigung der E-Mail-Adresse --------------------------------------
+
+EMAIL_TOKEN_TTL = timedelta(hours=24)
+
+
+def bestaetigung_verschicken(user: dict) -> None:
+    """Legt einen frischen Bestaetigungslink an und verschickt ihn.
+
+    Scheitert der Versand, wird das protokolliert, aber NICHT nach aussen
+    durchgereicht: sonst schluege die Registrierung fehl, obwohl das Konto
+    schon existiert - und der Mensch davor haette ein Konto, von dem er
+    nichts weiss. Stattdessen kann er die Mail spaeter neu anfordern.
+    """
+    token = secrets.token_urlsafe(32)
+    db.insert_email_token(_hash_token(token), user["id"], _iso(_now() + EMAIL_TOKEN_TTL))
+    link = f"{config.PUBLIC_URL}/bestaetigen?token={token}"
+    try:
+        mailer.send(user["email"], "Bitte bestaetige deine E-Mail-Adresse",
+                    mailer.bestaetigungs_mail(user["email"], user["display_name"], link))
+    except mailer.MailFehler as e:
+        print(f"[HOOKCUT] Bestaetigungsmail an {user['email']} fehlgeschlagen: {e}",
+              flush=True)
+
+
+def require_verified_email(user: dict = Depends(get_current_user)) -> dict:
+    """Fuer Routen, die etwas VEROEFFENTLICHEN.
+
+    Unbestaetigte Konten duerfen sich anmelden, das Netzwerk lesen und ihr
+    Profil pflegen - nur nichts posten oder kommentieren. Sonst waere die
+    Bestaetigung eine Huerde beim ersten Eindruck; so trifft sie genau das,
+    wogegen sie hilft: Inhalte von Wegwerf-Adressen.
+
+    Ist die Pruefung ausgeschaltet, laesst diese Abhaengigkeit alles durch.
+    """
+    if config.EMAIL_VERIFICATION and not user.get("email_verified"):
+        raise HTTPException(
+            403,
+            "Bitte bestaetige zuerst deine E-Mail-Adresse. Den Link findest du "
+            "in deinem Postfach - unter Einstellungen kannst du ihn neu anfordern.")
+    return user
+
+
+class VerifyBody(BaseModel):
+    token: str
+
+
+@router.post("/verify-email")
+def auth_verify_email(body: VerifyBody):
+    """Bestaetigungslink einloesen.
+
+    Bewusst OHNE Anmeldung: der Link wird oft auf dem Handy geoeffnet,
+    waehrend man am Rechner angemeldet ist. Das Token selbst ist der
+    Nachweis - es ist zufaellig, gilt 24 Stunden und genau einmal.
+    """
+    eintrag = db.get_email_token(_hash_token(body.token))
+    if not eintrag:
+        raise HTTPException(400, "Dieser Bestaetigungslink ist ungueltig.")
+    if _parse_iso(eintrag["expires_at"]) < _now():
+        db.delete_email_token(eintrag["token_hash"])
+        raise HTTPException(
+            400, "Dieser Bestaetigungslink ist abgelaufen. Bitte fordere einen neuen an.")
+
+    db.set_email_verified(eintrag["user_id"])
+    db.delete_email_token(eintrag["token_hash"])
+    return {"ok": True}
+
+
+@router.post("/resend-verification")
+def auth_resend_verification(user: dict = Depends(get_current_user)):
+    """Neuen Bestaetigungslink anfordern (fuer den angemeldeten Nutzer)."""
+    if user.get("email_verified"):
+        return {"ok": True, "bereits_bestaetigt": True}
+    bestaetigung_verschicken(user)
+    return {"ok": True, "bereits_bestaetigt": False}
 
 
 class DeleteMeBody(BaseModel):

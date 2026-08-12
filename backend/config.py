@@ -101,3 +101,20 @@ TRUST_PROXY: bool = _env_bool("HOOKCUT_TRUST_PROXY", False)
 # fuer eine WG oder ein Studio mit gemeinsamem Anschluss und trotzdem eng
 # genug gegen Automatisierung.
 REGISTER_MAX_PER_HOUR: int = _env_int("HOOKCUT_REGISTER_MAX_PER_HOUR", 5)
+
+# --- E-Mail ----------------------------------------------------------------
+# Muessen neue Konten ihre E-Mail-Adresse bestaetigen? Standard AUS: solange
+# es keine eigene Domain mit SPF/DKIM gibt, kaeme die Bestaetigungsmail bei
+# vielen gar nicht an - und niemand koennte sich anmelden. Erst einschalten,
+# wenn der Versand nachweislich funktioniert (siehe HOSTING.md).
+EMAIL_VERIFICATION: bool = _env_bool("HOOKCUT_EMAIL_VERIFICATION", False)
+
+# Wie wird zugestellt? "log" schreibt die Mail ins Serverfenster (zum
+# Ausprobieren ohne Domain), "resend" verschickt wirklich, "aus" tut nichts.
+MAIL_BACKEND: str = os.environ.get("HOOKCUT_MAIL_BACKEND", "log").strip().lower()
+MAIL_FROM: str = os.environ.get("HOOKCUT_MAIL_FROM", "HOOKCUT <noreply@example.com>")
+RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
+
+# Unter welcher Adresse ist die Plattform erreichbar? Wird fuer die Links in
+# E-Mails gebraucht - eine Mail mit "localhost"-Link waere nutzlos.
+PUBLIC_URL: str = os.environ.get("HOOKCUT_PUBLIC_URL", "http://localhost:5173").rstrip("/")
