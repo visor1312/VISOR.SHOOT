@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy, Flag,
+  Trash2,
 } from "lucide-react";
 import {
   updateDisplayName, changePassword, listInvites, createInvite, listUsers,
-  listReports, handleReport,
+  listReports, handleReport, deleteMe,
   type InviteCode, type AdminUser, type Meldung,
 } from "../api";
 import { useApp } from "../components/app-context";
@@ -22,6 +23,8 @@ export default function EinstellungenPage() {
         <NameCard user={user} onUpdated={setUser} />
         <PasswordCard />
         {user.is_admin && <AdminSection />}
+        {/* Ganz unten und optisch abgesetzt: nichts hier ist so endgueltig. */}
+        <KontoLoeschenCard />
       </div>
     </main>
   );
@@ -202,6 +205,83 @@ function AdminSection() {
         </div>
       </Card>
     </>
+  );
+}
+
+/** Konto loeschen (DSGVO Art. 17).
+ *
+ * Zwei Huerden, mit Absicht: erst aufklappen, dann Passwort eingeben. Das
+ * ist unwiderruflich, und der Knopf sitzt auf derselben Seite wie harmlose
+ * Einstellungen - ein Fehlklick darf nicht reichen.
+ *
+ * Ehrlich benennen, was verschwindet: wer nicht weiss, dass seine Beitraege
+ * mitgehen, fuehlt sich hinterher betrogen.
+ */
+function KontoLoeschenCard() {
+  const [offen, setOffen] = useState(false);
+  const [passwort, setPasswort] = useState("");
+  const [laeuft, setLaeuft] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function loeschen(e: React.FormEvent) {
+    e.preventDefault();
+    setLaeuft(true); setErr("");
+    try {
+      await deleteMe(passwort);
+      // Das Konto gibt es nicht mehr - komplett neu laden ist hier das
+      // Ehrlichste: die App startet auf der Anmeldemaske, ohne Reste im
+      // Zustand des Browsers.
+      window.location.href = "/";
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setLaeuft(false);
+    }
+  }
+
+  return (
+    <div className="bg-ink-900 border border-red-500/25 rounded-2xl p-5">
+      <h2 className="flex items-center gap-2 font-semibold">
+        <Trash2 size={18} className="text-red-400" />
+        Konto löschen
+      </h2>
+
+      {!offen ? (
+        <>
+          <p className="text-sm text-muted mt-2 leading-relaxed">
+            Löscht dein Konto, dein Profil, alle deine Beiträge samt Hörproben
+            und alle deine Kommentare – endgültig und ohne
+            Wiederherstellungsmöglichkeit.
+          </p>
+          <button onClick={() => setOffen(true)}
+            className="mt-3 text-sm px-4 py-2 rounded-xl bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors">
+            Konto löschen…
+          </button>
+        </>
+      ) : (
+        <form onSubmit={loeschen} className="mt-3 space-y-3">
+          <p className="text-sm text-muted leading-relaxed">
+            Das lässt sich <strong className="text-white">nicht</strong>{" "}
+            rückgängig machen. Zum Bestätigen bitte dein Passwort eingeben.
+          </p>
+          <input type="password" value={passwort} autoFocus
+            onChange={(e) => setPasswort(e.target.value)}
+            placeholder="Dein Passwort"
+            className="w-full text-sm bg-ink-800 border border-ink-700 focus:border-red-500 rounded-xl px-3 py-2.5 outline-none" />
+          {err && <p className="text-sm text-red-400">{err}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setOffen(false); setPasswort(""); setErr(""); }}
+              className="flex-1 text-sm px-4 py-2.5 rounded-xl bg-ink-800 hover:bg-ink-700 transition-colors">
+              Abbrechen
+            </button>
+            <button type="submit" disabled={!passwort || laeuft}
+              className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors">
+              {laeuft ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Endgültig löschen
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

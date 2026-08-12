@@ -672,8 +672,26 @@ def set_post_categories(post_id: str, categories: Sequence[str],
 
 
 def delete_post(post_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
-    """Raeumt die Kategorien mit weg - sonst haelt der Fremdschluessel dagegen."""
+    """Raeumt alles mit weg, was am Beitrag haengt - sonst haelt der
+    Fremdschluessel dagegen (PRAGMA foreign_keys = ON).
+
+    Kommentare und Interessen MUESSEN mit: sobald jemand kommentiert oder
+    Interesse gezeigt hatte, liess sich der Beitrag sonst gar nicht mehr
+    loeschen (FOREIGN KEY constraint failed -> 500). Genau das ist der
+    haeufige Fall, nicht der seltene.
+    Meldungen zu diesem Beitrag gehen auch weg: sie zeigen ins Leere, und der
+    Betreiber soll nur Offenes in seiner Liste haben.
+    """
     with _connect(db_path) as conn:
+        # Meldungen zuerst - auch die zu den Kommentaren, die gleich mit weg
+        # sind, sonst zeigen sie hinterher ins Leere.
+        conn.execute(
+            "DELETE FROM reports WHERE (target_type = 'post' AND target_id = ?) "
+            "   OR (target_type = 'comment' AND target_id IN "
+            "       (SELECT id FROM comments WHERE post_id = ?))",
+            (post_id, post_id))
+        conn.execute("DELETE FROM comments WHERE post_id = ?", (post_id,))
+        conn.execute("DELETE FROM post_interests WHERE post_id = ?", (post_id,))
         conn.execute("DELETE FROM post_categories WHERE post_id = ?", (post_id,))
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
 
@@ -1278,3 +1296,81 @@ def close_reports_for_target(target_type: str, target_id: str, status: str,
             "WHERE target_type = ? AND target_id = ? AND status = 'open'",
             (status, _now(), handled_by, target_type, target_id))
         return cur.rowcount
+
+
+def list_posts_by_user(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Alle Beitraege eines Kontos - fuer die Konto-Loeschung (dort muessen
+    auch die Dateien weg, dafuer werden die IDs gebraucht)."""
+    with _connect(db_path) as conn:
+        rows = conn.execute("SELECT * FROM posts WHERE user_id = ?", (user_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_user_completely(user_id: str,
+                           db_path: str | Path = DEFAULT_DB_PATH) -> list[str]:
+    """Konto und ALLES daran loeschen (DSGVO Art. 17).
+
+    Gibt die IDs der geloeschten Beitraege zurueck, damit der Aufrufer die
+    zugehoerigen Hoerproben von der Platte raeumen kann - die Datenbank
+    kennt nur die Pfade, nicht das Dateisystem.
+
+    Reihenfolge ist wichtig (PRAGMA foreign_keys = ON): erst alles, was auf
+    den Nutzer zeigt, dann der Nutzer selbst.
+
+    Bewusste Entscheidung beim Einladungscode: der Code bleibt als
+    VERBRAUCHT stehen, nur der Verweis auf das Konto faellt weg. Sonst
+    koennte man sich durch Loeschen und Neuanlegen unbegrenzt Einladungen
+    zurueckholen.
+    """
+    with _connect(db_path) as conn:
+        post_ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM posts WHERE user_id = ?", (user_id,)).fetchall()]
+
+        # Meldungen: eigene, und alle zu eigenen Inhalten.
+        conn.execute("DELETE FROM reports WHERE reporter_id = ?", (user_id,))
+        conn.execute(
+            "DELETE FROM reports WHERE (target_type = 'comment' AND target_id IN "
+            "       (SELECT id FROM comments WHERE user_id = ?)) "
+            "   OR (target_type = 'post' AND target_id IN "
+            "       (SELECT id FROM posts WHERE user_id = ?))",
+            (user_id, user_id))
+
+        # Eigene Kommentare - und die Kommentare anderer unter den eigenen
+        # Beitraegen (die Beitraege verschwinden ja).
+        conn.execute("DELETE FROM comments WHERE user_id = ?", (user_id,))
+        conn.execute(
+            "DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)",
+            (user_id,))
+
+        # Interesse: eigenes, und fremdes an den eigenen Beitraegen.
+        conn.execute("DELETE FROM post_interests WHERE user_id = ?", (user_id,))
+        conn.execute(
+            "DELETE FROM post_interests WHERE post_id IN "
+            "   (SELECT id FROM posts WHERE user_id = ?)", (user_id,))
+
+        conn.execute(
+            "DELETE FROM post_categories WHERE post_id IN "
+            "   (SELECT id FROM posts WHERE user_id = ?)", (user_id,))
+        conn.execute("DELETE FROM posts WHERE user_id = ?", (user_id,))
+
+        # Folgen in BEIDE Richtungen.
+        conn.execute("DELETE FROM follows WHERE follower_id = ? OR followee_id = ?",
+                     (user_id, user_id))
+
+        conn.execute("DELETE FROM profiles WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+        # Einladungscodes: Verweis loesen, Code bleibt verbraucht.
+        conn.execute("UPDATE invite_codes SET used_by = NULL WHERE used_by = ?", (user_id,))
+        conn.execute("UPDATE invite_codes SET created_by = NULL WHERE created_by = ?",
+                     (user_id,))
+        # Meldungen, die dieses Konto als Betreiber bearbeitet hat.
+        conn.execute("UPDATE reports SET handled_by = NULL WHERE handled_by = ?", (user_id,))
+
+        # Login-Sperrzaehler haengt an der E-Mail, nicht an der ID.
+        row = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row:
+            conn.execute("DELETE FROM login_attempts WHERE email = ?", (row["email"],))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+    return post_ids

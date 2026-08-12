@@ -22,6 +22,7 @@ import hashlib
 import json
 import re
 import secrets
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,7 +31,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from backend import config, db
+from backend import config, db, storage
 
 SESSION_COOKIE = "hookcut_session"
 SESSION_TTL = timedelta(days=30)
@@ -461,6 +462,36 @@ def auth_change_password(body: ChangePasswordBody, response: Response,
     db.delete_sessions_for_user(user["id"])
     _set_session_cookie(response, create_session(user["id"]))
     return {"ok": True}
+
+
+class DeleteMeBody(BaseModel):
+    password: str
+
+
+@router.delete("/me")
+def auth_delete_me(body: DeleteMeBody, response: Response,
+                   user: dict = Depends(get_current_user)):
+    """Konto und alle eigenen Inhalte loeschen (DSGVO Art. 17).
+
+    Wer sich registrieren kann, muss auch wieder gehen koennen - und zwar
+    selbst, ohne den Betreiber zu fragen.
+
+    Das Passwort wird verlangt, weil das hier unwiderruflich ist: ein
+    offenstehender Browser soll nicht reichen, um ein fremdes Konto samt
+    aller Beitraege zu vernichten.
+    """
+    full = db.get_user_by_id(user["id"])
+    if not full or not verify_password(body.password, full["password_hash"]):
+        raise HTTPException(401, "Das Passwort ist falsch.")
+
+    # Erst die DB (die kennt die Beitrags-IDs), dann die Dateien. Andersherum
+    # blieben bei einem Fehler Eintraege ohne Dateien zurueck.
+    post_ids = db.delete_user_completely(user["id"])
+    for post_id in post_ids:
+        shutil.rmtree(storage.post_dir(post_id), ignore_errors=True)
+
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"ok": True, "geloeschte_beitraege": len(post_ids)}
 
 
 # ---------------------------------------------------------------------------

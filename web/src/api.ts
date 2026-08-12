@@ -145,6 +145,17 @@ export async function getAuthConfig(): Promise<ServerConfig> {
   return jsonOrThrow<ServerConfig>(res);
 }
 
+/** Konto und alle eigenen Inhalte loeschen (DSGVO Art. 17).
+ *  Unwiderruflich - deshalb verlangt der Server das Passwort. */
+export async function deleteMe(password: string): Promise<{ geloeschte_beitraege: number }> {
+  const res = await requestOrExplain(`${BASE}/auth/me`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  }, { authRequest: true });
+  return jsonOrThrow<{ geloeschte_beitraege: number }>(res);
+}
+
 // --- Melden (DSA) ---------------------------------------------------------
 
 export interface Meldegrund {
