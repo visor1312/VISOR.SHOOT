@@ -159,3 +159,40 @@ def test_einladungscode_bleibt_verbraucht(client, tmp_path):
     assert eintrag is not None, "der Code selbst darf nicht verschwinden"
     assert eintrag["used_by"] is None       # Verweis aufs Konto ist geloest
     assert eintrag["used_at"] is not None   # ... aber verbraucht bleibt verbraucht
+
+
+def test_letzter_admin_kann_sich_nicht_loeschen(auth_client, second_auth_client):
+    """Sonst bleibt eine Plattform ohne Verwaltung zurueck: niemand koennte
+    mehr gemeldete Inhalte bearbeiten oder Einladungen erzeugen - und die
+    "erstes Konto wird Admin"-Regel greift nicht, weil es ja Konten gibt."""
+    with db._connect(db.DEFAULT_DB_PATH) as conn:
+        # Genau ein Admin im System: dieser hier.
+        conn.execute("UPDATE users SET is_admin = 0")
+        conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (auth_client.user["id"],))
+
+    r = auth_client.request("DELETE", "/auth/me", json={"password": TEST_PASSWORD})
+    assert r.status_code == 409
+    assert "Administrator" in r.json()["detail"]
+    assert auth_client.get("/auth/me").status_code == 200  # Konto lebt
+
+    # Mit einem zweiten Admin geht es.
+    with db._connect(db.DEFAULT_DB_PATH) as conn:
+        conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?",
+                     (second_auth_client.user["id"],))
+    r = auth_client.request("DELETE", "/auth/me", json={"password": TEST_PASSWORD})
+    assert r.status_code == 200, r.text
+
+
+def test_einzelnes_konto_darf_immer_gehen(client, tmp_path):
+    """Ist man der einzige Nutzer ueberhaupt, ist Loeschen unkritisch: das
+    naechste Konto wird wieder automatisch Admin."""
+    dbp = tmp_path / "allein.db"
+    db.init_db(dbp)
+    from backend import auth
+    allein = auth.register_user(db.create_invite_code("c", db_path=dbp),
+                                "allein@example.com", "Allein", TEST_PASSWORD, db_path=dbp)
+    assert allein["is_admin"] == 1
+    assert db.count_admins(db_path=dbp) == 1 and db.count_users(db_path=dbp) == 1
+    # Die Sperre greift nur, wenn noch jemand ANDERES da ist.
+    db.delete_user_completely(allein["id"], db_path=dbp)
+    assert db.count_users(db_path=dbp) == 0

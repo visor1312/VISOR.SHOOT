@@ -70,3 +70,47 @@ def test_eingeschaltet_bleibt_alles_beim_alten(auth_client, monkeypatch):
     # Ohne gueltige Datei scheitert die Route fachlich - aber NICHT mit 503.
     antwort = auth_client.post("/edit/gibtesnicht/hook")
     assert antwort.status_code != 503
+
+
+def test_api_dokumentation_laesst_sich_abschalten(tmp_path):
+    """Online muss /docs weg sein.
+
+    Die automatische Dokumentation listet sonst jedem Besucher saemtliche
+    Routen samt Parametern auf - auch die Admin-Routen. Der Schalter wird
+    beim Bau der Anwendung gelesen, deshalb ein eigener Prozess.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    projekt = Path(__file__).resolve().parent.parent
+    # Auf den STATUS zu schauen reicht hier NICHT: ist die Oberflaeche
+    # gebaut, faengt der Auffang-Pfad jede unbekannte Adresse ab und liefert
+    # brav 200 mit der HTML-Seite. Entscheidend ist der INHALT - kommt noch
+    # das Schema mit allen Routen zurueck?
+    skript = (
+        "from fastapi.testclient import TestClient\n"
+        "from backend.main import app\n"
+        "with TestClient(app) as c:\n"
+        "    for pfad in ('/docs', '/redoc', '/openapi.json'):\n"
+        "        text = c.get(pfad).text.lower()\n"
+        "        schema = '\"paths\"' in text or 'swagger-ui' in text or 'redoc.standalone' in text\n"
+        "        print(pfad, schema)\n"
+    )
+
+    def lauf(docs: str) -> dict[str, bool]:
+        e = subprocess.run(
+            [sys.executable, "-c", skript], cwd=projekt, capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH": str(projekt),
+                 "HOOKCUT_DB": str(tmp_path / f"docs-{docs}.db"),
+                 "HOOKCUT_API_DOCS": docs})
+        assert e.returncode == 0, e.stderr
+        return {z.split()[0]: z.split()[1] == "True" for z in e.stdout.strip().splitlines()}
+
+    an = lauf("1")
+    assert all(an.values()), f"lokal soll die Doku erreichbar sein: {an}"
+
+    aus = lauf("0")
+    verraeterisch = sorted(p for p, schema in aus.items() if schema)
+    assert not verraeterisch, f"gibt online weiter die Routen preis: {verraeterisch}"

@@ -484,6 +484,18 @@ def auth_delete_me(body: DeleteMeBody, response: Response,
     if not full or not verify_password(body.password, full["password_hash"]):
         raise HTTPException(401, "Das Passwort ist falsch.")
 
+    # Der letzte Betreiber darf nicht gehen, solange noch jemand da ist:
+    # sonst bleibt eine Plattform ohne Verwaltung zurueck - Meldungen koennte
+    # niemand mehr bearbeiten und Einladungen niemand mehr erzeugen. Die
+    # "erstes Konto wird Admin"-Regel hilft dann auch nicht mehr, weil es
+    # ja schon Konten gibt.
+    if full["is_admin"] and db.count_admins() <= 1 and db.count_users() > 1:
+        raise HTTPException(
+            409,
+            "Du bist das einzige Konto mit Verwaltungsrechten. Bitte mach erst "
+            "jemand anderen zum Administrator - sonst koennte niemand mehr "
+            "gemeldete Inhalte bearbeiten.")
+
     # Erst die DB (die kennt die Beitrags-IDs), dann die Dateien. Andersherum
     # blieben bei einem Fehler Eintraege ohne Dateien zurueck.
     post_ids = db.delete_user_completely(user["id"])

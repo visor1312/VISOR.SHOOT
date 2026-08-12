@@ -66,3 +66,9 @@ INVITE_ONLY: bool = _env_bool("HOOKCUT_INVITE_ONLY", True)
 # Oberflaeche und die Routen antworten verstaendlich, statt mitten im
 # Hintergrund-Job zu scheitern.
 TOOLS_ENABLED: bool = _env_bool("HOOKCUT_TOOLS_ENABLED", True)
+
+# Die automatische API-Dokumentation (/docs, /redoc, /openapi.json). Lokal
+# beim Entwickeln nuetzlich, oeffentlich aber eine fertige Landkarte der
+# gesamten Schnittstelle - inklusive der Admin-Routen und aller Parameter.
+# Das muss ein Fremder nicht bekommen, deshalb online aus.
+API_DOCS: bool = _env_bool("HOOKCUT_API_DOCS", True)

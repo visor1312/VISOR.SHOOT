@@ -161,6 +161,12 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Neue Route ⇒ `tests/test_routen_schutz.py` entscheidet.** Der Test ruft
+  jede Route ohne Anmeldung auf: 401/403 heißt geschützt. Ist eine Route
+  absichtlich offen, gehört sie **mit Begründung** in `BEWUSST_OFFEN` —
+  Offenheit muss eine Entscheidung sein, kein Versehen. Geprüft wird zur
+  Laufzeit, weil `/auth/me` die Anmeldung im Funktionskörper holt und eine
+  reine Code-Analyse das übersieht.
 - **Nichts blind an `db.py` anhängen.** Die Datei ist über 1300 Zeilen lang;
   eine neue Funktion mit einem schon vergebenen Namen verdeckt stillschweigend
   die alte, und ein ganz anderer Programmteil fällt später um (genau so

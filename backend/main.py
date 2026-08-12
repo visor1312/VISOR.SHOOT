@@ -58,7 +58,16 @@ async def _lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="HOOKCUT", lifespan=_lifespan)
+app = FastAPI(
+    title="HOOKCUT", lifespan=_lifespan,
+    # Online abgeschaltet (HOOKCUT_API_DOCS=0): /docs, /redoc und
+    # /openapi.json listen sonst jedem Besucher saemtliche Routen samt
+    # Parametern auf, auch die Admin-Routen. Lokal bleibt es an, dort ist es
+    # beim Entwickeln praktisch.
+    docs_url="/docs" if config.API_DOCS else None,
+    redoc_url="/redoc" if config.API_DOCS else None,
+    openapi_url="/openapi.json" if config.API_DOCS else None,
+)
 
 # Das React-Dashboard (web/, Vite auf Port 5173) spricht das Backend ueber den
 # /api-Proxy an (same-origin, web/vite.config.ts). CORS deckt nur direkte

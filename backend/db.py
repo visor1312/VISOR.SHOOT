@@ -961,6 +961,15 @@ def count_users(db_path: str | Path = DEFAULT_DB_PATH) -> int:
         return int(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
 
 
+def count_admins(db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Wie viele Konten koennen die Plattform noch verwalten? Wichtig vor dem
+    Loeschen eines Kontos: ohne Admin bearbeitet niemand mehr Meldungen und
+    niemand erzeugt mehr Einladungen."""
+    with _connect(db_path) as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0])
+
+
 def list_users(db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
     with _connect(db_path) as conn:
         rows = conn.execute("SELECT * FROM users ORDER BY created_at").fetchall()
@@ -1232,9 +1241,20 @@ def list_canvas_jobs(user_id: str, limit: int = 50,
 def create_report(target_type: str, target_id: str, reporter_id: str,
                   reason: str, note: str = "",
                   db_path: str | Path = DEFAULT_DB_PATH) -> Optional[str]:
-    """Legt eine Meldung an. Gibt None zurueck, wenn dieselbe Person denselben
-    Inhalt schon gemeldet hat (UNIQUE) - das ist kein Fehler, sondern der
-    Normalfall beim zweiten Klick."""
+    """Legt eine Meldung an.
+
+    Der UNIQUE-Schluessel verhindert, dass jemand denselben Inhalt mehrfach
+    in die Liste des Betreibers druecken kann. Zwei Faelle, die dabei
+    auseinandergehalten werden muessen:
+
+    * Es liegt schon eine OFFENE Meldung dieser Person vor -> nichts tun
+      (None). Der zweite Klick ist ein Doppelklick, keine neue Information.
+    * Die fruehere Meldung wurde bereits ENTSCHIEDEN -> wieder oeffnen, mit
+      dem neuen Grund und der neuen Notiz. Ohne das koennte niemand denselben
+      Inhalt je wieder melden - ein Beitrag laesst sich aber nach einer
+      Entscheidung aendern. Die Meldung waere stillschweigend verschwunden,
+      obwohl die Oberflaeche "Danke, ist angekommen" sagt.
+    """
     report_id = str(uuid.uuid4())
     try:
         with _connect(db_path) as conn:
@@ -1242,9 +1262,21 @@ def create_report(target_type: str, target_id: str, reporter_id: str,
                 "INSERT INTO reports (id, target_type, target_id, reporter_id, "
                 "reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (report_id, target_type, target_id, reporter_id, reason, note, _now()))
+        return report_id
     except sqlite3.IntegrityError:
-        return None
-    return report_id
+        pass
+
+    with _connect(db_path) as conn:
+        vorhanden = conn.execute(
+            "SELECT id, status FROM reports WHERE target_type = ? AND target_id = ? "
+            "AND reporter_id = ?", (target_type, target_id, reporter_id)).fetchone()
+        if not vorhanden or vorhanden["status"] == "open":
+            return None
+        conn.execute(
+            "UPDATE reports SET status = 'open', reason = ?, note = ?, created_at = ?, "
+            "handled_at = NULL, handled_by = NULL WHERE id = ?",
+            (reason, note, _now(), vorhanden["id"]))
+        return vorhanden["id"]
 
 
 def get_report(report_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:

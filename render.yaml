@@ -46,6 +46,11 @@ services:
       # (Phase 2, Schritt 7). Zum Oeffnen hier auf "0" stellen.
       - key: HOOKCUT_INVITE_ONLY
         value: "1"
+      # Automatische API-Dokumentation aus: /docs waere sonst eine fertige
+      # Landkarte der ganzen Schnittstelle fuer jeden Besucher, Admin-Routen
+      # inklusive.
+      - key: HOOKCUT_API_DOCS
+        value: "0"
 
       # --- Daten ----------------------------------------------------------
       # Muss auf die Platte oben zeigen. Die Datenbank landet automatisch

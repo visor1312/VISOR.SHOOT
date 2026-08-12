@@ -139,6 +139,14 @@ Interesse zeigen, kommentieren.
   melden drei Leute denselben Beitrag, ist das eine Entscheidung.
   `UNIQUE(target_type, target_id, reporter_id)` verhindert Melde-Spam; der
   zweite Klick sieht für den Nutzer trotzdem aus wie der erste.
+  **Wichtig dabei:** Ist die frühere Meldung schon *entschieden*, wird sie
+  bei einer neuen Meldung wieder geöffnet (`db.create_report`). Ohne das
+  könnte dieselbe Person denselben Inhalt nie wieder melden — ein Beitrag
+  lässt sich nach einer Entscheidung aber ändern, und die Meldung wäre
+  stillschweigend verschwunden, obwohl die Oberfläche „angekommen" sagt.
+- **Konto löschen ist für den letzten Admin gesperrt**, solange es noch
+  andere Konten gibt (409): sonst bliebe eine Plattform ohne Verwaltung
+  zurück, in der niemand mehr Meldungen bearbeiten kann.
 - **Konto löschen:** `DELETE /auth/me` (Passwort nötig) räumt Konto, Profil,
   Beiträge samt Hörproben, Kommentare, Interesse und Folgen weg —
   `db.delete_user_completely`, gibt die Beitrags-IDs zurück, damit `auth.py`
@@ -393,7 +401,15 @@ Geprüft und in Ordnung:
   E-Mails registriert sind. Lockout (5 Fehlversuche → 15 min) liegt in der DB.
 - Jede Datenroute hängt an get_current_user; fremde Ressourcen geben 404
   (nicht 403). Offen sind nur die statischen Kataloge (/styles, /platforms,
-  /presets, /health). Admin-Routen zusätzlich hinter get_admin_user.
+  /presets, /health, /post-categories, /report-reasons), /auth/config und
+  /betreiber (Impressum). Admin-Routen zusätzlich hinter get_admin_user.
+  **Seit August 2026 dauerhaft abgesichert:** `tests/test_routen_schutz.py`
+  ruft jede der 76 Routen ohne Anmeldung auf; jede offene Route braucht
+  einen Eintrag mit Begründung, sonst schlägt der Test fehl.
+- **Die automatische API-Doku ist online aus** (`HOOKCUT_API_DOCS=0`).
+  Gefunden beim Durchgang im August 2026: `/docs`, `/redoc` und
+  `/openapi.json` waren öffentlich und hätten jedem Besucher sämtliche
+  Routen samt Parametern gezeigt, Admin-Wege inklusive. Lokal bleibt es an.
 - Passwortwechsel wirft alle Sitzungen (auch andere Geräte) weg.
 - password_hash taucht in keiner Antwort auf. Alle Dateipfade kommen aus der
   DB, nie aus der URL — kein Path-Traversal.

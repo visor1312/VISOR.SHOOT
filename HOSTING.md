@@ -110,6 +110,7 @@ Alle Schalter stehen in `render.yaml` und sind im Render-Dashboard unter
 | `HOOKCUT_LOCAL_RENDER` | `0` | dieser Server rendert nichts selbst |
 | `HOOKCUT_SECURE_COOKIES` | `1` | Session-Cookie nur über HTTPS |
 | `HOOKCUT_INVITE_ONLY` | `1` → später `0` | Tür zu / offen für alle |
+| `HOOKCUT_API_DOCS` | `0` | technische Schnittstellen-Doku aus (nur lokal sinnvoll) |
 | `HOOKCUT_PROJECTS_DIR` | `/var/hookcut` | **muss** auf die Festplatte zeigen |
 
 Die Datenbank landet automatisch unter `HOOKCUT_PROJECTS_DIR/state.db` — ein

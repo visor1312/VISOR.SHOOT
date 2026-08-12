@@ -186,3 +186,45 @@ def test_meldeliste_ist_nur_fuer_den_betreiber(auth_client):
     assert auth_client.get("/admin/reports").status_code == 403
     assert auth_client.post("/admin/reports/x/handle",
                             data={"aktion": "behalten"}).status_code == 403
+
+
+def test_nach_einer_entscheidung_kann_erneut_gemeldet_werden(auth_client, second_auth_client):
+    """Regression: nach "ist in Ordnung" verschwand jede weitere Meldung
+    derselben Person stillschweigend - die Oberflaeche sagte trotzdem
+    "Danke, ist angekommen". Ein Beitrag laesst sich nach einer Entscheidung
+    aber aendern, und dann muss man ihn wieder melden koennen."""
+    post_id = _beitrag(auth_client, "Erst harmlos")
+    second_auth_client.post("/reports", data={
+        "target_type": "post", "target_id": post_id, "reason": "spam"})
+
+    _zum_admin(auth_client)
+    meldung = next(m for m in auth_client.get("/admin/reports").json()
+                   if m["target_id"] == post_id)
+    auth_client.post(f"/admin/reports/{meldung['id']}/handle", data={"aktion": "behalten"})
+    assert not [m for m in auth_client.get("/admin/reports").json()
+                if m["target_id"] == post_id]
+
+    # Zweiter Anlauf mit neuem Grund - der MUSS beim Betreiber ankommen.
+    r = second_auth_client.post("/reports", data={
+        "target_type": "post", "target_id": post_id, "reason": "illegal",
+        "note": "Der Text wurde geändert."})
+    assert r.status_code == 200 and r.json()["neu"] is True
+
+    wieder = [m for m in auth_client.get("/admin/reports").json()
+              if m["target_id"] == post_id]
+    assert len(wieder) == 1, "die erneute Meldung ist nicht angekommen"
+    assert wieder[0]["reason"] == "illegal"
+    assert wieder[0]["note"] == "Der Text wurde geändert."
+
+
+def test_offene_meldung_bleibt_gegen_doppelklick_geschuetzt(auth_client, second_auth_client):
+    """Das Wiederoeffnen darf die Spam-Bremse nicht aushebeln: solange eine
+    Meldung OFFEN ist, aendert weiteres Klicken nichts."""
+    post_id = _beitrag(auth_client, "Offen gemeldet")
+    for _ in range(3):
+        r = second_auth_client.post("/reports", data={
+            "target_type": "post", "target_id": post_id, "reason": "spam"})
+        assert r.status_code == 200
+    _zum_admin(auth_client)
+    assert len([m for m in auth_client.get("/admin/reports").json()
+                if m["target_id"] == post_id]) == 1
