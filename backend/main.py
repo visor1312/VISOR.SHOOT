@@ -958,3 +958,51 @@ def download_canvas(job_id: str, user: dict = Depends(auth.get_current_user)):
         raise HTTPException(404, "Canvas ist noch nicht fertig")
     return FileResponse(job["output_path"], media_type="video/mp4",
                         filename=f"canvas_{job_id[:8]}.mp4")
+
+
+# ---------------------------------------------------------------------------
+# Oberflaeche mitausliefern (nur im Betrieb)
+#
+# Lokal uebernimmt das der Vite-Dev-Server (Port 5173). Online gibt es den
+# nicht mehr: dann liefert dieses Backend den gebauten Ordner web/dist gleich
+# mit aus. Vorteil: EIN Dienst statt zwei (halbe Hosting-Kosten) und kein CORS,
+# weil Oberflaeche und API von derselben Adresse kommen.
+#
+# Der Auffang-Pfad steht bewusst ganz am ENDE der Datei: FastAPI probiert die
+# Routen in der Reihenfolge ihrer Registrierung, also greifen erst alle
+# API-Routen und nur der Rest landet hier.
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "web" / "dist"
+
+
+def _datei_im_frontend(pfad: str) -> Path | None:
+    """Loest einen angefragten Pfad INNERHALB von web/dist auf.
+
+    Die Aufloesung ist der eigentliche Schutz: ohne sie koennte jemand mit
+    '../../etc/passwd' beliebige Dateien vom Server anfordern. Nur was nach
+    dem Aufloesen noch unterhalb von FRONTEND_DIR liegt, wird ausgeliefert.
+    """
+    if not pfad:
+        return None
+    try:
+        ziel = (FRONTEND_DIR / pfad).resolve()
+        ziel.relative_to(FRONTEND_DIR.resolve())
+    except (ValueError, OSError):
+        return None
+    return ziel if ziel.is_file() else None
+
+
+if FRONTEND_DIR.is_dir():
+    @app.get("/{pfad:path}")
+    def oberflaeche(pfad: str):
+        """Gebaute Oberflaeche ausliefern.
+
+        Echte Dateien (JavaScript, CSS, Bilder) gehen direkt raus. Alles andere
+        bekommt index.html - die Seitenadressen wie /musiker/ynglyric kennt nur
+        der Router IM BROWSER, der Server wuerde sonst 404 sagen und ein
+        direkt aufgerufener oder geteilter Link waere kaputt.
+        """
+        datei = _datei_im_frontend(pfad)
+        if datei is not None:
+            return FileResponse(datei)
+        return FileResponse(FRONTEND_DIR / "index.html")

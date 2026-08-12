@@ -135,6 +135,15 @@ tests/            pytest
   ist einmal passiert).
 - **`db.py`-Funktionen** immer mit `db_path=`-Keyword (Tests nutzen
   eigene DBs über `HOOKCUT_DB`).
+- **Der API-Pfad unterscheidet sich zwischen Entwicklung und Betrieb.**
+  In `web/src/api.ts` gilt `BASE = import.meta.env.DEV ? "/api" : ""`: lokal
+  schreibt Vite `/api/...` aufs Backend um, im gebauten Stand liefert das
+  Backend die Oberfläche selbst aus (`FRONTEND_DIR`, ganz am Ende von
+  `backend/main.py`) — dann entfällt das Präfix. **Nie fest auf `/api`
+  verdrahten**, sonst funktioniert online gar nichts, und zwar mit
+  irreführenden Fehlern. Wer daran etwas ändert, muss den **gebauten** Stand
+  prüfen (`cd web && npm run build`, dann Backend starten und Port 8000
+  im Browser öffnen) — der Dev-Server beweist hier nichts.
 - **Einstellbares Verhalten** gehört in `backend/config.py` (Env-Variable mit
   sicherem Standard), nicht als `os.environ`-Abfrage quer im Code. Beispiel:
   `HOOKCUT_INVITE_ONLY` — Standard `1` (lokal nur mit Einladung), die offene

@@ -1,8 +1,15 @@
 // Typisierter Client fuer das HOOKCUT-FastAPI-Backend (backend/main.py).
-// Alle Aufrufe gehen an /api/... und werden im Dev-Server (vite.config.ts)
-// auf das Backend (127.0.0.1:8000) weitergeleitet.
-
-const BASE = "/api";
+//
+// WICHTIG - der Pfad unterscheidet sich zwischen Entwicklung und Betrieb:
+// Im Dev-Server faengt Vite alles unter /api ab und leitet es ans Backend
+// weiter, wobei es das /api-Praefix wieder ENTFERNT (vite.config.ts,
+// rewrite). Im gebauten Stand gibt es kein Vite mehr - dort liefert das
+// Backend die Oberflaeche gleich mit aus, alles kommt von derselben Adresse
+// und das Praefix muss weg.
+// Stuende hier fest "/api", wuerde der Browser online Adressen anfragen, die
+// es nicht gibt, vom SPA-Fallback die HTML-Seite zurueckbekommen und
+// versuchen, sie als Daten zu lesen - mit voellig irrefuehrenden Fehlern.
+const BASE = import.meta.env.DEV ? "/api" : "";
 
 export type TakeStatus =
   | "pending"
