@@ -25,6 +25,14 @@ from pathlib import Path
 _TEST_DATEN = Path(tempfile.mkdtemp(prefix="hookcut-tests-"))
 os.environ.setdefault("HOOKCUT_PROJECTS_DIR", str(_TEST_DATEN))
 os.environ.setdefault("HOOKCUT_DB", str(_TEST_DATEN / "state.db"))
+# Die Bremse gegen massenhaft angelegte Konten greift pro Adresse - und aus
+# Sicht des TestClient kommt der ganze Testlauf von derselben. Die Suite legt
+# aber dutzende Konten an, liefe also in ihr eigenes Limit (die Registrierung
+# antwortete dann mit 429 und Tests scheiterten an ganz anderer Stelle).
+# Hier deshalb hochgesetzt; die Bremse selbst wird in
+# tests/test_registrierung_bremse.py gezielt geprueft, indem sie dort per
+# monkeypatch wieder heruntergedreht wird.
+os.environ.setdefault("HOOKCUT_REGISTER_MAX_PER_HOUR", "100000")
 
 import pytest
 from fastapi.testclient import TestClient

@@ -51,6 +51,14 @@ services:
       # inklusive.
       - key: HOOKCUT_API_DOCS
         value: "0"
+      # Hinter Renders Proxy kommen ALLE Anfragen von derselben Adresse.
+      # Ohne diesen Schalter wuerde die Bremse gegen massenhaft angelegte
+      # Konten alle Nutzer GEMEINSAM aussperren - der klassische Fehler.
+      # Mit ihm wird die echte Adresse aus X-Forwarded-For gelesen, und zwar
+      # der LETZTE Eintrag (siehe auth.client_ip - der erste ist faelschbar).
+      # NUR setzen, wenn wirklich ein Proxy davorsteht.
+      - key: HOOKCUT_TRUST_PROXY
+        value: "1"
 
       # --- Daten ----------------------------------------------------------
       # Muss auf die Platte oben zeigen. Die Datenbank landet automatisch

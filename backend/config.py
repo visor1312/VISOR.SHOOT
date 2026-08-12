@@ -24,6 +24,18 @@ def _env_list(name: str, default: list[str]) -> list[str]:
     return [x.strip() for x in val.split(",") if x.strip()]
 
 
+def _env_int(name: str, default: int) -> int:
+    """Unsinnige Werte fallen auf den Standard zurueck - eine vertippte
+    Umgebungsvariable soll den Server nicht am Starten hindern."""
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    try:
+        return int(val.strip())
+    except ValueError:
+        return default
+
+
 # Wo liegen die Nutzerdaten (Datenbank, Hoerproben, Videos, fertige Reels)?
 # Lokal der projects/-Ordner im Projekt. Beim Hosting MUSS das auf die
 # dauerhafte Festplatte zeigen (HOOKCUT_PROJECTS_DIR=/var/hookcut): der
@@ -72,3 +84,20 @@ TOOLS_ENABLED: bool = _env_bool("HOOKCUT_TOOLS_ENABLED", True)
 # gesamten Schnittstelle - inklusive der Admin-Routen und aller Parameter.
 # Das muss ein Fremder nicht bekommen, deshalb online aus.
 API_DOCS: bool = _env_bool("HOOKCUT_API_DOCS", True)
+
+# Steht ein Reverse-Proxy davor (Render, nginx, Cloudflare)?
+#
+# WARUM DAS EIN SCHALTER IST UND KEIN AUTOMATISMUS: Hinter einem Proxy
+# kommen ALLE Anfragen von derselben Adresse - ein Rate-Limit auf
+# request.client.host wuerde also saemtliche Nutzer GEMEINSAM aussperren.
+# Die echte Adresse steht in X-Forwarded-For. Dieser Kopfzeile darf man
+# aber nur trauen, wenn wirklich ein Proxy davorsteht: sonst schreibt sich
+# jeder Angreifer einfach selbst eine hinein und umgeht jedes Limit.
+# Lokal deshalb aus, in render.yaml an.
+TRUST_PROXY: bool = _env_bool("HOOKCUT_TRUST_PROXY", False)
+
+# Wie viele Konten darf eine Adresse pro Stunde anlegen? Ohne diese Bremse
+# kann ein Skript die offene Plattform mit Konten fluten. 5 ist grosszuegig
+# fuer eine WG oder ein Studio mit gemeinsamem Anschluss und trotzdem eng
+# genug gegen Automatisierung.
+REGISTER_MAX_PER_HOUR: int = _env_int("HOOKCUT_REGISTER_MAX_PER_HOUR", 5)

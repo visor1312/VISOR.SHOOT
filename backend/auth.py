@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import bcrypt
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from backend import config, db, storage
@@ -57,6 +57,34 @@ def _parse_iso(s: str) -> datetime:
 
 def _secure_cookies() -> bool:
     return config.SECURE_COOKIES
+
+
+def client_ip(request: Request) -> str:
+    """Die Adresse, von der die Anfrage wirklich kommt.
+
+    Ohne Proxy ist das schlicht die Gegenstelle. Hinter einem Proxy (Render)
+    ist request.client.host IMMER die Adresse des Proxys - ein Rate-Limit
+    darauf wuerde alle Nutzer gemeinsam aussperren.
+
+    ACHTUNG, hier steckt der Fehler, den fast jeder macht: X-Forwarded-For
+    ist eine LISTE, und man nimmt NICHT den ersten Eintrag. Jeder Proxy
+    haengt hinten die Adresse an, von der ER die Verbindung bekommen hat.
+    Schickt ein Angreifer selbst "X-Forwarded-For: 1.2.3.4", steht das
+    vorne, und Render haengt die echte Adresse dahinter:
+        "1.2.3.4, <echte Adresse>"
+    Der erste Eintrag ist also frei erfunden, der LETZTE stammt von dem
+    Proxy, dem wir vertrauen. Deshalb von hinten lesen.
+
+    Und selbst das gilt nur, wenn wirklich ein Proxy davorsteht - sonst
+    koennte sich jeder eine beliebige Adresse ausdenken und jedes Limit
+    umgehen. Darum der Schalter config.TRUST_PROXY (lokal aus).
+    """
+    if config.TRUST_PROXY:
+        weitergereicht = request.headers.get("x-forwarded-for", "")
+        eintraege = [t.strip() for t in weitergereicht.split(",") if t.strip()]
+        if eintraege:
+            return eintraege[-1]
+    return request.client.host if request.client else "unbekannt"
 
 
 def normalize_email(email: str) -> str:
@@ -394,11 +422,29 @@ def auth_config():
 
 
 @router.post("/register")
-def auth_register(body: RegisterBody, response: Response):
+def auth_register(body: RegisterBody, request: Request, response: Response):
+    # Bremse gegen massenhaft angelegte Konten. Gezaehlt werden nur
+    # ERFOLGREICHE Registrierungen: wer sich beim Einladungscode vertippt,
+    # soll sich nicht selbst aussperren - und der Missbrauch, um den es
+    # geht, besteht ja gerade aus gelungenen Anmeldungen.
+    ip = client_ip(request)
+    seit = _iso(_now() - timedelta(hours=1))
+    if db.count_recent_signups(ip, seit) >= config.REGISTER_MAX_PER_HOUR:
+        raise HTTPException(
+            429,
+            "Von diesem Anschluss wurden gerade viele Konten angelegt. "
+            "Bitte versuch es in einer Stunde noch einmal.")
+
     try:
         user = register_user(body.invite_code, body.email, body.display_name, body.password)
     except RegisterError as e:
         raise HTTPException(e.status_code, e.message)
+
+    db.record_signup(ip)
+    # Bei Gelegenheit aufraeumen: Adressen sollen nicht laenger liegen
+    # bleiben, als die Bremse sie braucht (siehe Kommentar am Schema).
+    db.prune_signup_attempts(seit)
+
     _set_session_cookie(response, create_session(user["id"]))
     return public_user(user)
 

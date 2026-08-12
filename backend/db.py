@@ -207,6 +207,20 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
 
+-- Bremse gegen massenhaft angelegte Konten: eine Zeile je erfolgreicher
+-- Registrierung, mit der Herkunftsadresse.
+-- DATENSCHUTZ: Eine IP-Adresse ist ein personenbezogenes Datum. Sie steht
+-- hier nur, solange die Bremse sie braucht - alles aelter als eine Stunde
+-- wird bei jeder Registrierung weggeraeumt (prune_signup_attempts).
+-- Rechtsgrundlage: berechtigtes Interesse an einem missbrauchsfreien
+-- Dienst (Art. 6 Abs. 1 lit. f DSGVO); steht so in der Datenschutzerklaerung.
+CREATE TABLE IF NOT EXISTS signup_attempts (
+    ip TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_signup_attempts ON signup_attempts(ip, created_at);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -1390,3 +1404,30 @@ def delete_user_completely(user_id: str,
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
     return post_ids
+
+
+# --- Bremse gegen massenhaft angelegte Konten ------------------------------
+
+def record_signup(ip: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("INSERT INTO signup_attempts (ip, created_at) VALUES (?, ?)",
+                     (ip, _now()))
+
+
+def count_recent_signups(ip: str, since_iso: str,
+                         db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM signup_attempts WHERE ip = ? AND created_at > ?",
+            (ip, since_iso)).fetchone()
+        return int(row["n"])
+
+
+def prune_signup_attempts(before_iso: str,
+                          db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Alte Eintraege wegraeumen - Adressen sollen nicht laenger liegen
+    bleiben, als die Bremse sie braucht."""
+    with _connect(db_path) as conn:
+        cur = conn.execute("DELETE FROM signup_attempts WHERE created_at <= ?",
+                           (before_iso,))
+        return cur.rowcount

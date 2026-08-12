@@ -65,6 +65,15 @@ export default function DatenschutzPage() {
               aufgerufene Adresse. Sie entstehen beim Betrieb des Servers und
               werden nicht mit Ihrem Konto zusammengeführt.
             </p>
+            <p>
+              <strong className="text-white">Beim Anlegen eines Kontos</strong>{" "}
+              speichern wir zusätzlich für <strong className="text-white">eine
+              Stunde</strong> die IP-Adresse, von der aus das Konto angelegt
+              wurde. Damit begrenzen wir, wie viele Konten von einem Anschluss
+              pro Stunde entstehen können – sonst ließe sich die Plattform
+              automatisiert mit Konten fluten. Nach einer Stunde wird der
+              Eintrag gelöscht; er wird zu nichts anderem verwendet.
+            </p>
           </Abschnitt>
 
           <Abschnitt titel="Wozu und auf welcher Rechtsgrundlage">

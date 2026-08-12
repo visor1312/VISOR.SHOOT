@@ -48,6 +48,9 @@ ONLINE_SCHALTER = {
     "HOOKCUT_SECURE_COOKIES": "1",  # Session-Cookie nur ueber HTTPS
     "HOOKCUT_INVITE_ONLY": "1",     # Tuer zu bis Schritt 7
     "HOOKCUT_API_DOCS": "0",        # keine Routen-Landkarte fuer Fremde
+    # Ohne diesen sperrt die Registrierungs-Bremse alle Nutzer gemeinsam
+    # aus, weil hinter dem Proxy jede Anfrage dieselbe Adresse hat.
+    "HOOKCUT_TRUST_PROXY": "1",
 }
 
 
