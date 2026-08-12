@@ -167,3 +167,37 @@ def test_interest_of_profileless_account_is_visible(auth_client, second_auth_cli
 def test_interactions_require_login(client):
     assert client.post("/posts/x/interest").status_code == 401
     assert client.get("/posts/x/comments").status_code == 401
+
+
+def test_kommentar_flut_wird_gestoppt(auth_client, second_auth_client, monkeypatch):
+    """Kommentare landen unter FREMDEN Beitraegen - ohne Bremse ist das ein
+    Belaestigungswerkzeug. Im Sicherheits-Durchgang kamen ungebremst ueber
+    eine halbe Million pro Stunde durch."""
+    from backend import network
+
+    monkeypatch.setattr(network, "COMMENT_MAX_PER_HOUR", 3)
+    post_id = auth_client.post("/posts", data={"title": "Ziel",
+                                               "categories": "beat"}).json()["id"]
+    for i in range(3):
+        assert second_auth_client.post(f"/posts/{post_id}/comments",
+                                       data={"body": f"Nummer {i}"}).status_code == 200
+    gestoppt = second_auth_client.post(f"/posts/{post_id}/comments", data={"body": "zu viel"})
+    assert gestoppt.status_code == 429
+    assert "kommentiert" in gestoppt.json()["detail"]
+
+
+def test_bremse_gilt_ueber_alle_beitraege(auth_client, second_auth_client, monkeypatch):
+    """Sonst verteilt ein Skript die Flut einfach auf viele Beitraege."""
+    from backend import network
+
+    monkeypatch.setattr(network, "COMMENT_MAX_PER_HOUR", 2)
+    erster = auth_client.post("/posts", data={"title": "A", "categories": "beat"}).json()["id"]
+    zweiter = auth_client.post("/posts", data={"title": "B", "categories": "beat"}).json()["id"]
+
+    assert second_auth_client.post(f"/posts/{erster}/comments",
+                                   data={"body": "1"}).status_code == 200
+    assert second_auth_client.post(f"/posts/{zweiter}/comments",
+                                   data={"body": "2"}).status_code == 200
+    # Dritter Kommentar - anderer Beitrag, trotzdem gestoppt.
+    assert second_auth_client.post(f"/posts/{zweiter}/comments",
+                                   data={"body": "3"}).status_code == 429

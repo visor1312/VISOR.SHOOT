@@ -1489,3 +1489,25 @@ def delete_email_token(token_hash: str, db_path: str | Path = DEFAULT_DB_PATH) -
 def set_email_verified(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
     with _connect(db_path) as conn:
         conn.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (user_id,))
+
+
+def count_recent_comments(user_id: str, since_iso: str,
+                          db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Fuer die Spam-Bremse bei Kommentaren. Zaehlt ueber ALLE Beitraege
+    hinweg, nicht pro Beitrag: sonst verteilt ein Skript die Flut einfach
+    auf viele Beitraege und niemand merkt etwas."""
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM comments WHERE user_id = ? AND created_at > ?",
+            (user_id, since_iso)).fetchone()
+        return int(row["n"])
+
+
+def get_email_token_for_user(user_id: str,
+                             db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    """Der aktuelle Bestaetigungslink eines Kontos (es gibt hoechstens einen).
+    Gebraucht fuer die Wartezeit zwischen zwei Anforderungen."""
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM email_tokens WHERE user_id = ?",
+                           (user_id,)).fetchone()
+        return dict(row) if row else None

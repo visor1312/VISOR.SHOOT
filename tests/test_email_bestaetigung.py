@@ -190,3 +190,49 @@ def test_resend_ohne_zugangsschluessel(monkeypatch):
     monkeypatch.setattr(config, "RESEND_API_KEY", "")
     with pytest.raises(mailer.MailFehler):
         mailer.send("wer@example.com", "B", "T")
+
+
+def test_bestaetigungsmail_hat_eine_wartezeit(client, gefangene_mails, monkeypatch):
+    """Ohne Wartezeit laesst sich das Gratis-Kontingent des Mail-Dienstes in
+    einer Minute verbrennen - im Sicherheits-Durchgang wurden 50 von 50
+    Anforderungen angenommen."""
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", False)
+    _registrieren(client)                      # erstes Konto: ausgenommen
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", True)
+    _registrieren(client)                      # dieses ist unbestaetigt
+    assert len(gefangene_mails) == 1
+
+    gebremst = client.post("/auth/resend-verification")
+    assert gebremst.status_code == 429
+    assert "Postfach" in gebremst.json()["detail"]
+    assert len(gefangene_mails) == 1, "trotz Bremse wurde verschickt"
+
+
+def test_nach_der_wartezeit_geht_es_wieder(client, gefangene_mails, monkeypatch):
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", False)
+    _registrieren(client)
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", True)
+    r = _registrieren(client)
+
+    # Den vorhandenen Link kuenstlich altern lassen.
+    with db._connect(db.DEFAULT_DB_PATH) as conn:
+        conn.execute("UPDATE email_tokens SET created_at = '2000-01-01T00:00:00+00:00' "
+                     "WHERE user_id = ?", (r.json()["id"],))
+
+    assert client.post("/auth/resend-verification").status_code == 200
+    assert len(gefangene_mails) == 2
+
+
+def test_bestaetigtes_konto_loest_keinen_versand_aus(client, gefangene_mails, monkeypatch):
+    """Wer schon bestaetigt ist, bekommt keine Mail mehr - und laeuft auch
+    nicht in die Wartezeit."""
+    # Bei ausgeschalteter Pruefung angelegt = von vornherein bestaetigt.
+    # (Sich auf "erstes Konto ist ausgenommen" zu verlassen geht hier nicht:
+    # alle Tests teilen sich eine DB, es gibt also laengst andere Konten.)
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", False)
+    _registrieren(client)
+    monkeypatch.setattr(config, "EMAIL_VERIFICATION", True)
+
+    r = client.post("/auth/resend-verification")
+    assert r.status_code == 200 and r.json()["bereits_bestaetigt"] is True
+    assert gefangene_mails == []

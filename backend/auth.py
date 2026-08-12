@@ -526,6 +526,8 @@ def auth_change_password(body: ChangePasswordBody, response: Response,
 # --- Bestaetigung der E-Mail-Adresse --------------------------------------
 
 EMAIL_TOKEN_TTL = timedelta(hours=24)
+# Mindestabstand zwischen zwei Bestaetigungsmails an dasselbe Konto.
+RESEND_COOLDOWN = timedelta(minutes=2)
 
 
 def bestaetigung_verschicken(user: dict) -> None:
@@ -595,6 +597,23 @@ def auth_resend_verification(user: dict = Depends(get_current_user)):
     """Neuen Bestaetigungslink anfordern (fuer den angemeldeten Nutzer)."""
     if user.get("email_verified"):
         return {"ok": True, "bereits_bestaetigt": True}
+
+    # Wartezeit zwischen zwei Anforderungen. Ohne sie laesst sich das
+    # Gratis-Kontingent des Mail-Dienstes in einer Minute verbrennen (im Test
+    # wurden 50 von 50 Anforderungen angenommen) - und das eigene Postfach
+    # zumuellen. Es gibt hoechstens EINEN gueltigen Link je Konto, also
+    # genuegt sein Alter als Massstab.
+    vorhanden = db.get_email_token_for_user(user["id"])
+    if vorhanden:
+        alter = _now() - _parse_iso(vorhanden["created_at"])
+        if alter < RESEND_COOLDOWN:
+            wartet = int((RESEND_COOLDOWN - alter).total_seconds())
+            raise HTTPException(
+                429,
+                f"Wir haben dir gerade erst einen Link geschickt. Bitte schau "
+                f"in dein Postfach (auch im Spam) und versuch es in {wartet} "
+                f"Sekunden noch einmal.")
+
     bestaetigung_verschicken(user)
     return {"ok": True, "bereits_bestaetigt": False}
 

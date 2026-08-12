@@ -105,6 +105,13 @@ REPORT_NOTE_MAX = 1000
 # reicht fuer jede ehrliche Nutzung deutlich aus.
 REPORT_MAX_PER_HOUR = 20
 
+# Kommentare sind das Einfallstor fuer Belaestigung: sie landen unter FREMDEN
+# Beitraegen. Ohne Bremse kamen im Test ueber eine halbe Million pro Stunde
+# durch. 60 sind fuer ein Gespraech reichlich und stoppen jede Flut.
+# Gezaehlt wird ueber alle Beitraege hinweg - sonst verteilt ein Skript die
+# Flut einfach auf viele Beitraege.
+COMMENT_MAX_PER_HOUR = 60
+
 
 def _post_public(post: dict, autor_profil: dict | None = None) -> dict:
     """Beitrag so, wie ihn andere Mitglieder sehen. Der Dateipfad der
@@ -409,6 +416,11 @@ def create_comment(post_id: str, body: str = Form(...),
     text = body.strip()
     if not text:
         raise HTTPException(422, "Bitte einen Text eingeben.")
+
+    seit = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    if db.count_recent_comments(user["id"], seit) >= COMMENT_MAX_PER_HOUR:
+        raise HTTPException(
+            429, "Du hast gerade sehr viel kommentiert. Bitte versuch es später noch mal.")
     comment_id = db.create_comment(post_id, user["id"], text[:COMMENT_MAX])
     return next(k for k in (_kommentar_public(z) for z in db.list_comments(post_id))
                 if k["id"] == comment_id)
