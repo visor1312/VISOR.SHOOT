@@ -123,9 +123,18 @@ Schalter verschiebt beides, Datenbank und Dateien.
 - **Die Video-Werkzeuge gibt es online nicht** und sie sind auch nicht
   geplant: Sie brauchen Chrome mit WebGPU und mehrere GB an Modellen. Sie
   bleiben auf deinem Rechner (`start-hookcut.bat`).
-- **Noch nicht erledigt:** Impressum, Datenschutzerklärung, AGB, Meldeknopf
-  und „Konto löschen" (Phase 2, Schritt 5). **Bevor Fremde mitmachen, muss das
-  stehen** — sonst ist der Betrieb rechtlich angreifbar.
+- **Die Rechtstexte sind nicht anwaltlich geprüft.** Impressum,
+  Datenschutzerklärung, Nutzungsbedingungen, Meldeknopf und „Konto löschen"
+  stehen (Phase 2, Schritt 5) und sind nah am tatsächlichen Verhalten der
+  Software geschrieben. Trotzdem: **vor dem Öffnen für Fremde einmal selbst
+  durchlesen**, vor allem die Nutzungsbedingungen (Rechte an Beats und
+  Samples). Deine Angaben stehen in `backend/betreiber.py` bzw. als
+  `HOOKCUT_BETREIBER_*` in den Umgebungsvariablen — eine Adressänderung
+  braucht kein Programmieren und kein neues Ausrollen.
+- **Gemeldete Inhalte** landen bei dir unter **Einstellungen → Gemeldete
+  Inhalte**. Dort entscheidest du je Meldung „Ausblenden" oder „Ist in
+  Ordnung". Da schaust du nach dem Öffnen regelmäßig rein — eine liegen
+  gebliebene Meldung ist genau das, was bei einer Beschwerde zählt.
 
 ## Was hier geprüft wurde und was nicht
 

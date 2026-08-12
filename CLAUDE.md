@@ -29,10 +29,10 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Werkzeug (Reels, Hook, Canvas, Wochen-Content) | fertig, läuft beim Besitzer |
 | Benutzersystem (Login, Profile) | fertig |
 | Netzwerk (posten, Feed, folgen, Interesse, Kommentare) | **fertig, aber noch nie von echten Musikern benutzt** |
-| Live stellen (Phase 2) | **läuft** — 3 von 7 Schritten fertig |
+| Live stellen (Phase 2) | **läuft** — 5 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
 | Premium-Abo, Apps für iOS/Android | später |
 
-238 pytest-Tests grün, Web-Build und oxlint grün.
+262 pytest-Tests grün, Web-Build und oxlint grün.
 Der genaue Fahrplan steht in `PROJEKT-STATUS.md`, Abschnitt „Fahrplan".
 
 ## Grundregeln
@@ -159,6 +159,13 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Etwas löschen heißt: alles mit weg, was daran hängt.** Fremdschlüssel
+  sind an (`PRAGMA foreign_keys = ON`), also blockiert jede vergessene
+  Abhängigkeit den Löschvorgang mit einem 500er — und zwar erst dann, wenn
+  jemand kommentiert oder Interesse gezeigt hat, also im Erfolgsfall.
+  `db.delete_post` und `db.delete_user_completely` räumen deshalb Kommentare,
+  Interesse, Kategorien und Meldungen mit. **Neue Tabelle mit Verweis auf
+  `posts` oder `users` ⇒ in beide Funktionen eintragen.**
 - **Betreiberangaben stehen nur in `backend/betreiber.py`** (Name, Anschrift,
   E-Mail, Hoster). Impressum, Datenschutz und AGB holen sie über den
   öffentlichen Endpunkt `/betreiber` — **nie in die Oberfläche kopieren**,

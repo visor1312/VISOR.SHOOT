@@ -130,8 +130,19 @@ Interesse zeigen, kommentieren.
   ffprobe → 422 (Nutzereingabe), nicht 500. Bei Fehlschlag werden Datei UND
   Beitragszeile zurückgebaut.
 - **Spam-Bremse:** 10 Beiträge/Stunde. **Notaus:**
-  `POST /admin/posts/{id}/hide` (nur Admin). Der vollständige Melde-Ablauf
-  für Nutzer kommt in Phase 2.
+  `POST /admin/posts/{id}/hide` (nur Admin).
+- **Melden (seit Phase 2, Schritt 5):** Tabelle `reports`, `POST /reports`
+  (Beitrag oder Kommentar, fester Grund + freie Notiz, 20/Stunde),
+  `GET /admin/reports` als Arbeitsliste und
+  `POST /admin/reports/{id}/handle` (`ausblenden` / `behalten`). Eine
+  Entscheidung schließt **alle** offenen Meldungen zu diesem Inhalt —
+  melden drei Leute denselben Beitrag, ist das eine Entscheidung.
+  `UNIQUE(target_type, target_id, reporter_id)` verhindert Melde-Spam; der
+  zweite Klick sieht für den Nutzer trotzdem aus wie der erste.
+- **Konto löschen:** `DELETE /auth/me` (Passwort nötig) räumt Konto, Profil,
+  Beiträge samt Hörproben, Kommentare, Interesse und Folgen weg —
+  `db.delete_user_completely`, gibt die Beitrags-IDs zurück, damit `auth.py`
+  auch die Dateien löschen kann.
 - **Frontend** (alles unter `web/src/`): `pages/FeedPage.tsx` (Reiter
   Entdecken/Folge ich + Filter), `pages/PostDetailPage.tsx`,
   `pages/ProfilAnsichtPage.tsx` (Route `/musiker/:handle`),
@@ -273,7 +284,7 @@ ist der letzte, bewusste Schritt.
 | 2 | Video-Werkzeuge online abschaltbar (`HOOKCUT_TOOLS_ENABLED`) | **fertig** (`b91ce1e`) |
 | 3 | Schlanker Server (schwere Importe faul, `requirements-server.txt`) | **fertig** |
 | 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | **Dateien fertig**, Livegang liegt beim Besitzer → `HOSTING.md` |
-| 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | offen |
+| 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | **fertig** |
 | 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | offen |
 | 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | offen |
 
@@ -292,13 +303,12 @@ ist der letzte, bewusste Schritt.
 - **Kein Object Storage zum Start.** Hörproben liegen mit auf der Platte.
   Nachrüstbar, aber kein Startblocker.
 
-**Was in Schritt 5 nicht verhandelbar ist:** Impressum nach § 5 DDG (löste 2024
-das TMG ab; ladungsfähige Anschrift, Postfach genügt **nicht**),
-Datenschutzerklärung getrennt davon, AGB, Meldefunktion an jedem Beitrag (DSA)
-und Konto löschen (DSGVO Art. 17 — fehlt bisher komplett). Der Admin-Notaus
-(`POST /admin/posts/{id}/hide`) ist nur das Minimum für den Betreiber.
-Betreiberdaten kommen an **eine einzige Stelle**, damit die Privatadresse
-später ohne Programmieren gegen eine Geschäftsadresse tauschbar ist.
+**Schritt 5 ist erledigt** (Impressum nach § 5 DDG mit ladungsfähiger
+Anschrift, Datenschutzerklärung getrennt davon, Nutzungsbedingungen,
+Meldefunktion nach DSA, Konto löschen nach DSGVO Art. 17). Die Betreiberdaten
+stehen an **einer einzigen Stelle** (`backend/betreiber.py`, zusätzlich per
+`HOOKCUT_BETREIBER_*` überschreibbar), damit die Privatadresse später ohne
+Programmieren gegen eine Geschäftsadresse tauschbar ist.
 Die Texte gehören vor dem Livegang einmal vom Besitzer geprüft — besonders die
 AGB, weil es dort um fremde Rechte an Beats und Samples geht.
 
@@ -420,9 +430,15 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
 
 ## Offene / nächste Themen (Stand der Diskussion)
 
-**Als Nächstes:** Phase 2, Schritt 5 — Impressum, Datenschutz, AGB,
-Meldeknopf und „Konto löschen". Parallel dazu kann der Besitzer den Livegang
-aus Schritt 4 durchführen (`HOSTING.md`); die Tür bleibt dabei zu.
+**Als Nächstes:** Phase 2, Schritt 6 — E-Mail-Bestätigung (abschaltbar) und
+Rate-Limit auf die Registrierung. **Zwei Fallstricke, die dort zählen:**
+hinter Renders Proxy ist `request.client.host` immer dieselbe Adresse (die
+echte steht in `X-Forwarded-For`), sonst sperrt das Limit alle gemeinsam aus;
+und der Versand von der eigenen Domain braucht SPF/DKIM, geht also erst mit
+Domain — bis dahin bleibt die Bestätigung abschaltbar.
+
+Parallel dazu kann der Besitzer jederzeit den Livegang aus Schritt 4
+durchführen (`HOSTING.md`); die Tür bleibt dabei zu.
 
 **Warten auf den Besitzer** (nur sein Rechner kann das prüfen):
 1. Beat-Effekte, Multi-Plattform-Export, Wochen-Content und Spotify Canvas
