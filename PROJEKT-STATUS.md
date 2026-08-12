@@ -296,7 +296,7 @@ ist der letzte, bewusste Schritt.
 | 4 | `Dockerfile` + `render.yaml`, erster Livegang — noch geschlossen | **Dateien fertig**, Livegang liegt beim Besitzer → `HOSTING.md` |
 | 5 | Impressum / Datenschutz / AGB, Meldeknopf, Konto löschen | **fertig** |
 | 6 | E-Mail-Bestätigung + Rate-Limit auf die Registrierung | **fertig** (Bestätigung standardmäßig aus, siehe unten) |
-| 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | offen |
+| 7 | Sicherheits-Durchgang, `HOOKCUT_INVITE_ONLY=0`, echte Musiker einladen | Durchgang **fertig**; Öffnen wartet auf den Livegang |
 
 **Zwei Entscheidungen, die diesen Plan von der alten Fassung unterscheiden:**
 
@@ -393,6 +393,64 @@ Benachrichtigungen · „Bleibt-online"-Features Smart Link / EPK.
   Code. Die alten REST-Endpunkte (`POST /projects`, `/takes`, `/sync`,
   `/presets`) bleiben als dokumentierte API bestehen; das Dashboard nutzt
   `GET /projects` + Take-Download.
+
+## Sicherheits-Durchgang vor dem Öffnen (Phase 2, Schritt 7)
+
+**Angriffe statt Codelektüre.** Vor dem Öffnen der Tür wurde die Anwendung
+mit echten Konten angegriffen, nicht nur gelesen. Die Skripte dazu waren
+Wegwerf-Werkzeuge; was sie geprüft haben, ist unten festgehalten, und die
+wichtigsten Fälle sind als dauerhafte Tests eingebaut.
+
+**Zwei echte Funde — beide gemessen, nicht vermutet:**
+
+1. **Kommentar-Flut.** Kommentare waren die einzige Schreib-Route ohne
+   Bremse — und sie landen unter *fremden* Beiträgen, sind also ein
+   Belästigungswerkzeug. Gemessen: 300 Kommentare in 2,1 Sekunden,
+   hochgerechnet über eine halbe Million pro Stunde. Jetzt 60/Stunde,
+   gezählt über **alle** Beiträge hinweg (sonst verteilt ein Skript die Flut
+   einfach auf viele Beiträge).
+2. **Bestätigungsmails ohne Ende.** `/auth/resend-verification` nahm 50 von
+   50 Anforderungen an — damit ließe sich das Gratis-Kontingent des
+   Mail-Dienstes in einer Minute verbrennen. Jetzt zwei Minuten Wartezeit,
+   gemessen am Alter des vorhandenen Links.
+
+**Geprüft und gehalten:**
+
+- **Kein Ausbruch aus dem Oberflächen-Ordner.** 13 Pfad-Tricks
+  (`../`, URL-kodiert, doppelt kodiert, Backslashes, Null-Byte, absolute
+  Pfade) landen alle auf der normalen Startseite. Gegenprobe: die Oberfläche
+  wird wirklich ausgeliefert, der Test misst also etwas.
+- **Kein SQL-Einschleusen.** Werte gehen ausnahmslos über Platzhalter. Die
+  wenigen f-Strings bauen nur *Spaltennamen* ein, und die stammen aus fest
+  verdrahtetem Code plus Positivliste (`_POST_FIELDS`), nie aus Eingaben.
+- **23 Angriffe auf Rechte und Datentrennung** abgewehrt: fremde Beiträge
+  ändern/löschen, fremde Kommentare löschen, sechs Admin-Wege als normales
+  Mitglied, fremde Projekte lesen (404, nicht 403), Interessenten-Liste als
+  Unbeteiligter, Passwort-Hash oder fremde E-Mail in einer Antwort,
+  Dateipfade im Feed, `javascript:`-Link im Profil, überlange und unsinnige
+  Eingaben.
+- **Sitzungen:** In der DB liegt nur der Hash. Abmelden löscht die Zeile
+  wirklich. Ein Passwortwechsel wirft alle Sitzungen weg, auch auf anderen
+  Geräten. Erfundene Cookies (auch ein selbst gebauter Hash) ergeben 401.
+- **Anmeldung:** Sperre nach fünf Fehlversuchen; unbekannte und echte
+  Adresse liefern dieselbe Meldung.
+- **Uploads:** 9-MB-Datei → 413, fremde Endung → 415, als `.wav` getarnter
+  Text → 422.
+- **Kein `dangerouslySetInnerHTML`** in der Oberfläche; Skript-Text wird
+  gespeichert wie eingegeben und von React beim Anzeigen entschärft.
+- **CORS** ohne Wildcard, fremde Herkunft wird nicht erlaubt. Cookie mit
+  HttpOnly und SameSite; `Secure` nur online.
+- **Werkzeuge online aus:** `POST /packs` → 503, Feed weiter nutzbar.
+
+**Der 409-Hinweis beim Registrieren hat sich nebenbei entschärft.** Bisher
+verriet „E-Mail schon registriert", welche Adressen ein Konto haben. Mit der
+neuen Bremse ist das praktisch tot: im offenen Modus legt jeder Fehlversuch
+selbst ein Konto an und zählt aufs Limit — nach fünf Adressen ist für eine
+Stunde Schluss. Gemessen: 6 Versuche, dann gebremst.
+
+**Bewusst nicht angefasst:** Folgen und Interesse haben keine Bremse, sind
+aber idempotent (der Schlüssel verhindert Doppeleinträge); Profil-Änderungen
+betreffen nur das eigene Profil.
 
 ## Sicherheit (Review-Stand August 2026)
 

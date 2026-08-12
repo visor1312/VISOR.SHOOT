@@ -29,7 +29,7 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Werkzeug (Reels, Hook, Canvas, Wochen-Content) | fertig, läuft beim Besitzer |
 | Benutzersystem (Login, Profile) | fertig |
 | Netzwerk (posten, Feed, folgen, Interesse, Kommentare) | **fertig, aber noch nie von echten Musikern benutzt** |
-| Live stellen (Phase 2) | **läuft** — 6 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
+| Live stellen (Phase 2) | **Code fertig** (7/7) — Livegang und Öffnen liegen beim Besitzer (`HOSTING.md`) |
 | Premium-Abo, Apps für iOS/Android | später |
 
 416 pytest-Tests grün, Web-Build und oxlint grün.
@@ -162,6 +162,11 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Jede neue Schreib-Route braucht eine Bremse.** Beiträge 10/Stunde,
+  Kommentare 60/Stunde, Meldungen 20/Stunde, Registrierungen 5/Stunde —
+  ohne eine solche Grenze kamen im Sicherheits-Durchgang über eine halbe
+  Million Kommentare pro Stunde durch. Gezählt wird **über alle Ziele
+  hinweg**, sonst verteilt ein Skript die Flut einfach.
 - **Neue Route ⇒ `tests/test_routen_schutz.py` entscheidet.** Der Test ruft
   jede Route ohne Anmeldung auf: 401/403 heißt geschützt. Ist eine Route
   absichtlich offen, gehört sie **mit Begründung** in `BEWUSST_OFFEN` —

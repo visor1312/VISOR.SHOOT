@@ -133,6 +133,28 @@ Eindruck.
 **Du selbst bist ausgenommen:** Das erste Konto (deins) gilt immer als
 bestätigt. Sonst könntest du dich aus deiner eigenen Plattform aussperren.
 
+## 7. Die Tür aufmachen
+
+Wenn der Dienst läuft, du die Rechtstexte gelesen hast und ein paar Runden
+selbst gedreht hast: In Render unter **Environment** `HOOKCUT_INVITE_ONLY`
+auf `0` stellen. Ab dann kann sich jeder registrieren, und das Code-Feld
+verschwindet von selbst aus der Anmeldemaske.
+
+**Lad danach fünf bis zehn Musiker ein und schau ihnen zu, ohne zu
+erklären.** Wo sie hängenbleiben, ist die Antwort auf die einzige Frage, die
+noch offen ist: ob das Ding im echten Leben funktioniert. Alles andere ist
+bis dahin Vermutung.
+
+Was dich dabei schützt (im Sicherheits-Durchgang gemessen, nicht vermutet):
+höchstens 5 neue Konten pro Stunde und Anschluss, 10 Beiträge und 60
+Kommentare pro Stunde und Person, Hörproben auf 8 MB und 30 Sekunden
+begrenzt, und ein Melden-Knopf an jedem fremden Beitrag samt deiner
+Arbeitsliste unter **Einstellungen → Gemeldete Inhalte**.
+
+**Wenn etwas aus dem Ruder läuft:** `HOOKCUT_INVITE_ONLY` wieder auf `1` —
+dann kommt niemand Neues mehr rein, und die vorhandenen Konten laufen
+weiter.
+
 ## Was wo eingestellt wird
 
 Alle Schalter stehen in `render.yaml` und sind im Render-Dashboard unter
