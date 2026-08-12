@@ -1298,14 +1298,6 @@ def close_reports_for_target(target_type: str, target_id: str, status: str,
         return cur.rowcount
 
 
-def list_posts_by_user(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
-    """Alle Beitraege eines Kontos - fuer die Konto-Loeschung (dort muessen
-    auch die Dateien weg, dafuer werden die IDs gebraucht)."""
-    with _connect(db_path) as conn:
-        rows = conn.execute("SELECT * FROM posts WHERE user_id = ?", (user_id,)).fetchall()
-        return [dict(r) for r in rows]
-
-
 def delete_user_completely(user_id: str,
                            db_path: str | Path = DEFAULT_DB_PATH) -> list[str]:
     """Konto und ALLES daran loeschen (DSGVO Art. 17).

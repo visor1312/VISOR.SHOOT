@@ -159,6 +159,11 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Nichts blind an `db.py` anhängen.** Die Datei ist über 1300 Zeilen lang;
+  eine neue Funktion mit einem schon vergebenen Namen verdeckt stillschweigend
+  die alte, und ein ganz anderer Programmteil fällt später um (genau so
+  passiert mit `list_posts_by_user`). Erst `grep -n "def name"`, dann
+  schreiben — `tests/test_keine_doppelten_namen.py` fängt den Rest ab.
 - **Etwas löschen heißt: alles mit weg, was daran hängt.** Fremdschlüssel
   sind an (`PRAGMA foreign_keys = ON`), also blockiert jede vergessene
   Abhängigkeit den Löschvorgang mit einem 500er — und zwar erst dann, wenn
