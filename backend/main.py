@@ -18,7 +18,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend import auth, config, db, network, storage
+from backend import auth, betreiber, config, db, network, storage
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.presets import PRESETS, apply_preset, preset_catalog, preset_is_noop
 from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
@@ -86,6 +86,17 @@ app.include_router(network.router)
 def health():
     """Einfacher Health-Check (fuer Hosting/Monitoring)."""
     return {"status": "ok"}
+
+
+@app.get("/betreiber")
+def betreiber_daten():
+    """Angaben fuer Impressum, Datenschutz und AGB.
+
+    BEWUSST OHNE ANMELDUNG: ein Impressum muss von jeder Seite aus
+    erreichbar sein, auch ohne Konto (§ 5 DDG). Die Daten sind ohnehin zur
+    Veroeffentlichung bestimmt - genau das ist der Sinn eines Impressums.
+    """
+    return betreiber.als_dict()
 
 
 def _save_upload(upload: UploadFile, dest: Path) -> Path:

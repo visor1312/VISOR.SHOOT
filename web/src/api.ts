@@ -145,6 +145,31 @@ export async function getAuthConfig(): Promise<ServerConfig> {
   return jsonOrThrow<ServerConfig>(res);
 }
 
+/** Betreiberangaben fuer Impressum, Datenschutz und AGB. Kommen aus
+ *  backend/betreiber.py, damit sie an genau EINER Stelle gepflegt werden
+ *  und ein Adresswechsel nicht durch drei Seiten gesucht werden muss. */
+export interface Betreiber {
+  name: string;
+  strasse: string;
+  plz: string;
+  ort: string;
+  land: string;
+  email: string;
+  /** Leer = nicht anzeigen (eine Telefonnummer ist nicht zwingend). */
+  telefon: string;
+  plattform_name: string;
+  hoster_name: string;
+  hoster_ort: string;
+  hoster_region: string;
+}
+
+export async function getBetreiber(): Promise<Betreiber> {
+  // authRequest: kein Umleiten auf die Login-Maske - die Rechtsseiten sind
+  // absichtlich auch ohne Konto erreichbar.
+  const res = await requestOrExplain(`${BASE}/betreiber`, undefined, { authRequest: true });
+  return jsonOrThrow<Betreiber>(res);
+}
+
 export async function login(email: string, password: string): Promise<User> {
   const res = await requestOrExplain(
     `${BASE}/auth/login`, jsonPost({ email, password }), { authRequest: true });

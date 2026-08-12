@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, LogIn, Mic2, Ticket, UserPlus } from "lucide-react";
 import { getAuthConfig, login, register, type User } from "../api";
+import Footer from "./Footer";
 
 type Mode = "login" | "register";
 
@@ -146,6 +147,10 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
         <p className="text-center text-xs text-ink-600 mt-4">
           Passwort vergessen? Am HOOKCUT-Rechner „hookcut-passwort-reset.bat" doppelklicken.
         </p>
+
+        {/* Impressum und Datenschutz muessen auch OHNE Konto erreichbar sein -
+            wer hier steht, ist noch kein Mitglied. */}
+        <Footer />
       </div>
     </div>
   );

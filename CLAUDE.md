@@ -159,6 +159,14 @@ HOSTING.md                Schritt-für-Schritt-Anleitung zum Livegang
   `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
   Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
   vergessen**, sonst startet online ein Job, der nie fertig wird.
+- **Betreiberangaben stehen nur in `backend/betreiber.py`** (Name, Anschrift,
+  E-Mail, Hoster). Impressum, Datenschutz und AGB holen sie über den
+  öffentlichen Endpunkt `/betreiber` — **nie in die Oberfläche kopieren**,
+  sonst stimmen nach einem Umzug zwei von drei Seiten nicht mehr. Zusätzlich
+  per Env überschreibbar (`HOOKCUT_BETREIBER_*`), damit ein Adresswechsel
+  ohne neuen Programmstand geht. **Ändert sich, welche Daten die Anwendung
+  verarbeitet, muss `DatenschutzPage.tsx` mitwachsen** — eine Erklärung, die
+  etwas verschweigt oder Nichtvorhandenes aufzählt, ist schlechter als keine.
 - **Nutzerdaten gehören unter `config.PROJECTS_DIR`** (`HOOKCUT_PROJECTS_DIR`),
   nie fest ins Projektverzeichnis. `storage.py` und `db.DEFAULT_DB_PATH`
   hängen daran, ein Schalter verschiebt beides. Online zeigt er auf die

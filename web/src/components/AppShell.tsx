@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import Footer from "./Footer";
 import CreateReelWizard from "./CreateReelWizard";
 import type { AppContext } from "./app-context";
 import type { User } from "../api";
@@ -39,7 +40,13 @@ export default function AppShell({
     <div className="flex min-h-screen bg-ink-950 text-white">
       <Sidebar user={user} onLogout={onLogout} toolsEnabled={toolsEnabled}
         onOpenWizard={() => setWizardOpen(true)} />
-      <Outlet context={ctx} />
+      {/* Spalte statt direktem Outlet: die Seite waechst oben (flex-1 auf
+          <main>), die Fusszeile mit Impressum und Datenschutz sitzt darunter -
+          und zwar auf JEDER Seite, so wie es sein muss. */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Outlet context={ctx} />
+        <Footer />
+      </div>
       {/* Der Assistent existiert nur dort, wo auch gerendert werden kann. */}
       {wizardOpen && toolsEnabled && <CreateReelWizard onClose={closeWizard} />}
     </div>
