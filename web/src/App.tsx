@@ -16,13 +16,17 @@ import FeedPage from "./pages/FeedPage";
 import PostDetailPage from "./pages/PostDetailPage";
 import ProfilAnsichtPage from "./pages/ProfilAnsichtPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
-import { getMe, logout, setUnauthorizedHandler, type User } from "./api";
+import { getAuthConfig, getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
 type AuthPhase = "loading" | "loggedOut" | "loggedIn";
 
 function App() {
   const [authPhase, setAuthPhase] = useState<AuthPhase>("loading");
   const [user, setUser] = useState<User | null>(null);
+  // Laufen hier die Video-Werkzeuge? Bis die Antwort da ist, wird von "ja"
+  // ausgegangen - lokal ist das der Normalfall, und so blitzt beim Start
+  // nichts kurz auf und verschwindet wieder.
+  const [toolsEnabled, setToolsEnabled] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +36,9 @@ function App() {
       setUser(null);
       setAuthPhase("loggedOut");
     });
+    getAuthConfig()
+      .then((c) => !cancelled && setToolsEnabled(c.tools_enabled))
+      .catch(() => { /* Standard beibehalten */ });
     getMe()
       .then((u) => {
         if (cancelled) return;
@@ -84,8 +91,19 @@ function App() {
 
   return (
     <Routes>
-      <Route element={<AppShell user={user} setUser={setUser} onLogout={handleLogout} />}>
-        <Route index element={<DashboardPage />} />
+      <Route element={
+        <AppShell user={user} setUser={setUser} onLogout={handleLogout}
+          toolsEnabled={toolsEnabled} />
+      }>
+        {/* Startseite: lokal das Werkzeug-Dashboard, online der Feed. Ohne
+            Werkzeuge waere das Dashboard eine leere Seite mit toten Knoepfen -
+            und genau das ist der erste Eindruck nach dem Anmelden.
+            Bewusst eine Weiterleitung statt derselben Seite unter zwei
+            Adressen: so gibt es eine kanonische URL und der Menuepunkt
+            "Offene Projekte" ist auch wirklich hervorgehoben. */}
+        <Route index element={
+          toolsEnabled ? <DashboardPage /> : <Navigate to="/projekte-feed" replace />
+        } />
         <Route path="hook" element={<HookPage />} />
         <Route path="canvas" element={<CanvasPage />} />
         <Route path="reels" element={<ReelsPage />} />

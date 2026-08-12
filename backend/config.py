@@ -44,3 +44,11 @@ LOCAL_RENDER: bool = _env_bool("HOOKCUT_LOCAL_RENDER", True)
 # einfach ein Konto anlegen). Die oeffentliche Musiker-Plattform setzt
 # HOOKCUT_INVITE_ONLY=0 - dann ist die Registrierung fuer alle offen.
 INVITE_ONLY: bool = _env_bool("HOOKCUT_INVITE_ONLY", True)
+
+# Sind die Video-Werkzeuge verfuegbar (Reel-Assistent, Hook-Analyse, Canvas,
+# Wochen-Content)? Die brauchen Chrome mit WebGPU, ffmpeg und mehrere GB an
+# Modellen - das gibt es nur auf dem Rechner des Besitzers. Der gehostete
+# Server setzt HOOKCUT_TOOLS_ENABLED=0: dann verschwinden sie aus der
+# Oberflaeche und die Routen antworten verstaendlich, statt mitten im
+# Hintergrund-Job zu scheitern.
+TOOLS_ENABLED: bool = _env_bool("HOOKCUT_TOOLS_ENABLED", True)

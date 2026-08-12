@@ -133,9 +133,16 @@ export async function getMe(): Promise<User | null> {
 
 /** Verlangt dieser Server einen Einladungscode? (Lokales Werkzeug: ja,
  *  offene Plattform: nein.) Wird vor dem Anmelden abgefragt. */
-export async function getAuthConfig(): Promise<{ invite_required: boolean }> {
+export interface ServerConfig {
+  /** Verlangt dieser Server einen Einladungscode? */
+  invite_required: boolean;
+  /** Laufen hier die Video-Werkzeuge? Auf dem gehosteten Server nicht. */
+  tools_enabled: boolean;
+}
+
+export async function getAuthConfig(): Promise<ServerConfig> {
   const res = await requestOrExplain(`${BASE}/auth/config`, undefined, { authRequest: true });
-  return jsonOrThrow<{ invite_required: boolean }>(res);
+  return jsonOrThrow<ServerConfig>(res);
 }
 
 export async function login(email: string, password: string): Promise<User> {

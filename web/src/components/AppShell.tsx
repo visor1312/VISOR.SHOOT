@@ -12,10 +12,12 @@ export default function AppShell({
   user,
   setUser,
   onLogout,
+  toolsEnabled,
 }: {
   user: User;
   setUser: (user: User) => void;
   onLogout: () => void;
+  toolsEnabled: boolean;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -30,13 +32,16 @@ export default function AppShell({
     setUser,
     openWizard: () => setWizardOpen(true),
     refreshKey,
+    toolsEnabled,
   };
 
   return (
     <div className="flex min-h-screen bg-ink-950 text-white">
-      <Sidebar user={user} onLogout={onLogout} onOpenWizard={() => setWizardOpen(true)} />
+      <Sidebar user={user} onLogout={onLogout} toolsEnabled={toolsEnabled}
+        onOpenWizard={() => setWizardOpen(true)} />
       <Outlet context={ctx} />
-      {wizardOpen && <CreateReelWizard onClose={closeWizard} />}
+      {/* Der Assistent existiert nur dort, wo auch gerendert werden kann. */}
+      {wizardOpen && toolsEnabled && <CreateReelWizard onClose={closeWizard} />}
     </div>
   );
 }

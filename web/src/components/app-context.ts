@@ -10,6 +10,10 @@ export interface AppContext {
   openWizard: () => void;
   /** Zaehlt nach jedem Modal-Schliessen hoch -> Seiten koennen neu laden. */
   refreshKey: number;
+  /** Laufen auf diesem Server die Video-Werkzeuge? Online nicht (kein
+   *  Chrome/WebGPU) - dann verschwinden sie aus der Navigation und der Feed
+   *  ist die Startseite. Kommt aus GET /auth/config. */
+  toolsEnabled: boolean;
 }
 
 export function useApp(): AppContext {

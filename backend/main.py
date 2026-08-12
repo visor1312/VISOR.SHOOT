@@ -98,9 +98,27 @@ def _own(row: dict | None, user: dict) -> dict:
     return row
 
 
+def require_tools() -> None:
+    """Sperre fuer die Video-Werkzeuge, wenn sie nicht verfuegbar sind.
+
+    Rendern braucht Chrome mit WebGPU, ffmpeg und mehrere GB an Modellen - das
+    gibt es nur auf dem Rechner des Besitzers. Auf dem gehosteten Server
+    (HOOKCUT_TOOLS_ENABLED=0) wuerden diese Routen sonst froehlich einen
+    Hintergrund-Job starten, der dann still scheitert. Lieber sofort eine
+    ehrliche Antwort: 503 heisst "gibt es hier nicht", nicht "kaputt".
+    """
+    if not config.TOOLS_ENABLED:
+        raise HTTPException(
+            503,
+            "Diese Funktion laeuft nur in der HOOKCUT-App auf deinem Rechner. "
+            "Im Netzwerk stehen die Video-Werkzeuge nicht zur Verfuegung.",
+        )
+
+
 @app.post("/projects")
 def create_project(name: str = Form(...), song: UploadFile = File(...),
                    user: dict = Depends(auth.get_current_user)):
+    require_tools()
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
     project_id = db.create_project(name=name, song_path="", user_id=user["id"])
     song_dest = storage.song_path(project_id, suffix)
@@ -121,6 +139,7 @@ def list_projects(user: dict = Depends(auth.get_current_user)):
 @app.post("/projects/{project_id}/takes")
 def create_take(project_id: str, video: UploadFile = File(...), original_audio_mode: str = Form("mute"),
                 user: dict = Depends(auth.get_current_user)):
+    require_tools()
     _own(db.get_project(project_id), user)
     if original_audio_mode not in ("mute", "background"):
         raise HTTPException(400, "original_audio_mode muss 'mute' oder 'background' sein")
@@ -217,6 +236,7 @@ def sync_take(
     language: str = Form("de"),
     user: dict = Depends(auth.get_current_user),
 ):
+    require_tools()
     _own(db.get_project(project_id), user)
     take = db.get_take(take_id)
     if not take or take["project_id"] != project_id:
@@ -279,6 +299,7 @@ def _run_hook_job(job_id: str) -> None:
 @app.post("/hooks/analyze")
 def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...),
                  user: dict = Depends(auth.get_current_user)):
+    require_tools()
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
     job_id = db.create_hook_job(song_path="", user_id=user["id"])
     song_dest = storage.hook_song_path(job_id, suffix)
@@ -386,6 +407,7 @@ def editor_analyze(
     song: UploadFile = File(...),
     user: dict = Depends(auth.get_current_user),
 ):
+    require_tools()
     video_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     song_suffix = Path(song.filename or "song.wav").suffix or ".wav"
     job_id = db.create_analyze_job(video_path="", song_path="", user_id=user["id"])
@@ -431,6 +453,7 @@ def _run_edit_analyze(job_id: str) -> None:
 def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...),
                  song: UploadFile = File(...), with_subtitles: str = Form("false"),
                  lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
+    require_tools()
     v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
     want_subs = with_subtitles.lower() in ("true", "1", "yes", "on")
@@ -465,6 +488,7 @@ def _run_edit_hook(job_id: str) -> None:
 @app.post("/edit/{job_id}/hook")
 def edit_hook(job_id: str, background_tasks: BackgroundTasks,
               user: dict = Depends(auth.get_current_user)):
+    require_tools()
     _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="hooking")
     background_tasks.add_task(_run_edit_hook, job_id)
@@ -547,6 +571,7 @@ def edit_render(job_id: str, background_tasks: BackgroundTasks,
                 style: str = Form(...), use_hook: str = Form("false"),
                 beat_effects: str = Form("false"), platforms: str = Form("reel"),
                 user: dict = Depends(auth.get_current_user)):
+    require_tools()
     _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="rendering")
     background_tasks.add_task(_run_edit_render, job_id, style,
@@ -722,6 +747,7 @@ def create_pack(background_tasks: BackgroundTasks, video: UploadFile = File(...)
                 hook_count: int = Form(2), platforms: str = Form("reel"),
                 beat_effects: str = Form("false"), with_subtitles: str = Form("false"),
                 lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
+    require_tools()
     from backend.pipeline.content_pack import MAX_PACK_ITEMS
     from backend.pipeline.platforms import parse_platform_keys
     from backend.pipeline.styles import STYLES
@@ -916,6 +942,7 @@ def create_canvas(background_tasks: BackgroundTasks, video: UploadFile = File(..
                   song: UploadFile = File(...), style: str = Form("clean"),
                   duration_sec: float = Form(6.0), use_hook: str = Form("true"),
                   user: dict = Depends(auth.get_current_user)):
+    require_tools()
     from backend.pipeline.content_pack import clamp_canvas_duration
     from backend.pipeline.styles import STYLES
 

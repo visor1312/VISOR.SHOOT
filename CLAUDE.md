@@ -144,6 +144,14 @@ tests/            pytest
   irreführenden Fehlern. Wer daran etwas ändert, muss den **gebauten** Stand
   prüfen (`cd web && npm run build`, dann Backend starten und Port 8000
   im Browser öffnen) — der Dev-Server beweist hier nichts.
+- **Die Video-Werkzeuge sind abschaltbar** (`HOOKCUT_TOOLS_ENABLED`, lokal `1`,
+  gehostet `0`). Sie brauchen Chrome/WebGPU, ffmpeg und mehrere GB Modelle —
+  online gibt es das nicht. Backend: `require_tools()` in `main.py` steht in
+  **jeder Route, die einen Render- oder Analyse-Job startet** und antwortet
+  abgeschaltet mit 503 statt still zu scheitern. Frontend: die Einträge sind in
+  `Sidebar.tsx` mit `werkzeug: true` markiert und verschwinden, und die
+  Startseite wird der Feed. **Neue Werkzeug-Route ⇒ `require_tools()` nicht
+  vergessen**, sonst startet online ein Job, der nie fertig wird.
 - **Einstellbares Verhalten** gehört in `backend/config.py` (Env-Variable mit
   sicherem Standard), nicht als `os.environ`-Abfrage quer im Code. Beispiel:
   `HOOKCUT_INVITE_ONLY` — Standard `1` (lokal nur mit Einladung), die offene

@@ -234,10 +234,13 @@ def test_invite_still_required_when_enabled(tmp_path, monkeypatch):
 
 
 def test_auth_config_reports_invite_mode(client, monkeypatch):
+    # Bewusst nur DAS eine Feld pruefen statt die ganze Antwort zu
+    # vergleichen: /auth/config sagt der Oberflaeche noch mehr ueber diesen
+    # Server (z.B. tools_enabled), und ein neues Feld ist kein Fehler.
     monkeypatch.setattr(auth.config, "INVITE_ONLY", False)
-    assert client.get("/auth/config").json() == {"invite_required": False}
+    assert client.get("/auth/config").json()["invite_required"] is False
     monkeypatch.setattr(auth.config, "INVITE_ONLY", True)
-    assert client.get("/auth/config").json() == {"invite_required": True}
+    assert client.get("/auth/config").json()["invite_required"] is True
 
 
 def test_expired_session_is_rejected(tmp_path):

@@ -27,19 +27,22 @@ interface NavItem {
   icon: LucideIcon;
   to: string;
   soon?: boolean;
+  /** Braucht die Video-Werkzeuge (Chrome/WebGPU, ffmpeg, Modelle) und ist
+   *  deshalb online nicht verfuegbar. */
+  werkzeug?: boolean;
 }
 
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/", werkzeug: true },
   { label: "Offene Projekte", icon: Users2, to: "/projekte-feed" },
   { label: "Mein Profil", icon: UserCircle, to: "/profil" },
-  { label: "Hook Generator", icon: Zap, to: "/hook" },
-  { label: "Spotify Canvas", icon: Film, to: "/canvas" },
-  { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content" },
-  { label: "Meine fertigen Reels", icon: Music2, to: "/reels" },
+  { label: "Hook Generator", icon: Zap, to: "/hook", werkzeug: true },
+  { label: "Spotify Canvas", icon: Film, to: "/canvas", werkzeug: true },
+  { label: "Wochen-Content", icon: CalendarClock, to: "/wochen-content", werkzeug: true },
+  { label: "Meine fertigen Reels", icon: Music2, to: "/reels", werkzeug: true },
   // Frueher "Offene Projekte" - umbenannt, seit es den gleichnamigen
   // Netzwerk-Feed gibt. Hier liegen die EIGENEN Aufnahme-Projekte.
-  { label: "Meine Aufnahmen", icon: FolderOpen, to: "/projekte" },
+  { label: "Meine Aufnahmen", icon: FolderOpen, to: "/projekte", werkzeug: true },
 ];
 
 const analyticsNav: NavItem[] = [
@@ -103,11 +106,17 @@ export default function Sidebar({
   user,
   onLogout,
   onOpenWizard,
+  toolsEnabled,
 }: {
   user: User;
   onLogout: () => void;
   onOpenWizard: () => void;
+  toolsEnabled: boolean;
 }) {
+  // Online (kein Chrome/WebGPU) fliegen die Werkzeug-Eintraege raus. Ein
+  // sichtbarer Knopf, der nur einen Fehler erzeugt, waere schlimmer als gar
+  // kein Knopf - besonders als erster Eindruck.
+  const hauptNav = toolsEnabled ? mainNav : mainNav.filter((i) => !i.werkzeug);
   return (
     <aside className="w-64 shrink-0 h-screen sticky top-0 bg-ink-900 border-r border-ink-700 flex flex-col">
       {/* Logo */}
@@ -120,10 +129,11 @@ export default function Sidebar({
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         <div className="space-y-1 pt-2">
-          {mainNav.map((i) => (
+          {hauptNav.map((i) => (
             <NavRow key={i.to} item={i} />
           ))}
           {/* "Reel erstellen" oeffnet den Assistenten als Overlay (keine Route). */}
+          {toolsEnabled && (
           <button
             onClick={onOpenWizard}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted hover:text-white hover:bg-ink-800 transition-colors"
@@ -131,6 +141,7 @@ export default function Sidebar({
             <Upload size={18} />
             Reel erstellen
           </button>
+          )}
         </div>
 
         <SectionLabel>Analytics</SectionLabel>

@@ -381,9 +381,15 @@ class LoginBody(BaseModel):
 
 @router.get("/config")
 def auth_config():
-    """Was die Login-Maske wissen muss, bevor jemand angemeldet ist:
-    Wird ein Einladungscode verlangt? Bewusst oeffentlich (kein Geheimnis)."""
-    return {"invite_required": config.INVITE_ONLY}
+    """Was die Oberflaeche ueber diesen Server wissen muss, bevor jemand
+    angemeldet ist. Bewusst oeffentlich - hier steht nichts Geheimes.
+
+    - invite_required: zeigt die Login-Maske das Code-Feld?
+    - tools_enabled:   laufen hier die Video-Werkzeuge? Auf dem gehosteten
+      Server nicht (kein Chrome/WebGPU), dann blendet die Oberflaeche sie aus
+      und startet auf dem Feed statt auf dem Werkzeug-Dashboard.
+    """
+    return {"invite_required": config.INVITE_ONLY, "tools_enabled": config.TOOLS_ENABLED}
 
 
 @router.post("/register")
