@@ -32,7 +32,9 @@ Arbeitsbranch: **`claude/rap-video-auto-editor-s9xfvt`**
 | Live stellen (Phase 2) | **läuft** — 5 von 7 Schritten fertig; Livegang liegt beim Besitzer (`HOSTING.md`) |
 | Premium-Abo, Apps für iOS/Android | später |
 
-262 pytest-Tests grün, Web-Build und oxlint grün.
+291 pytest-Tests grün, Web-Build und oxlint grün.
+(Die Zahl enthält je einen Fall pro `backend/`-Datei aus
+`test_keine_doppelten_namen.py` — deshalb der Sprung.)
 Der genaue Fahrplan steht in `PROJEKT-STATUS.md`, Abschnitt „Fahrplan".
 
 ## Grundregeln
