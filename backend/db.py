@@ -1299,14 +1299,6 @@ def list_reports(status: str | None = "open", limit: int = 100,
         return [dict(r) for r in rows]
 
 
-def set_report_status(report_id: str, status: str, handled_by: str,
-                      db_path: str | Path = DEFAULT_DB_PATH) -> None:
-    with _connect(db_path) as conn:
-        conn.execute(
-            "UPDATE reports SET status = ?, handled_at = ?, handled_by = ? WHERE id = ?",
-            (status, _now(), handled_by, report_id))
-
-
 def count_recent_reports(reporter_id: str, since_iso: str,
                          db_path: str | Path = DEFAULT_DB_PATH) -> int:
     """Spam-Bremse: auch das Melden selbst laesst sich missbrauchen."""

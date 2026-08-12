@@ -1,11 +1,18 @@
 """Gemeinsame Fixtures: TestClient + eingeloggte Clients fuers Benutzer-System.
 
-WICHTIG: HOOKCUT_DB wird HIER gesetzt, BEVOR irgendein backend-Modul
-importiert wird - alle API-Tests laufen damit gegen eine Wegwerf-DB statt
-gegen die echte projects/state.db. (Sonst wuerde z.B. der erste Test-User
-per Backfill die Altdaten des Betreibers uebernehmen.) Einmalige E-Mails
-pro Test-User, weil die Wegwerf-DB pro pytest-Lauf geteilt wird. Der
-httpx-Cookie-Jar des TestClient haelt die Session ueber Requests hinweg.
+WICHTIG: Datenbank UND Datenordner werden HIER umgebogen, BEVOR irgendein
+backend-Modul importiert wird (beide Pfade werden beim Import festgelegt).
+
+* HOOKCUT_DB - alle API-Tests laufen gegen eine Wegwerf-DB statt gegen die
+  echte projects/state.db. Sonst wuerde z.B. der erste Test-User per
+  Backfill die Altdaten des Betreibers uebernehmen.
+* HOOKCUT_PROJECTS_DIR - sonst schreiben die Tests ihre Songs, Hoerproben
+  und Job-Ordner mitten in den echten projects/-Ordner. Auf dem Rechner des
+  Besitzers landet dieser Muell direkt neben seinen echten Projekten.
+
+Einmalige E-Mails pro Test-User, weil die Wegwerf-DB pro pytest-Lauf
+geteilt wird. Der httpx-Cookie-Jar des TestClient haelt die Session ueber
+Requests hinweg.
 """
 from __future__ import annotations
 
@@ -15,8 +22,9 @@ import tempfile
 import uuid
 from pathlib import Path
 
-os.environ.setdefault(
-    "HOOKCUT_DB", str(Path(tempfile.mkdtemp(prefix="hookcut-tests-")) / "state.db"))
+_TEST_DATEN = Path(tempfile.mkdtemp(prefix="hookcut-tests-"))
+os.environ.setdefault("HOOKCUT_PROJECTS_DIR", str(_TEST_DATEN))
+os.environ.setdefault("HOOKCUT_DB", str(_TEST_DATEN / "state.db"))
 
 import pytest
 from fastapi.testclient import TestClient

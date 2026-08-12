@@ -200,9 +200,11 @@ Interesse zeigen, kommentieren.
   Register-„E-Mail vergeben"-409 ist ein Enumerations-Hinweis, aber durch
   den Einladungscode-Zwang gedeckelt; TOCTOU-Rennen bei Register/Invite sind
   lokal vernachlaessigbar.
-- **Bekannte Grenzen:** Download-Links (`<a href>`) zeigen bei abgelaufener
-  Sitzung rohes 401-JSON statt Login-Maske. Das Gradio-Legacy (frontend/app.py)
-  umgeht die HTTP-Auth (ruft die Pipeline direkt) — bleibt deprecated/lokal.
+- **Bekannte Grenze:** Download-Links (`<a href>`) zeigen bei abgelaufener
+  Sitzung rohes 401-JSON statt Login-Maske.
+  *(Die alte Gradio-Oberfläche umging die HTTP-Auth komplett, indem sie die
+  Pipeline direkt aufrief. Sie wurde im August 2026 entfernt — damit ist
+  diese Lücke zu.)*
 
 ## Wochen-Content / Content-Packs (das erste „warum 10€/Monat"-Feature)
 
@@ -380,12 +382,17 @@ Benachrichtigungen · „Bleibt-online"-Features Smart Link / EPK.
   Ende gut aussieht — das kann nur sein Rechner zeigen.
 - **Das Netzwerk hat noch nie ein echter Musiker benutzt.** Alles bisher sind
   Testkonten. Das ist die größte offene Unbekannte im ganzen Projekt.
-- Legacy, funktioniert aber: Gradio-UI (frontend/app.py), alte ffmpeg-
-  Effekte (effects_grading.py — durch FreeCut-Styles überholt, aber von
-  Gradio + Tests noch genutzt). UploadModal im web/ wurde entfernt (durch
-  Wizard ersetzt); die alten REST-Endpunkte (/projects POST, /takes, /sync,
-  /presets) bleiben fürs Gradio-Legacy + dokumentierte API bestehen, das
-  Dashboard nutzt weiterhin GET /projects + Take-Download.
+- **Ohne Bedienoberfläche, aber fertig und getestet:**
+  `pipeline/multitake_cut.py` (taktgenauer Bildwechsel zwischen mehreren
+  Takes) und `pipeline/upscale.py`. Beide hingen an der Gradio-Oberfläche,
+  die im August 2026 entfernt wurde (kein Knopf führte mehr dorthin, und sie
+  war der einzige Grund für die schwere `gradio`-Abhängigkeit). Die Module
+  bleiben — sie warten auf eine Anbindung im Dashboard.
+- `effects_grading.py` (alte ffmpeg-Effekte) ist durch die FreeCut-Styles
+  überholt, wird aber weiter von `presets.py` genutzt — also **kein** toter
+  Code. Die alten REST-Endpunkte (`POST /projects`, `/takes`, `/sync`,
+  `/presets`) bleiben als dokumentierte API bestehen; das Dashboard nutzt
+  `GET /projects` + Take-Download.
 
 ## Sicherheit (Review-Stand August 2026)
 

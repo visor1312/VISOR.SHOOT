@@ -1,8 +1,10 @@
-"""Gemeinsame Pfad-Konventionen fuer Projekt-/Take-Dateien.
+"""Gemeinsame Pfad-Konventionen fuer alle Dateien der Nutzer.
 
-Wird sowohl vom FastAPI-Backend (main.py) als auch vom Gradio-Frontend
-(frontend/app.py) genutzt, damit beide dieselbe Verzeichnisstruktur unter
-/projects/<project_id>/ verwenden.
+EINE Stelle fuer die Verzeichnisstruktur - Projekte, Takes, Hook-Jobs,
+Content-Packs, Canvas und die Hoerproben des Netzwerks. Wer einen neuen
+Ablageort braucht, ergaenzt ihn hier, statt Pfade selbst zusammenzubauen:
+sonst landet beim Hosting etwas neben der dauerhaften Festplatte und ist
+nach dem naechsten Ausrollen weg.
 """
 from __future__ import annotations
 

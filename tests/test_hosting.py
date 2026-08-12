@@ -149,3 +149,21 @@ def test_render_item_ownership(auth_client, second_auth_client):
         files={"video": ("out.mp4", b"x", "video/mp4")}).status_code == 404
     # und taucht nicht in der pending-Liste des anderen Nutzers auf
     assert all(p["item_id"] != item_id for p in second_auth_client.get("/render/pending").json())
+
+
+def test_tests_schreiben_nicht_in_den_echten_datenordner():
+    """Waechter: die Testlaeufe duerfen den projects/-Ordner nicht anfassen.
+
+    Vorher legten sie dort Songs, Hoerproben und Job-Ordner an - auf dem
+    Rechner des Besitzers mitten zwischen seinen echten Projekten. Seit
+    conftest.py HOOKCUT_PROJECTS_DIR umbiegt, laeuft alles in einem
+    Wegwerf-Ordner. Faellt das je wieder heraus, schlaegt dieser Test an.
+    """
+    from backend import storage
+
+    echter_ordner = PROJEKT / "projects"
+    assert storage.PROJECTS_ROOT != echter_ordner, (
+        "Die Tests schreiben in den echten Datenordner. In conftest.py muss "
+        "HOOKCUT_PROJECTS_DIR gesetzt sein, BEVOR backend importiert wird.")
+    # Und der Wegwerf-Ordner darf auch kein Unterordner davon sein.
+    assert echter_ordner not in storage.PROJECTS_ROOT.parents

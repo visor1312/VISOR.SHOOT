@@ -12,9 +12,13 @@ im Video passen bereits zum Song (Playback lief beim Filmen). Die einzige
 Aufgabe ist Audio-Video-Synchronisation: die richtige Stelle im Song finden und
 zeitlich exakt über das Video legen.
 
-Aktueller Stand: **Phase 1 (Sync)**, **Phase 2 (Untertitel)**, **Phase 3
-(Effekte, Grading, Upscaling)** und **Hook-Erkennung** (Roadmap-Ausbaustufe
-Richtung All-in-One-App fuer Indie-Musiker) sind fertig und lauffähig.
+Aktueller Stand: **Ausbaustufe 1 (Sync)**, **2 (Untertitel)**, **3 (Effekte,
+Grading, Upscaling)** und die **Hook-Erkennung** sind fertig und lauffähig.
+
+> Diese Nummern meinen die Ausbaustufen des **Werkzeugs**. Der Fahrplan in
+> `PROJEKT-STATUS.md` zählt davon getrennt die Phasen der **Plattform**
+> (Phase 1 = Netzwerk, Phase 2 = live stellen). Zwei Zählungen für zwei
+> verschiedene Dinge — nicht verwechseln.
 
 ## Neu: das Netzwerk für Musiker
 
@@ -218,47 +222,16 @@ Der Upload-Workflow bietet zusätzlich:
   fertigen Videos, Karaoke-ASS wird eingebrannt. Job-Status durchläuft
   `processing -> effects -> subtitles -> done`.
 
-### Gradio-Oberfläche (Legacy-MVP, alle Pipeline-Features direkt bedienbar)
+### Multi-Take-Schnitt und Upscaling
 
-```bash
-python -m frontend.app
-```
-
-Öffnet eine lokale Web-Oberfläche (Standard: http://127.0.0.1:7860). Songdatei
-und einen oder mehrere Video-Takes derselben Songstelle hochladen, auf
-"Synchronisieren" klicken. Jeder Take wird einzeln gegen den Song
-synchronisiert (eigener Zeitversatz pro Take) und als 9:16 H.264-Video
-ausgegeben, inkl. Vorschau, Download, sowie einer eigenen Anzeige für
-Zeitversatz (ms) und Konfidenz.
-
-Pro Take kann danach "Transkribieren" geklickt werden (Whisper-Modellgröße und
-Sprache waehlbar). Das erkannte Transkript erscheint als editierbare Tabelle
-(Start/Ende/Wort) - **bitte immer pruefen und korrigieren**, bevor auf
-"Untertitel rendern" geklickt wird (Whisper macht bei Rap-Slang/Dialekt
-Fehler). Danach steht ein zweites Video mit eingebrannten Untertiteln zum
-Download bereit, optional im TikTok-typischen Karaoke-Stil (aktuelles Wort
-farblich hervorgehoben).
-
-Darunter: **Farbgrading & Beat-Effekte** (Farbpreset waehlen, vier Effekte
-mit Intensitaetsregler 0-1: Zoom-Pulse, Flash, Shake, RGB-Split-Kick, alle
-takgenau auf die erkannten Taktschlaege dieses Takes). Wurden **mindestens 2
-Takes** erfolgreich synchronisiert, erscheint darunter der Bereich
-**Multi-Take-Schnitt**: Wechsel-Rhythmus (jeden/jeden 2./jeden 4. Takt) und
-Take-Reihenfolge (fest/zufaellig) waehlen, ein Klick erzeugt einen
-durchgehenden Song mit taktgenau geschnittenem Bildwechsel zwischen den Takes.
-
-Ganz unten pro Take: **Upscaling** (optional, siehe Warnhinweis im UI zur
-Rechenzeit) - wirkt auf die zuletzt erzeugte Version dieses Takes (mit
-Effekten > mit Untertiteln > nur Sync).
-
-Ganz oben, direkt unter dem Song-Upload: **🎯 Hook im Song finden** - nur die
-Songdatei hochladen (noch kein Video noetig) und auf "Hook finden" klicken,
-um zu erfahren, welcher ~15-30-Sekunden-Abschnitt sich am ehesten als
-Social-Media-Hook eignet, inkl. Hoerprobe. Ist ein Take bereits
-synchronisiert, steht dort zusaetzlich "Auf Hook zuschneiden" - schneidet den
-Take automatisch auf den erkannten Bereich zu (faellt auf die naechstbeste
-Alternative zurueck, falls der Top-Vorschlag ausserhalb des gefilmten
-Materials liegt).
+Zwei fertige Pipeline-Bausteine, die es noch nicht ins Dashboard
+geschafft haben: `backend/pipeline/multitake_cut.py` (taktgenauer
+Bildwechsel zwischen mehreren Takes desselben Songabschnitts) und
+`backend/pipeline/upscale.py` (Hochskalieren, braucht torch, siehe
+Abschnitt „Upscaling"). Beide sind getestet und einsatzbereit; ihre
+frühere Bedienoberfläche (ein Gradio-Prototyp aus der Anfangszeit) wurde
+im August 2026 entfernt, weil das React-Dashboard sie abgelöst hat und
+nichts mehr dorthin führte. Sie warten auf eine Anbindung im Dashboard.
 
 ### FastAPI-Backend (programmatischer Zugriff)
 
@@ -317,9 +290,10 @@ backend/
     hook_detect.py              # Findet den wahrscheinlichsten Hook-/Refrain-Abschnitt eines Songs
   db.py                  # SQLite: Projekte + Takes
   storage.py              # gemeinsame Verzeichnis-Konventionen (/projects/<id>/...)
-  main.py                  # FastAPI-Endpunkte
-frontend/
-  app.py                   # Gradio-Oberfläche (ruft pipeline-Funktionen direkt auf)
+  main.py                  # FastAPI-Endpunkte (Werkzeug)
+  network.py               # das Netzwerk: Beiträge, Feed, Interesse, Meldungen
+  auth.py                  # Konten, Sitzungen, Profile
+  betreiber.py             # Impressum-Angaben, an EINER Stelle
 projects/
   <projekt-id>/...          # Song, Takes, Zwischenergebnisse, Exporte
 ```
@@ -363,9 +337,10 @@ direkt im Zeitrahmen des fertigen Videos liegen - keine zusätzliche
 Offset-Verrechnung nötig. Sprache ist per Default Deutsch, kann aber pro Take
 auf Englisch umgestellt werden (falls der Songtext teils englisch ist).
 
-Im Gradio-Frontend erscheint das Transkript als editierbare Tabelle
-(Start/Ende/Wort) - **das ist ein Pflicht-Schritt, kein Nice-to-have**, da
-Whisper bei Rap-Slang/Dialekt zuverlässig Fehler macht.
+Weil Whisper bei Rap-Slang und Dialekt zuverlässig Fehler macht, ist der
+eingefügte Songtext im Assistenten der bessere Weg: dann gilt **dein Text**
+als Wahrheit und die Erkennung liefert nur noch das Timing
+(`pipeline/lyrics_align.py`).
 
 `subtitles.py` gruppiert die (korrigierten) Wörter zu Untertitelzeilen
 (Zeilenumbruch bei Sprechpause, zu langer Zeilendauer oder zu vielen Zeichen),

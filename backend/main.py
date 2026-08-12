@@ -1,10 +1,12 @@
 """FastAPI-Endpunkte fuer HOOKCUT (Sync + Viral Hook Detector).
 
-Duenne Schicht ueber db.py und den pipeline/-Modulen. Das Gradio-Frontend
-(frontend/app.py) ruft fuer die MVP-Oberflaeche dieselben pipeline-Funktionen
-direkt auf (kein HTTP-Umweg noetig fuer einen lokalen Einzelnutzer), nutzt
-aber dieselbe Verzeichnisstruktur (storage.py) und DB (db.py). Diese API
-existiert fuer programmatischen/skriptbaren Zugriff.
+Duenne Schicht ueber db.py und den pipeline/-Modulen: hier haengen die
+Routen fuer Sync, Hook-Erkennung, Styles, Wochen-Content und Canvas. Das
+React-Dashboard in web/ spricht ausschliesslich diese API an.
+
+Das NETZWERK (Beitraege, Feed, Interesse, Kommentare, Meldungen) liegt
+bewusst in backend/network.py, das Benutzer-System in backend/auth.py;
+beide werden hier unten per include_router eingehaengt.
 """
 from __future__ import annotations
 
@@ -38,10 +40,9 @@ from backend.pipeline.vocal_separation import separate_vocals
 # Standardbibliothek aus, und /presets ist ein oeffentlicher Katalog, der
 # auch online antworten muss.
 
-# Whisper-Modell fuer die automatischen Untertitel im Web-Flow. "small" ist
-# der Kompromiss aus Qualitaet und Tempo auf CPU (~460 MB einmaliger
-# Download). Das beste Modell ("large-v3", ~3 GB, deutlich langsamer) bleibt
-# ueber die Gradio-Oberflaeche waehlbar.
+# Whisper-Modell fuer die automatischen Untertitel im schnellen Sync-Flow.
+# "small" ist der Kompromiss aus Qualitaet und Tempo auf CPU (~460 MB
+# einmaliger Download).
 AUTO_SUBTITLE_MODEL = "small"
 # Fuer den All-in-One-Assistenten: bestes Whisper-Modell auf der ISOLIERTEN
 # Gesangsspur (Demucs) - das war die Ursache der schlechten Untertitel: der
