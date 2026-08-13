@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Mail, User as UserIcon, KeyRound, Ticket, Users, Check, Loader2, Plus, Copy, Flag,
-  Trash2, MailWarning,
+  Trash2, MailWarning, Sparkles,
 } from "lucide-react";
 import {
   updateDisplayName, changePassword, listInvites, createInvite, listUsers,
@@ -13,7 +13,7 @@ import { useApp } from "../components/app-context";
 import { formatDate } from "../lib/format";
 
 export default function EinstellungenPage() {
-  const { user, setUser } = useApp();
+  const { user, setUser, premiumRequired } = useApp();
   return (
     <main className="flex-1 min-w-0 px-8 py-7 max-w-3xl">
       <h1 className="text-3xl font-bold tracking-tight">Einstellungen</h1>
@@ -24,6 +24,9 @@ export default function EinstellungenPage() {
             eingeschaltete Pruefung sieht das niemand. */}
         {!user.email_verified && <BestaetigungCard email={user.email} />}
         <NameCard user={user} onUpdated={setUser} />
+        {/* Nur, wo Premium ueberhaupt eine Rolle spielt. Auf dem eigenen
+            Rechner kostet nichts etwas - da waere die Karte nur Verwirrung. */}
+        {premiumRequired && <AboCard user={user} />}
         <PasswordCard />
         {user.is_admin && <AdminSection />}
         {/* Ganz unten und optisch abgesetzt: nichts hier ist so endgueltig. */}
@@ -79,6 +82,38 @@ function BestaetigungCard({ email }: { email: string }) {
       )}
       {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
     </div>
+  );
+}
+
+/** Der eigene Abo-Zustand - und der Weg zur Premium-Seite. Zeigt nur an,
+ *  was der Server sagt; gekuendigt wird (spaeter) beim Zahlungsanbieter,
+ *  und der Kuendigungsbutton nach § 312k BGB kommt zusammen mit ihm. */
+function AboCard({ user }: { user: import("../api").User }) {
+  const preis = (user.preis_cent / 100).toLocaleString("de-DE", {
+    style: "currency", currency: user.waehrung || "EUR",
+  });
+  const bis = user.premium_bis ? formatDate(user.premium_bis) : null;
+  return (
+    <Card title="Dein Abo" icon={<Sparkles size={18} className="text-brand-400" />}>
+      {user.premium ? (
+        <p className="text-sm text-muted">
+          {user.premium_status === "canceled"
+            ? <>Gekündigt – <span className="text-white">HOOKCUT Premium</span> läuft
+                {bis ? <> noch bis {bis}</> : " aus"}.</>
+            : <><span className="text-white">HOOKCUT Premium</span> läuft
+                {bis ? <> bis {bis}</> : " – ohne Enddatum"}.</>}
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          Du nutzt HOOKCUT kostenlos. Das Netzwerk bleibt frei; die
+          Video-Werkzeuge gehören zu Premium ({preis} pro Monat).
+        </p>
+      )}
+      <Link to="/premium"
+        className="inline-block mt-3 text-sm text-brand-400 hover:text-brand-500 font-medium">
+        {user.premium ? "Was dazugehört" : "Was Premium kostet"}
+      </Link>
+    </Card>
   );
 }
 

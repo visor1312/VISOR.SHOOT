@@ -307,6 +307,38 @@ Zwei Entscheidungen des Besitzers, hergeleitet in `PHASE-3-PLAN.md`:
   bekam „FOREIGN KEY constraint failed", also einen 500er ausgerechnet beim
   Löschrecht (DSGVO Art. 17).
 
+**Schritt 2 (fertig): Bezahlschranke.**
+
+- **Die Regel, wo sie greift** (Kommentarblock über den Routen in `main.py`):
+  **Arbeit kostet** — alle zehn POST-Routen, die etwas anlegen oder rechnen
+  lassen, hängen an `require_premium`. **Lesen und Herunterladen bleibt offen** —
+  wessen Abo ausläuft, kommt weiter an das, was er in der bezahlten Zeit
+  erzeugt hat. **Der `/render`-Vertrag bleibt offen** — läuft ein Abo aus,
+  während der Agent noch rendert, muss das Video trotzdem ankommen.
+- **`/premium`** (`PremiumPage.tsx`): Preis, Leistungen, was frei bleibt.
+  **Bewusst ohne Bestellknopf**, solange von Hand verkauft wird — ein Knopf,
+  der zahlungspflichtig bestellt, zieht die Button-Lösung (§ 312j Abs. 3 BGB),
+  die Widerrufsbelehrung und den Kündigungsbutton (§ 312k BGB) nach sich. Das
+  kommt zusammen mit dem Zahlungsanbieter, nicht halb.
+- **`PremiumSchranke`** als Layout-Route vor den Werkzeug-Seiten. Bewusst
+  **keine Weiterleitung**: die Adresse bleibt stehen, der Nutzer sieht, worauf
+  er geklickt hat.
+- Werkzeug-Einträge bleiben **sichtbar** (anders als bei fehlenden Werkzeugen):
+  wer nicht sieht, was er kaufen könnte, kauft es nicht. Der Knopf „Reel
+  erstellen" verschwindet dagegen — er würde ins Leere fassen.
+- Das hartkodierte „Free Plan" in der Sidebar ist jetzt echte Auskunft.
+
+Zwei Fehler, die erst der Browser-Test gezeigt hat:
+
+1. **`require_premium` hing an keiner einzigen Route.** Die Schranke in der
+   Oberfläche war damit reine Deko — ein `fetch` wäre durchgegangen. Jetzt
+   angehängt und mit einer Liste in `tests/test_abo.py` festgenagelt, die
+   jede der zehn Routen einzeln prüft (402 **vor** der Eingabeprüfung, sonst
+   verrät ein 422, dass die Route gearbeitet hätte).
+2. **`/auth/login` und `/auth/register` lieferten das Nutzer-Objekt ohne
+   Abo-Felder.** Direkt nach dem Anmelden stand deshalb „NaN €" auf der
+   Premium-Seite. `public_user()` liefert den Abo-Zustand jetzt überall mit.
+
 ## Fahrplan (die große Linie, mit dem Besitzer abgestimmt)
 
 Ziel: aus dem Werkzeug wird eine **Plattform für Independent-Musiker** —

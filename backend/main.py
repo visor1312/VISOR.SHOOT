@@ -150,9 +150,28 @@ def require_tools() -> None:
         )
 
 
+# Bezahlschranke - die Regel, nach der unten die Abhaengigkeiten gewaehlt sind:
+#
+#   ARBEIT KOSTET -> Depends(auth.require_premium), 402:
+#     alle POST-Routen, die etwas anlegen oder rechnen lassen - Projekte,
+#     Takes, Sync, Hook-Analyse, Wizard, Wochen-Content, Canvas.
+#
+#   LESEN UND HERUNTERLADEN BLEIBT OFFEN -> Depends(auth.get_current_user):
+#     Listen, Detailansichten, Downloads. Wessen Abo auslaeuft, kommt weiter
+#     an das, was er waehrend der bezahlten Zeit erzeugt hat. Alles andere
+#     hiesse, ihm bezahlte Ergebnisse wegzunehmen.
+#
+#   AUCH OFFEN: der /render-Vertrag weiter unten. Laeuft ein Abo aus, waehrend
+#     der Agent noch rendert, muss das fertige Video trotzdem ankommen - sonst
+#     geht bezahlte Arbeit verloren.
+#
+# Die Oberflaeche hat dieselbe Schranke (web/src/components/PremiumSchranke),
+# aber die ist nur Hoeflichkeit. Verlassen kann man sich auf diese hier.
+
+
 @app.post("/projects")
 def create_project(name: str = Form(...), song: UploadFile = File(...),
-                   user: dict = Depends(auth.get_current_user)):
+                   user: dict = Depends(auth.require_premium)):
     require_tools()
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
     project_id = db.create_project(name=name, song_path="", user_id=user["id"])
@@ -173,7 +192,7 @@ def list_projects(user: dict = Depends(auth.get_current_user)):
 
 @app.post("/projects/{project_id}/takes")
 def create_take(project_id: str, video: UploadFile = File(...), original_audio_mode: str = Form("mute"),
-                user: dict = Depends(auth.get_current_user)):
+                user: dict = Depends(auth.require_premium)):
     require_tools()
     _own(db.get_project(project_id), user)
     if original_audio_mode not in ("mute", "background"):
@@ -274,7 +293,7 @@ def sync_take(
     preset: str = Form("clean"),
     subtitles: bool = Form(False),
     language: str = Form("de"),
-    user: dict = Depends(auth.get_current_user),
+    user: dict = Depends(auth.require_premium),
 ):
     require_tools()
     _own(db.get_project(project_id), user)
@@ -340,7 +359,7 @@ def _run_hook_job(job_id: str) -> None:
 
 @app.post("/hooks/analyze")
 def analyze_hook(background_tasks: BackgroundTasks, song: UploadFile = File(...),
-                 user: dict = Depends(auth.get_current_user)):
+                 user: dict = Depends(auth.require_premium)):
     require_tools()
     suffix = Path(song.filename or "song.wav").suffix or ".wav"
     job_id = db.create_hook_job(song_path="", user_id=user["id"])
@@ -450,7 +469,7 @@ def editor_analyze(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     song: UploadFile = File(...),
-    user: dict = Depends(auth.get_current_user),
+    user: dict = Depends(auth.require_premium),
 ):
     require_tools()
     video_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
@@ -499,7 +518,7 @@ def _run_edit_analyze(job_id: str) -> None:
 @app.post("/edit/analyze")
 def edit_analyze(background_tasks: BackgroundTasks, video: UploadFile = File(...),
                  song: UploadFile = File(...), with_subtitles: str = Form("false"),
-                 lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
+                 lyrics: str = Form(""), user: dict = Depends(auth.require_premium)):
     require_tools()
     v_suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     s_suffix = Path(song.filename or "song.wav").suffix or ".wav"
@@ -536,7 +555,7 @@ def _run_edit_hook(job_id: str) -> None:
 
 @app.post("/edit/{job_id}/hook")
 def edit_hook(job_id: str, background_tasks: BackgroundTasks,
-              user: dict = Depends(auth.get_current_user)):
+              user: dict = Depends(auth.require_premium)):
     require_tools()
     _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="hooking")
@@ -622,7 +641,7 @@ def _run_edit_render(job_id: str, style_key: str, use_hook: bool, beat_effects: 
 def edit_render(job_id: str, background_tasks: BackgroundTasks,
                 style: str = Form(...), use_hook: str = Form("false"),
                 beat_effects: str = Form("false"), platforms: str = Form("reel"),
-                user: dict = Depends(auth.get_current_user)):
+                user: dict = Depends(auth.require_premium)):
     require_tools()
     _own(db.get_edit_job(job_id), user)
     db.update_edit_job(job_id, status="rendering")
@@ -800,7 +819,7 @@ def create_pack(background_tasks: BackgroundTasks, video: UploadFile = File(...)
                 song: UploadFile = File(...), styles: str = Form("clean"),
                 hook_count: int = Form(2), platforms: str = Form("reel"),
                 beat_effects: str = Form("false"), with_subtitles: str = Form("false"),
-                lyrics: str = Form(""), user: dict = Depends(auth.get_current_user)):
+                lyrics: str = Form(""), user: dict = Depends(auth.require_premium)):
     require_tools()
     from backend.pipeline.content_pack import MAX_PACK_ITEMS
     from backend.pipeline.platforms import parse_platform_keys
@@ -1019,7 +1038,7 @@ def _run_canvas_job(job_id: str, use_hook: bool) -> None:
 def create_canvas(background_tasks: BackgroundTasks, video: UploadFile = File(...),
                   song: UploadFile = File(...), style: str = Form("clean"),
                   duration_sec: float = Form(6.0), use_hook: str = Form("true"),
-                  user: dict = Depends(auth.get_current_user)):
+                  user: dict = Depends(auth.require_premium)):
     require_tools()
     from backend.pipeline.content_pack import clamp_canvas_duration
     from backend.pipeline.styles import STYLES

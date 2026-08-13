@@ -14,6 +14,10 @@ export interface AppContext {
    *  Chrome/WebGPU) - dann verschwinden sie aus der Navigation und der Feed
    *  ist die Startseite. Kommt aus GET /auth/config. */
   toolsEnabled: boolean;
+  /** Kosten die Werkzeuge auf diesem Server ein Abo? Lokal nein, online ja.
+   *  Kommt aus GET /auth/config. Ob der angemeldete Nutzer eins HAT, steht
+   *  in user.premium. */
+  premiumRequired: boolean;
 }
 
 export function useApp(): AppContext {

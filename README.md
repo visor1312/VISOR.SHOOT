@@ -162,6 +162,12 @@ Gut zu wissen:
   Kulanzfälle nützlich. Von Hand vergebene Abos stehen in der Liste als
   „von Hand".
 
+**Was Premium sperrt und was nicht:** Bezahlt wird die *Arbeit* — ein Projekt
+anlegen, synchronisieren, analysieren, rendern. **Lesen und Herunterladen
+bleiben offen.** Wenn ein Abo ausläuft, kommt der Nutzer weiterhin an alles,
+was er in der bezahlten Zeit erzeugt hat. Alles andere hieße, ihm bezahlte
+Ergebnisse wegzunehmen.
+
 Dasselbe auf der Kommandozeile:
 
 ```bash

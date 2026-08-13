@@ -12,6 +12,7 @@ import pytest
 from fastapi import HTTPException
 
 from backend import abo, admin, auth, config, db
+from tests.conftest import TEST_PASSWORD
 
 
 def _iso(dt: datetime) -> str:
@@ -219,6 +220,19 @@ def test_me_liefert_abo_zustand(auth_client):
     assert me["preis_cent"] == abo.PLAN_PREIS_CENT
 
 
+def test_registrierung_und_login_liefern_dasselbe_wie_me(auth_client):
+    """War ein Fehler: /auth/register und /auth/login lieferten das
+    Nutzer-Objekt OHNE Abo-Felder. Die Oberflaeche zeigte direkt nach dem
+    Anmelden deshalb "NaN €" - bis zum naechsten Neuladen."""
+    me = set(auth_client.get("/auth/me").json())
+    ein = auth_client.post("/auth/login", json={
+        "email": auth_client.user_email, "password": TEST_PASSWORD}).json()
+    assert set(ein) == me
+    # Auch nach einer Namensaenderung darf nichts fehlen.
+    neu = auth_client.patch("/auth/me", json={"display_name": "Neuer Name"}).json()
+    assert set(neu) == me
+
+
 def test_me_zeigt_freigeschaltetes_abo(auth_client):
     db.set_subscription(auth_client.user["id"], status="active", plan="premium",
                         period_end=_iso(datetime.now(timezone.utc) + timedelta(days=30)))
@@ -265,6 +279,64 @@ def test_lokal_sperrt_premium_niemanden_aus(auth_client):
 def test_config_sagt_ob_premium_noetig_ist(client):
     c = client.get("/auth/config").json()
     assert c["premium_required"] is False
+
+
+# --- Die Schranke haengt auch wirklich an den Routen ----------------------
+#
+# Genau das fehlte beim ersten Anlauf: require_premium existierte, war aber an
+# keiner Route angehaengt. Die Bezahlschranke in der Oberflaeche war damit
+# reine Deko - ein Aufruf per fetch waere durchgegangen.
+
+# (Route, Methode) - alles, was Arbeit ausloest. Bewusst hier als feste Liste
+# und nicht aus der App abgeleitet: eine neue Werkzeug-Route soll auffallen,
+# nicht sich selbst durchwinken.
+ARBEITS_ROUTEN = [
+    ("POST", "/projects"),
+    ("POST", "/projects/x/takes"),
+    ("POST", "/projects/x/takes/y/sync"),
+    ("POST", "/hooks/analyze"),
+    ("POST", "/editor/analyze"),
+    ("POST", "/edit/analyze"),
+    ("POST", "/edit/x/hook"),
+    ("POST", "/edit/x/render"),
+    ("POST", "/packs"),
+    ("POST", "/canvas"),
+]
+
+
+@pytest.mark.parametrize("methode,pfad", ARBEITS_ROUTEN)
+def test_arbeit_kostet_ein_abo(auth_client, monkeypatch, methode, pfad):
+    monkeypatch.setattr(config, "PREMIUM_REQUIRED", True)
+    r = auth_client.request(methode, pfad)
+    # 402 muss VOR der Eingabepruefung kommen: sonst verraet ein 422, dass die
+    # Route ueberhaupt gearbeitet haette.
+    assert r.status_code == 402, f"{methode} {pfad} antwortet {r.status_code}"
+
+
+@pytest.mark.parametrize("methode,pfad", ARBEITS_ROUTEN)
+def test_mit_abo_greift_die_bezahlschranke_nicht_mehr(auth_client, monkeypatch,
+                                                      methode, pfad):
+    monkeypatch.setattr(config, "PREMIUM_REQUIRED", True)
+    db.set_subscription(auth_client.user["id"], status="active", plan="premium",
+                        period_end=_iso(datetime.now(timezone.utc) + timedelta(days=30)))
+    r = auth_client.request(methode, pfad)
+    assert r.status_code != 402, f"{methode} {pfad} sperrt trotz Abo"
+
+
+# Lesen und Herunterladen bleibt offen: wessen Abo auslaeuft, kommt weiter an
+# das, was er waehrend der bezahlten Zeit erzeugt hat.
+@pytest.mark.parametrize("pfad", ["/projects", "/edit", "/packs", "/canvas"])
+def test_lesen_bleibt_ohne_abo_erlaubt(auth_client, monkeypatch, pfad):
+    monkeypatch.setattr(config, "PREMIUM_REQUIRED", True)
+    r = auth_client.get(pfad)
+    assert r.status_code == 200, f"GET {pfad} antwortet {r.status_code}"
+
+
+def test_render_vertrag_bleibt_ohne_abo_erreichbar(auth_client, monkeypatch):
+    """Laeuft ein Abo aus, waehrend der Agent noch rendert, muss das fertige
+    Video trotzdem ankommen - sonst geht bezahlte Arbeit verloren."""
+    monkeypatch.setattr(config, "PREMIUM_REQUIRED", True)
+    assert auth_client.get("/render/pending").status_code == 200
 
 
 def test_konto_loeschen_raeumt_das_abo_weg(auth_client):

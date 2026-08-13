@@ -18,6 +18,7 @@ import {
   UserCircle,
   Settings,
   LogOut,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import type { User } from "../api";
@@ -44,6 +45,11 @@ const mainNav: NavItem[] = [
   // Netzwerk-Feed gibt. Hier liegen die EIGENEN Aufnahme-Projekte.
   { label: "Meine Aufnahmen", icon: FolderOpen, to: "/projekte", werkzeug: true },
 ];
+
+// Steht nur in der Navigation, solange kein Abo laeuft - wer bezahlt hat,
+// braucht keine Werbung mehr. Erreichbar bleibt /premium trotzdem (ueber die
+// Einstellungen), damit man Laufzeit und Leistungen nachsehen kann.
+const premiumNav: NavItem = { label: "HOOKCUT Premium", icon: Sparkles, to: "/premium" };
 
 const analyticsNav: NavItem[] = [
   { label: "Spotify Streaming Dashboard", icon: TrendingUp, to: "/spotify", soon: true },
@@ -95,6 +101,14 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
+/** Die Zeile unter dem Namen. "Admin" schlaegt alles - wer das Ding
+ *  betreibt, will das sehen und nicht seinen Tarif. */
+function planLabel(user: User): string {
+  if (user.is_admin) return "Admin";
+  if (!user.premium) return "Kostenlos";
+  return user.premium_status === "canceled" ? "Premium (gekündigt)" : "Premium";
+}
+
 /** Initialen aus dem Anzeigenamen (max. 2 Woerter), fuer den Avatar. */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
@@ -107,16 +121,26 @@ export default function Sidebar({
   onLogout,
   onOpenWizard,
   toolsEnabled,
+  premiumRequired,
+  darfRendern,
 }: {
   user: User;
   onLogout: () => void;
   onOpenWizard: () => void;
   toolsEnabled: boolean;
+  premiumRequired: boolean;
+  /** Werkzeuge vorhanden UND (falls noetig) bezahlt. */
+  darfRendern: boolean;
 }) {
   // Online (kein Chrome/WebGPU) fliegen die Werkzeug-Eintraege raus. Ein
   // sichtbarer Knopf, der nur einen Fehler erzeugt, waere schlimmer als gar
   // kein Knopf - besonders als erster Eindruck.
   const hauptNav = toolsEnabled ? mainNav : mainNav.filter((i) => !i.werkzeug);
+  // Ohne Abo bleiben die Werkzeug-Eintraege SICHTBAR (anders als ohne
+  // Werkzeuge): dahinter steht dann die Bezahlschranke, die erklaert, was es
+  // ist und was es kostet. Wer nicht sehen kann, was er kaufen koennte,
+  // kauft es auch nicht.
+  const zeigePremium = premiumRequired && !user.premium;
   return (
     <aside className="w-64 shrink-0 h-screen sticky top-0 bg-ink-900 border-r border-ink-700 flex flex-col">
       {/* Logo */}
@@ -133,7 +157,7 @@ export default function Sidebar({
             <NavRow key={i.to} item={i} />
           ))}
           {/* "Reel erstellen" oeffnet den Assistenten als Overlay (keine Route). */}
-          {toolsEnabled && (
+          {darfRendern && (
           <button
             onClick={onOpenWizard}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted hover:text-white hover:bg-ink-800 transition-colors"
@@ -142,6 +166,7 @@ export default function Sidebar({
             Reel erstellen
           </button>
           )}
+          {zeigePremium && <NavRow item={premiumNav} />}
         </div>
 
         <SectionLabel>Analytics</SectionLabel>
@@ -180,7 +205,9 @@ export default function Sidebar({
             <p className="text-sm font-medium truncate group-hover:text-brand-400 transition-colors">
               {user.display_name}
             </p>
-            <p className="text-xs text-muted">{user.is_admin ? "Admin" : "Free Plan"}</p>
+            {/* Frueher stand hier hartkodiert "Free Plan". Jetzt ist es
+                echte Auskunft: was der Server ueber dieses Konto sagt. */}
+            <p className="text-xs text-muted">{planLabel(user)}</p>
           </div>
         </NavLink>
         <NavLink to="/einstellungen" title="Einstellungen"

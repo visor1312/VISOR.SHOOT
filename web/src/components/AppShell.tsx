@@ -14,11 +14,13 @@ export default function AppShell({
   setUser,
   onLogout,
   toolsEnabled,
+  premiumRequired,
 }: {
   user: User;
   setUser: (user: User) => void;
   onLogout: () => void;
   toolsEnabled: boolean;
+  premiumRequired: boolean;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -34,11 +36,17 @@ export default function AppShell({
     openWizard: () => setWizardOpen(true),
     refreshKey,
     toolsEnabled,
+    premiumRequired,
   };
+
+  // Ohne Abo gaebe es nur eine Bezahlschranke statt des Assistenten - dann
+  // ist es ehrlicher, den Knopf gar nicht erst anzubieten.
+  const darfRendern = toolsEnabled && (!premiumRequired || user.premium);
 
   return (
     <div className="flex min-h-screen bg-ink-950 text-white">
       <Sidebar user={user} onLogout={onLogout} toolsEnabled={toolsEnabled}
+        premiumRequired={premiumRequired} darfRendern={darfRendern}
         onOpenWizard={() => setWizardOpen(true)} />
       {/* Spalte statt direktem Outlet: die Seite waechst oben (flex-1 auf
           <main>), die Fusszeile mit Impressum und Datenschutz sitzt darunter -
@@ -48,7 +56,7 @@ export default function AppShell({
         <Footer />
       </div>
       {/* Der Assistent existiert nur dort, wo auch gerendert werden kann. */}
-      {wizardOpen && toolsEnabled && <CreateReelWizard onClose={closeWizard} />}
+      {wizardOpen && darfRendern && <CreateReelWizard onClose={closeWizard} />}
     </div>
   );
 }

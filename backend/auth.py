@@ -301,12 +301,20 @@ def check_login(email: str, password: str,
 
 
 def public_user(user: dict) -> dict:
-    """Nur die Felder, die das Frontend sehen darf (nie der Passwort-Hash)."""
+    """Nur die Felder, die das Frontend sehen darf (nie der Passwort-Hash).
+
+    Der Abo-Zustand gehoert dazu, und zwar ueberall: /auth/me, /auth/login,
+    /auth/register und PATCH /auth/me liefern dasselbe. Sonst haette die
+    Oberflaeche direkt nach dem Anmelden ein halbes Nutzer-Objekt (kein
+    Preis, kein premium-Feld) und wuerde bis zum naechsten Neuladen falsch
+    anzeigen - genau das ist beim ersten Anlauf passiert.
+    """
     return {"id": user["id"], "email": user["email"],
             "display_name": user["display_name"], "is_admin": bool(user["is_admin"]),
             # Damit die Oberflaeche einen Hinweis zeigen kann, statt den
             # Nutzer erst beim Posten in einen Fehler laufen zu lassen.
-            "email_verified": bool(user.get("email_verified", 1))}
+            "email_verified": bool(user.get("email_verified", 1)),
+            **abo.zustand(user["id"])}
 
 
 # Erlaubte Profil-Links. Bewusst eine feste Liste statt "irgendeine URL":
@@ -486,11 +494,7 @@ def auth_logout(response: Response, hookcut_session: str | None = Cookie(default
 
 @router.get("/me")
 def auth_me(hookcut_session: str | None = Cookie(default=None)):
-    user = get_current_user(hookcut_session)
-    # Der Abo-Zustand kommt hier mit, damit die Oberflaeche die Werkzeuge
-    # gar nicht erst als Knoepfe anbietet, statt den Nutzer beim Klick in
-    # eine Absage laufen zu lassen.
-    return {**public_user(user), **abo.zustand(user["id"])}
+    return public_user(get_current_user(hookcut_session))
 
 
 class UpdateMeBody(BaseModel):

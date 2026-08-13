@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Mic2 } from "lucide-react";
 import AppShell from "./components/AppShell";
+import PremiumSchranke from "./components/PremiumSchranke";
 import Footer from "./components/Footer";
 import AuthScreen from "./components/AuthScreen";
 import DashboardPage from "./pages/DashboardPage";
@@ -21,6 +22,7 @@ import ImpressumPage from "./pages/ImpressumPage";
 import DatenschutzPage from "./pages/DatenschutzPage";
 import AgbPage from "./pages/AgbPage";
 import BestaetigenPage from "./pages/BestaetigenPage";
+import PremiumPage from "./pages/PremiumPage";
 import { getAuthConfig, getMe, logout, setUnauthorizedHandler, type User } from "./api";
 
 type AuthPhase = "loading" | "loggedOut" | "loggedIn";
@@ -32,6 +34,10 @@ function App() {
   // ausgegangen - lokal ist das der Normalfall, und so blitzt beim Start
   // nichts kurz auf und verschwindet wieder.
   const [toolsEnabled, setToolsEnabled] = useState(true);
+  // Kosten die Werkzeuge auf diesem Server ein Abo? Bis die Antwort da ist
+  // "nein" - das ist der lokale Normalfall, und so blitzt keine
+  // Bezahlschranke auf, die gleich wieder verschwindet.
+  const [premiumRequired, setPremiumRequired] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +48,11 @@ function App() {
       setAuthPhase("loggedOut");
     });
     getAuthConfig()
-      .then((c) => !cancelled && setToolsEnabled(c.tools_enabled))
+      .then((c) => {
+        if (cancelled) return;
+        setToolsEnabled(c.tools_enabled);
+        setPremiumRequired(c.premium_required);
+      })
       .catch(() => { /* Standard beibehalten */ });
     getMe()
       .then((u) => {
@@ -109,27 +119,38 @@ function App() {
     );
   }
 
+  // Dieselbe Rechnung wie im AppShell, hier nur fuer die Startseite: die
+  // Werkzeuge muessen vorhanden UND (falls noetig) bezahlt sein.
+  const darfRendern = toolsEnabled && (!premiumRequired || user.premium);
+
   return (
     <Routes>
       <Route element={
         <AppShell user={user} setUser={setUser} onLogout={handleLogout}
-          toolsEnabled={toolsEnabled} />
+          toolsEnabled={toolsEnabled} premiumRequired={premiumRequired} />
       }>
-        {/* Startseite: lokal das Werkzeug-Dashboard, online der Feed. Ohne
-            Werkzeuge waere das Dashboard eine leere Seite mit toten Knoepfen -
-            und genau das ist der erste Eindruck nach dem Anmelden.
+        {/* Startseite: das Werkzeug-Dashboard nur fuer die, die auch rendern
+            koennen - sonst der Feed. Ohne Werkzeuge (oder ohne Abo) waere das
+            Dashboard eine Seite mit toten Knoepfen, und genau das ist der
+            erste Eindruck nach dem Anmelden.
             Bewusst eine Weiterleitung statt derselben Seite unter zwei
             Adressen: so gibt es eine kanonische URL und der Menuepunkt
             "Offene Projekte" ist auch wirklich hervorgehoben. */}
         <Route index element={
-          toolsEnabled ? <DashboardPage /> : <Navigate to="/projekte-feed" replace />
+          darfRendern ? <DashboardPage /> : <Navigate to="/projekte-feed" replace />
         } />
-        <Route path="hook" element={<HookPage />} />
-        <Route path="canvas" element={<CanvasPage />} />
-        <Route path="reels" element={<ReelsPage />} />
-        <Route path="wochen-content" element={<PacksPage />} />
-        <Route path="wochen-content/:id" element={<PackDetailPage />} />
-        <Route path="projekte" element={<ProjektePage />} />
+        {/* Alles, was rendert, liegt hinter der Bezahlschranke. Sie ist nur
+            die Hoeflichkeit - verlassen kann man sich auf den Server
+            (auth.require_premium, 402). */}
+        <Route element={<PremiumSchranke />}>
+          <Route path="hook" element={<HookPage />} />
+          <Route path="canvas" element={<CanvasPage />} />
+          <Route path="reels" element={<ReelsPage />} />
+          <Route path="wochen-content" element={<PacksPage />} />
+          <Route path="wochen-content/:id" element={<PackDetailPage />} />
+          <Route path="projekte" element={<ProjektePage />} />
+        </Route>
+        <Route path="premium" element={<PremiumPage />} />
         <Route path="projekte-feed" element={<FeedPage />} />
         <Route path="projekt/:postId" element={<PostDetailPage />} />
         <Route path="musiker/:handle" element={<ProfilAnsichtPage />} />

@@ -117,6 +117,18 @@ export interface User {
   /** Ist die E-Mail-Adresse bestaetigt? Ohne eingeschaltete Pruefung
    *  immer true - dann gibt es auch keinen Hinweis zu zeigen. */
   email_verified: boolean;
+  /** Laeuft gerade ein Premium-Abo? Entscheidet der Server (backend/abo.py),
+   *  nie das Frontend - hier steht nur das Ergebnis. */
+  premium: boolean;
+  /** Bis wann (ISO). null = unbefristet oder gar kein Abo. */
+  premium_bis: string | null;
+  /** 'active' | 'canceled' | 'expired' | 'past_due', null = nie eins gehabt.
+   *  'canceled' zusammen mit premium=true heisst: gekuendigt, laeuft aus. */
+  premium_status: string | null;
+  plan: string;
+  /** In Cent, damit beim Rechnen nichts gerundet wird. */
+  preis_cent: number;
+  waehrung: string;
 }
 
 /** Bestaetigungslink einloesen. Braucht KEINE Anmeldung - der Link wird oft
@@ -156,6 +168,10 @@ export interface ServerConfig {
   invite_required: boolean;
   /** Laufen hier die Video-Werkzeuge? Auf dem gehosteten Server nicht. */
   tools_enabled: boolean;
+  /** Kosten die Video-Werkzeuge ein Abo? Lokal nein (eigener Rechner,
+   *  eigene Rechenzeit), online ja. Daran erkennt die Oberflaeche, ob sie
+   *  ueberhaupt von Preisen reden soll. */
+  premium_required: boolean;
 }
 
 export async function getAuthConfig(): Promise<ServerConfig> {
