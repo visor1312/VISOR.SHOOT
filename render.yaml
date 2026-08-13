@@ -59,6 +59,11 @@ services:
       # NUR setzen, wenn wirklich ein Proxy davorsteht.
       - key: HOOKCUT_TRUST_PROXY
         value: "1"
+      # Die Video-Werkzeuge kosten hier ein Abo. Lokal steht der Schalter auf
+      # 0 - auf dem eigenen Rechner sind es die eigenen Werkzeuge und die
+      # eigene Rechenzeit, da soll sich niemand selbst aussperren.
+      - key: HOOKCUT_PREMIUM_REQUIRED
+        value: "1"
 
       # --- Daten ----------------------------------------------------------
       # Muss auf die Platte oben zeigen. Die Datenbank landet automatisch

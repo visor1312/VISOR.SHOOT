@@ -79,6 +79,13 @@ INVITE_ONLY: bool = _env_bool("HOOKCUT_INVITE_ONLY", True)
 # Hintergrund-Job zu scheitern.
 TOOLS_ENABLED: bool = _env_bool("HOOKCUT_TOOLS_ENABLED", True)
 
+# Kosten die Video-Werkzeuge ein Abo? Lokal NEIN: das ist der Rechner des
+# Besitzers, seine Werkzeuge, seine Rechenzeit - sich dort selbst
+# auszusperren waere absurd. Online JA (HOOKCUT_PREMIUM_REQUIRED=1), denn
+# dort kostet jeder Auftrag Speicher auf der gemieteten Platte und
+# Rechenzeit auf dem Rechner des Betreibers.
+PREMIUM_REQUIRED: bool = _env_bool("HOOKCUT_PREMIUM_REQUIRED", False)
+
 # Die automatische API-Dokumentation (/docs, /redoc, /openapi.json). Lokal
 # beim Entwickeln nuetzlich, oeffentlich aber eine fertige Landkarte der
 # gesamten Schnittstelle - inklusive der Admin-Routen und aller Parameter.

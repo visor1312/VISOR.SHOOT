@@ -255,6 +255,57 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
   Lokal (`HOOKCUT_LOCAL_RENDER=1`, Default) rendert der In-Process-Worker in
   `_run_content_pack`; beim Hosting (`=0`) bleiben die Items offen und der
   Agent zieht sie über diesen Vertrag ab.
+- **`/render/{item}/result` ist gedeckelt** (200 MB, `backend/uploads.py`).
+  Diese drei Routen haben bewusst **kein** `require_tools()` — sie müssen auch
+  antworten, wenn der Server nicht rendert. Damit sind sie die einzigen
+  Werkzeug-Routen, die online offenstehen, also gilt für sie dieselbe Regel
+  wie für Dateien von Fremden. Läuft die Grenze über, wird die halbe Datei
+  weggeräumt **und** das Item auf `pending` zurückgesetzt (sonst hängt es für
+  immer auf `rendering`).
+
+### Bekannter Befund: der Render-Vertrag ist online noch unerreichbar
+
+`render.yaml` setzt `HOOKCUT_TOOLS_ENABLED=0` → `POST /packs` antwortet mit
+503 (`tests/test_tools_switch.py`) → es entstehen nie `pack_items` →
+`/render/pending` ist immer leer. Dazu fehlen dem schlanken Server die
+Analyse-Pakete (librosa, faster_whisper). **Wird in Phase 3, Schritt 3
+umgebaut:** vom Item-Auftrag zum Pack-Auftrag, damit der Agent auch die
+Analyse übernimmt. Siehe `PHASE-3-PLAN.md`.
+
+## Phase 3: Premium-Abo (August 2026)
+
+Zwei Entscheidungen des Besitzers, hergeleitet in `PHASE-3-PLAN.md`:
+
+1. **Wer rendert: der PC des Betreibers, für alle** (Modell B). Der Kunde
+   installiert nichts — das ist das Argument, das 10 €/Monat trägt. Nadelöhr
+   ist die 5-GB-Platte, nicht die Rechenzeit: Upload-Grenze und automatisches
+   Löschen des Rohmaterials sind deshalb Pflicht, nicht Kür.
+2. **Wer kassiert: Merchant of Record (Paddle)**, nicht Stripe. Kostet ~0,55 €
+   mehr pro Abonnent, erspart dem Betreiber aber die EU-Umsatzsteuer komplett
+   (bei Stripe greift ab 10.000 € EU-Umsatz das One-Stop-Shop-Verfahren).
+
+**Schritt 1 (fertig): Abo-Zustand + Handschalter.**
+
+- **Tabelle `subscriptions`**: eine Zeile pro Konto, kein Verlauf. Status
+  `active` / `canceled` / `expired` / `past_due`; `period_end` `NULL` heißt
+  unbefristet (gibt es nur bei Abos von Hand). Die `provider_*`-Spalten sind
+  für Paddle vorbereitet und bleiben im Handbetrieb leer (`provider = 'hand'`).
+- **`backend/abo.py`**: die Regel, wann ein Abo trägt — bewusst ohne FastAPI
+  und ohne Route. `canceled` trägt **bis** `period_end` weiter (wer kündigt,
+  hat bezahlt). Unlesbares Datum → gilt als abgelaufen, nicht als unbefristet.
+- **`auth.require_premium()`**: **402**, nicht 403. 403 heißt „du darfst
+  nicht", 402 heißt „das kostet" — daran erkennt die Oberfläche, dass sie auf
+  die Premium-Seite schicken soll. Ersetzt `require_tools()` **nicht**: die
+  eine sagt „das kostet", die andere „das läuft hier nicht".
+- **`HOOKCUT_PREMIUM_REQUIRED`** (Default `0`, online `1`): lokal soll sich
+  niemand aus seinen eigenen Werkzeugen aussperren.
+- **`hookcut-abo.bat`** + `abo-geben` / `abo-nehmen` / `abo-liste`: Verkauf
+  von Hand, bevor ein Zahlungsanbieter existiert. Freischalten **verlängert**
+  ab dem bisherigen Ende, statt Resttage zu verschlucken.
+- Nebenbei gefunden und behoben: `delete_user_completely` räumte
+  `email_tokens` nicht weg — wer sein Konto vor der E-Mail-Bestätigung löschte,
+  bekam „FOREIGN KEY constraint failed", also einen 500er ausgerechnet beim
+  Löschrecht (DSGVO Art. 17).
 
 ## Fahrplan (die große Linie, mit dem Besitzer abgestimmt)
 

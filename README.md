@@ -130,6 +130,47 @@ python -m backend.admin list-users                    # alle Konten
 python -m backend.admin reset-password [email]        # Passwort neu setzen
 ```
 
+## Premium-Abo (Handbetrieb)
+
+Die Video-Werkzeuge sind das kostenpflichtige Angebot, das Netzwerk bleibt
+frei. **Auf deinem eigenen Rechner kostet nichts etwas** — dort ist der
+Schalter `HOOKCUT_PREMIUM_REQUIRED` aus, es sind ja deine Werkzeuge und deine
+Rechenzeit. Online steht er auf `1`.
+
+Solange kein Zahlungsanbieter angebunden ist (das ist Schritt 5 aus
+`PHASE-3-PLAN.md`), vergibst du Abos von Hand: Rechnung schicken, Zahlung
+abwarten, freischalten. **`hookcut-abo.bat` doppelklicken** — es erscheint ein
+Menü:
+
+1. Alle Abos anzeigen
+2. Premium freischalten (1 Monat)
+3. Premium freischalten (12 Monate)
+4. Premium unbefristet (für dein eigenes Konto und für Tests)
+5. Premium beenden
+
+Gut zu wissen:
+
+* **Freischalten verlängert, es überschreibt nicht.** Wer früh nachzahlt,
+  verliert seine Resttage nicht — es wird ab dem bisherigen Ende weitergerechnet.
+* **Beenden löscht das Abo nicht**, es setzt es auf „abgelaufen". So bleibt
+  sichtbar, dass jemand mal Kunde war.
+* Ein Monat sind 30 Tage. Bewusst so — „31. Januar plus ein Monat" ist
+  mehrdeutig, 30 Tage sind es nie.
+* Wer kündigt, behält Premium **bis zum Ende der bezahlten Zeit**. Alles
+  andere wäre falsch abgerechnet.
+* Sobald ein Zahlungsanbieter da ist, bleiben diese Befehle für Testkonten und
+  Kulanzfälle nützlich. Von Hand vergebene Abos stehen in der Liste als
+  „von Hand".
+
+Dasselbe auf der Kommandozeile:
+
+```bash
+python -m backend.admin abo-geben [email] --monate 12   # freischalten
+python -m backend.admin abo-geben [email] --unbefristet # ohne Enddatum
+python -m backend.admin abo-nehmen [email]              # sofort beenden
+python -m backend.admin abo-liste                       # alle Abos
+```
+
 ## Setup
 
 ```bash

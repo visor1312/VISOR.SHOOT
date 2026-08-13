@@ -31,7 +31,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from backend import config, db, mailer, storage
+from backend import abo, config, db, mailer, storage
 
 SESSION_COOKIE = "hookcut_session"
 SESSION_TTL = timedelta(days=30)
@@ -427,8 +427,12 @@ def auth_config():
     - tools_enabled:   laufen hier die Video-Werkzeuge? Auf dem gehosteten
       Server nicht (kein Chrome/WebGPU), dann blendet die Oberflaeche sie aus
       und startet auf dem Feed statt auf dem Werkzeug-Dashboard.
+    - premium_required: kosten die Werkzeuge ein Abo? Lokal nein, online ja.
+      Daran erkennt die Oberflaeche, ob sie ueberhaupt von Preisen reden soll.
     """
-    return {"invite_required": config.INVITE_ONLY, "tools_enabled": config.TOOLS_ENABLED}
+    return {"invite_required": config.INVITE_ONLY,
+            "tools_enabled": config.TOOLS_ENABLED,
+            "premium_required": config.PREMIUM_REQUIRED}
 
 
 @router.post("/register")
@@ -482,7 +486,11 @@ def auth_logout(response: Response, hookcut_session: str | None = Cookie(default
 
 @router.get("/me")
 def auth_me(hookcut_session: str | None = Cookie(default=None)):
-    return public_user(get_current_user(hookcut_session))
+    user = get_current_user(hookcut_session)
+    # Der Abo-Zustand kommt hier mit, damit die Oberflaeche die Werkzeuge
+    # gar nicht erst als Knoepfe anbietet, statt den Nutzer beim Klick in
+    # eine Absage laufen zu lassen.
+    return {**public_user(user), **abo.zustand(user["id"])}
 
 
 class UpdateMeBody(BaseModel):
@@ -564,6 +572,32 @@ def require_verified_email(user: dict = Depends(get_current_user)) -> dict:
             403,
             "Bitte bestaetige zuerst deine E-Mail-Adresse. Den Link findest du "
             "in deinem Postfach - unter Einstellungen kannst du ihn neu anfordern.")
+    return user
+
+
+def require_premium(user: dict = Depends(get_current_user)) -> dict:
+    """Fuer die Video-Werkzeuge: nur mit laufendem Abo.
+
+    Bewusst 402 ("Payment Required") und nicht 403: 403 heisst "du darfst
+    das nicht", 402 heisst "das kostet". Die Oberflaeche kann daran erkennen,
+    dass sie auf die Premium-Seite schicken soll und nicht auf eine
+    Fehlermeldung.
+
+    Wichtig zur Reihenfolge: diese Sperre ersetzt NICHT require_tools(). Die
+    eine sagt "das kostet", die andere "das laeuft hier nicht". Beide koennen
+    zutreffen, und beide sagen etwas anderes.
+
+    Lokal (HOOKCUT_PREMIUM_REQUIRED=0, der Standard) laesst sie alles durch:
+    auf dem eigenen Rechner soll sich niemand aus seinen eigenen Werkzeugen
+    aussperren.
+    """
+    if not config.PREMIUM_REQUIRED:
+        return user
+    if not abo.ist_aktiv(db.get_subscription(user["id"])):
+        raise HTTPException(
+            402,
+            "Dafuer brauchst du HOOKCUT Premium. Unter Einstellungen findest "
+            "du, was dazugehoert und was es kostet.")
     return user
 
 

@@ -4,19 +4,29 @@
     python -m backend.admin list-invites
     python -m backend.admin list-users
     python -m backend.admin reset-password [email]
+    python -m backend.admin abo-geben [email] [--monate N | --unbefristet]
+    python -m backend.admin abo-nehmen [email]
+    python -m backend.admin abo-liste
 
 Alles bewusst offline/lokal: Einladungscodes erzeugt der Betreiber selbst,
 und "Passwort vergessen" ist bis zum Hosting (E-Mail-Versand) ein
 Notfall-Reset direkt am Rechner. Alle Funktionen nehmen db_path als
 Keyword, damit die Tests gegen eine Wegwerf-DB laufen koennen.
+
+Die abo-Befehle sind der Handbetrieb, bevor ein Zahlungsanbieter
+angebunden ist: Rechnung per Ueberweisung, Abo hier freischalten. Sobald
+der Anbieter da ist, bleiben sie fuer Testkonten und Kulanz nuetzlich -
+deshalb tragen sie provider = 'hand' ein und sind so von echten Abos
+unterscheidbar.
 """
 from __future__ import annotations
 
 import argparse
 import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from backend import auth, db
+from backend import abo, auth, db
 
 
 def create_invites(count: int = 1, db_path: str | Path = db.DEFAULT_DB_PATH) -> list[str]:
@@ -43,6 +53,92 @@ def reset_password(email: str, new_password: str,
     db.set_user_password_hash(user["id"], auth.hash_password(new_password), db_path=db_path)
     db.delete_sessions_for_user(user["id"], db_path=db_path)
     db.reset_login_failures(user["email"], db_path=db_path)
+
+
+def abo_geben(email: str, monate: int = 1, unbefristet: bool = False,
+              db_path: str | Path = db.DEFAULT_DB_PATH) -> str | None:
+    """Premium von Hand freischalten. Gibt das Enddatum zurueck (None =
+    unbefristet). Wirft ValueError mit deutscher Meldung bei unbekannter
+    E-Mail.
+
+    Verlaengern statt ueberschreiben: laeuft das Abo noch, wird ab dem
+    bisherigen Ende weitergerechnet. Sonst wuerde ein Kunde, der frueh
+    nachzahlt, die Resttage verlieren.
+    """
+    db.init_db(db_path)
+    user = db.get_user_by_email(auth.normalize_email(email), db_path=db_path)
+    if not user:
+        raise ValueError(f"Kein Konto mit der E-Mail-Adresse {email!r} gefunden.")
+
+    ende_iso: str | None = None
+    if not unbefristet:
+        jetzt = datetime.now(timezone.utc)
+        bisher = db.get_subscription(user["id"], db_path=db_path)
+        start = jetzt
+        if abo.ist_aktiv(bisher, jetzt) and bisher.get("period_end"):
+            vorhanden = abo.parse_zeit(bisher["period_end"])
+            if vorhanden and vorhanden > jetzt:
+                start = vorhanden
+        # 30 Tage statt Kalendermonat: nachvollziehbar und ohne Sonderfaelle
+        # am Monatsende (der 31. Januar plus einen Monat ist mehrdeutig).
+        ende_iso = (start + timedelta(days=30 * max(1, monate))).isoformat()
+
+    db.set_subscription(user["id"], status="active", plan=abo.PLAN_KEY,
+                        period_end=ende_iso, provider=abo.PROVIDER_HAND,
+                        db_path=db_path)
+    return ende_iso
+
+
+def abo_nehmen(email: str, db_path: str | Path = db.DEFAULT_DB_PATH) -> None:
+    """Premium sofort beenden. Bewusst 'expired' statt Loeschen: so bleibt
+    sichtbar, dass dieses Konto einmal Kunde war."""
+    db.init_db(db_path)
+    user = db.get_user_by_email(auth.normalize_email(email), db_path=db_path)
+    if not user:
+        raise ValueError(f"Kein Konto mit der E-Mail-Adresse {email!r} gefunden.")
+    if not db.get_subscription(user["id"], db_path=db_path):
+        raise ValueError(f"{email} hat gar kein Abo.")
+    db.set_subscription(user["id"], status="expired", plan=abo.PLAN_KEY,
+                        period_end=datetime.now(timezone.utc).isoformat(),
+                        provider=abo.PROVIDER_HAND, db_path=db_path)
+
+
+def _cmd_abo_geben(args: argparse.Namespace) -> None:
+    email = args.email or input("E-Mail-Adresse des Kontos: ").strip()
+    try:
+        ende = abo_geben(email, monate=args.monate, unbefristet=args.unbefristet)
+    except ValueError as e:
+        print(str(e))
+        return
+    if ende is None:
+        print(f"{email} hat jetzt HOOKCUT Premium - unbefristet.")
+    else:
+        print(f"{email} hat jetzt HOOKCUT Premium bis {ende[:10]}.")
+
+
+def _cmd_abo_nehmen(args: argparse.Namespace) -> None:
+    email = args.email or input("E-Mail-Adresse des Kontos: ").strip()
+    try:
+        abo_nehmen(email)
+    except ValueError as e:
+        print(str(e))
+        return
+    print(f"Das Abo von {email} ist beendet.")
+    print("Achtung: eine laufende Zahlung beim Anbieter wird dadurch NICHT "
+          "gekuendigt - das geht nur dort.")
+
+
+def _cmd_abo_liste(args: argparse.Namespace) -> None:
+    db.init_db()
+    abos = db.list_subscriptions()
+    if not abos:
+        print("Noch keine Abos vergeben.")
+        return
+    for s in abos:
+        laeuft = "laeuft" if abo.ist_aktiv(s) else "beendet"
+        bis = s["period_end"][:10] if s["period_end"] else "unbefristet"
+        quelle = "von Hand" if s["provider"] == abo.PROVIDER_HAND else s["provider"]
+        print(f"  {s['email']}  ({s['display_name']}, {laeuft}, bis {bis}, {quelle})")
 
 
 def _cmd_create_invite(args: argparse.Namespace) -> None:
@@ -110,6 +206,21 @@ def _main() -> None:
     rp = sub.add_parser("reset-password", help="Passwort eines Kontos neu setzen")
     rp.add_argument("email", nargs="?", default=None)
     rp.set_defaults(func=_cmd_reset_password)
+
+    ag = sub.add_parser("abo-geben", help="HOOKCUT Premium freischalten")
+    ag.add_argument("email", nargs="?", default=None)
+    ag.add_argument("--monate", type=int, default=1,
+                    help="Laufzeit in Monaten zu je 30 Tagen (Standard: 1)")
+    ag.add_argument("--unbefristet", action="store_true",
+                    help="Ohne Enddatum - fuer eigene Konten und Tests")
+    ag.set_defaults(func=_cmd_abo_geben)
+
+    an = sub.add_parser("abo-nehmen", help="HOOKCUT Premium sofort beenden")
+    an.add_argument("email", nargs="?", default=None)
+    an.set_defaults(func=_cmd_abo_nehmen)
+
+    al = sub.add_parser("abo-liste", help="Alle Abos anzeigen")
+    al.set_defaults(func=_cmd_abo_liste)
 
     args = p.parse_args()
     args.func(args)

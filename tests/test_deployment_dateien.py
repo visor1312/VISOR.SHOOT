@@ -51,6 +51,8 @@ ONLINE_SCHALTER = {
     # Ohne diesen sperrt die Registrierungs-Bremse alle Nutzer gemeinsam
     # aus, weil hinter dem Proxy jede Anfrage dieselbe Adresse hat.
     "HOOKCUT_TRUST_PROXY": "1",
+    # Ohne diesen waeren die Video-Werkzeuge online umsonst zu haben.
+    "HOOKCUT_PREMIUM_REQUIRED": "1",
 }
 
 

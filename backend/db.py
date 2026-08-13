@@ -238,6 +238,30 @@ CREATE TABLE IF NOT EXISTS email_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id);
 
+-- Premium-Abo. EINE Zeile pro Konto, kein Verlauf: was zaehlt, ist der
+-- aktuelle Zustand. Rechnungshistorie fuehrt der Zahlungsanbieter ohnehin.
+--
+-- Die provider_*-Spalten sind fuer den spaeteren Zahlungsanbieter da und
+-- bleiben bei von Hand vergebenen Abos leer (provider = 'hand'). Dieselbe
+-- Tabelle passt dann fuer beides und muss spaeter nicht umgebaut werden.
+--
+-- status: 'active'   - laeuft
+--         'canceled' - gekuendigt, gilt aber bis period_end weiter
+--         'expired'  - vorbei
+--         'past_due' - Zahlung offen (erst mit dem Zahlungsanbieter relevant)
+-- period_end NULL heisst "unbefristet" - das gibt es nur bei Abos von Hand.
+CREATE TABLE IF NOT EXISTS subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    status TEXT NOT NULL,
+    plan TEXT NOT NULL,
+    period_end TEXT,
+    provider TEXT NOT NULL,
+    provider_customer_id TEXT,
+    provider_subscription_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_categories ON post_categories(category, post_id);
@@ -1415,6 +1439,15 @@ def delete_user_completely(user_id: str,
 
         conn.execute("DELETE FROM profiles WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        # Offener Bestaetigungslink. Fehlte hier - wer sich registriert und
+        # sein Konto loeschte, BEVOR er die E-Mail bestaetigt hat, lief in
+        # "FOREIGN KEY constraint failed" und bekam einen 500er. Ausgerechnet
+        # beim Loeschrecht (DSGVO Art. 17).
+        conn.execute("DELETE FROM email_tokens WHERE user_id = ?", (user_id,))
+        # Abo. Beim Loeschen des Kontos ist es ohnehin vorbei; beim
+        # Zahlungsanbieter muss es getrennt gekuendigt werden - das kann diese
+        # Datenbank nicht, und so tut sie auch nicht so.
+        conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
 
         # Einladungscodes: Verweis loesen, Code bleibt verbraucht.
         conn.execute("UPDATE invite_codes SET used_by = NULL WHERE used_by = ?", (user_id,))
@@ -1511,3 +1544,64 @@ def get_email_token_for_user(user_id: str,
         row = conn.execute("SELECT * FROM email_tokens WHERE user_id = ?",
                            (user_id,)).fetchone()
         return dict(row) if row else None
+
+
+# --- Premium-Abo -----------------------------------------------------------
+
+def get_subscription(user_id: str,
+                     db_path: str | Path = DEFAULT_DB_PATH) -> Optional[dict]:
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?",
+                           (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def set_subscription(user_id: str, status: str, plan: str,
+                     period_end: str | None = None, provider: str = "hand",
+                     provider_customer_id: str | None = None,
+                     provider_subscription_id: str | None = None,
+                     db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    """Abo anlegen oder ueberschreiben (eine Zeile pro Konto).
+
+    Bewusst ein vollstaendiges Setzen statt eines Teil-Updates: der
+    Zahlungsanbieter schickt spaeter bei jedem Ereignis den KOMPLETTEN
+    Zustand. Wer nur einzelne Felder aendert, baut sich Mischzustaende, die es
+    beim Anbieter nie gab.
+
+    created_at bleibt beim Ueberschreiben erhalten - wann jemand das erste Mal
+    Kunde wurde, soll eine Verlaengerung nicht loeschen.
+    """
+    jetzt = _now()
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO subscriptions (user_id, status, plan, period_end, provider, "
+            "    provider_customer_id, provider_subscription_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET "
+            "    status = excluded.status, plan = excluded.plan, "
+            "    period_end = excluded.period_end, provider = excluded.provider, "
+            "    provider_customer_id = excluded.provider_customer_id, "
+            "    provider_subscription_id = excluded.provider_subscription_id, "
+            "    updated_at = excluded.updated_at",
+            (user_id, status, plan, period_end, provider, provider_customer_id,
+             provider_subscription_id, jetzt, jetzt))
+
+
+def delete_subscription(user_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    """Abo restlos entfernen. Fuer den Handbetrieb: "war ein Versehen".
+    Fuers normale Beenden ist set_subscription(status='expired') richtig -
+    das laesst sichtbar, dass jemand mal Kunde war."""
+    with _connect(db_path) as conn:
+        cur = conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
+        return cur.rowcount > 0
+
+
+def list_subscriptions(db_path: str | Path = DEFAULT_DB_PATH) -> list[dict]:
+    """Alle Abos mit Name und E-Mail des Kontos - fuer die Uebersicht im
+    Handbetrieb. Neueste Aenderung zuerst."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT s.*, u.email, u.display_name FROM subscriptions s "
+            "JOIN users u ON u.id = s.user_id "
+            "ORDER BY s.updated_at DESC").fetchall()
+        return [dict(r) for r in rows]
