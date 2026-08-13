@@ -20,7 +20,8 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend import auth, betreiber, config, db, network, storage
+from backend import auth, betreiber, config, db, network, storage, uploads
+from backend.uploads import UploadTooLarge, save_upload_capped
 from backend.pipeline.extract_audio import extract_audio
 from backend.pipeline.presets import PRESETS, apply_preset, preset_catalog, preset_is_noop
 from backend.pipeline.render_sync import _probe_duration_sec, render_synced_video
@@ -110,6 +111,10 @@ def betreiber_daten():
 
 
 def _save_upload(upload: UploadFile, dest: Path) -> Path:
+    """Ungedeckelt - bewusst. Hier laedt der Besitzer seine EIGENEN Rohvideos
+    auf seinen EIGENEN Rechner; ein 4K-Take hat schnell mehrere Gigabyte, eine
+    Obergrenze waere hier nur im Weg. Alle Routen, die auch ONLINE erreichbar
+    sind, benutzen stattdessen save_upload_capped() aus backend/uploads.py."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("wb") as f:
         shutil.copyfileobj(upload.file, f)
@@ -870,6 +875,18 @@ def download_pack_item(pack_id: str, idx: int, user: dict = Depends(auth.get_cur
 # selbst. Beim Hosting (HOOKCUT_LOCAL_RENDER=0) bleiben die pack_items 'pending'
 # und ein lokaler Render-Agent zieht sie hierueber ab: pending -> claim ->
 # rendern -> result. So ist "Job anlegen" (Cloud) von "rendern" (lokal) getrennt.
+#
+# ACHTUNG: Diese drei Routen haben bewusst KEIN require_tools(). Sie muessen
+# auch dann antworten, wenn der Server selbst gar nicht rendert - das ist der
+# ganze Sinn des Hybrid-Modells. Damit sind sie aber die einzigen
+# Werkzeug-Routen, die online offenstehen: alles, was hier hereinkommt, wird
+# behandelt wie eine Datei von fremd (gedeckelt, siehe unten).
+
+# Ein fertiges Item ist ein kurzer Clip (Hook-Fenster, 9:16). Selbst 60
+# Sekunden in hoher Bitrate bleiben weit unter 200 MB - das laesst jedes echte
+# Ergebnis durch und stoppt den Versuch, die gemietete Platte vollzuschreiben.
+RENDER_RESULT_MAX_BYTES = 200 * 1024 * 1024
+
 
 def _own_pack_item(item_id: str, user: dict) -> tuple[dict, dict]:
     item = db.get_pack_item(item_id)
@@ -918,7 +935,17 @@ def render_result(item_id: str, video: UploadFile = File(...),
                   user: dict = Depends(auth.get_current_user)):
     pack, item = _own_pack_item(item_id, user)
     out = storage.pack_item_output_path(pack["id"], item["idx"])
-    _save_upload(video, out)
+    try:
+        save_upload_capped(video, out, RENDER_RESULT_MAX_BYTES)
+    except UploadTooLarge:
+        # Der Job bleibt NICHT auf 'rendering' haengen - sonst waere er fuer
+        # den Agenten fuer immer blockiert. Zurueck auf offen, mit Grund.
+        db.update_pack_item(
+            item_id, status="pending",
+            error=f"Ergebnis zu gross (max. {uploads.mb(RENDER_RESULT_MAX_BYTES)} MB)")
+        raise HTTPException(
+            413, f"Das gerenderte Video ist zu groß (max. "
+                 f"{uploads.mb(RENDER_RESULT_MAX_BYTES)} MB).")
     db.update_pack_item(item_id, status="done", output_path=str(out), error=None)
     # Pack als fertig markieren, sobald kein Item mehr offen/rendert.
     items = db.list_pack_items(pack["id"])

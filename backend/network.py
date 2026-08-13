@@ -22,38 +22,15 @@ from fastapi.responses import FileResponse
 
 from backend import auth, db, storage
 from backend.pipeline.render_sync import _probe_duration_sec
+from backend.uploads import UploadTooLarge, save_upload_capped
 
 router = APIRouter()
 
-
-class UploadTooLarge(Exception):
-    pass
-
-
-def _save_upload_capped(upload: UploadFile, dest: Path, max_bytes: int) -> Path:
-    """Datei mit harter Obergrenze speichern.
-
-    Das _save_upload() in main.py schreibt stumpf alles auf die Platte - fuer
-    die lokalen Werkzeug-Flows in Ordnung, fuer Dateien von FREMDEN aber ein
-    Fuell-die-Platte-Risiko. Hier wird blockweise kopiert und beim
-    Ueberschreiten sofort abgebrochen; die halbe Datei wird weggeraeumt.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    geschrieben = 0
-    try:
-        with dest.open("wb") as f:
-            while True:
-                block = upload.file.read(64 * 1024)
-                if not block:
-                    break
-                geschrieben += len(block)
-                if geschrieben > max_bytes:
-                    raise UploadTooLarge()
-                f.write(block)
-    except UploadTooLarge:
-        dest.unlink(missing_ok=True)
-        raise
-    return dest
+# Der gedeckelte Schreiber stand frueher hier. Er liegt jetzt in
+# backend/uploads.py, weil ihn auch der Render-Vertrag in main.py braucht -
+# der ist naemlich ebenfalls online erreichbar. Der alte Name bleibt als
+# Abkuerzung erhalten, damit die Aufrufe unten lesbar bleiben.
+_save_upload_capped = save_upload_capped
 
 
 def _own_public(row: dict | None, user: dict, was: str = "Beitrag") -> dict:

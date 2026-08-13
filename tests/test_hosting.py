@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from backend import config, db
+from backend import config, db, main, storage
 
 PROJEKT = Path(__file__).resolve().parent.parent
 
@@ -139,6 +139,33 @@ def test_render_claim_then_result_completes_pack(auth_client):
     assert detail["items"][0]["status"] == "done" and detail["items"][0]["ready"] is True
     # Download klappt jetzt
     assert auth_client.get(f"/packs/{pack_id}/items/0/download").status_code == 200
+
+
+def test_render_result_ist_gedeckelt(auth_client, monkeypatch):
+    """Die drei /render-Routen sind bewusst auch ohne Werkzeuge erreichbar -
+    also online. Ein ungedeckelter Upload waere damit ein offenes Scheunentor
+    auf die gemietete Festplatte. Grenze hier klein gedreht, damit der Test
+    nicht 200 MB durch den Speicher schiebt."""
+    monkeypatch.setattr(main, "RENDER_RESULT_MAX_BYTES", 1024)
+    _pack_id, item_id = _pending_pack(auth_client.user["id"])
+    auth_client.post(f"/render/{item_id}/claim")
+
+    zu_gross = b"x" * 5000
+    r = auth_client.post(f"/render/{item_id}/result",
+                         files={"video": ("out.mp4", zu_gross, "video/mp4")})
+    assert r.status_code == 413
+    # Die halbe Datei darf nicht liegenbleiben ...
+    assert not storage.pack_item_output_path(_pack_id, 0).exists()
+    # ... und das Item darf nicht auf 'rendering' festhaengen, sonst holt es
+    # der Agent nie wieder ab.
+    item = db.get_pack_item(item_id)
+    assert item["status"] == "pending" and "zu gross" in item["error"]
+
+    # Knapp unter der Grenze geht weiterhin durch.
+    ok = auth_client.post(f"/render/{item_id}/result",
+                          files={"video": ("out.mp4", b"y" * 900, "video/mp4")})
+    assert ok.status_code == 200
+    assert db.get_pack_item(item_id)["status"] == "done"
 
 
 def test_render_item_ownership(auth_client, second_auth_client):
