@@ -119,30 +119,29 @@ function App() {
     );
   }
 
-  // Dieselbe Rechnung wie im AppShell, hier nur fuer die Startseite: die
-  // Werkzeuge muessen vorhanden UND (falls noetig) bezahlt sein.
-  const darfRendern = toolsEnabled && (!premiumRequired || user.premium);
-
   return (
     <Routes>
       <Route element={
         <AppShell user={user} setUser={setUser} onLogout={handleLogout}
           toolsEnabled={toolsEnabled} premiumRequired={premiumRequired} />
       }>
-        {/* Startseite: das Werkzeug-Dashboard nur fuer die, die auch rendern
-            koennen - sonst der Feed. Ohne Werkzeuge (oder ohne Abo) waere das
-            Dashboard eine Seite mit toten Knoepfen, und genau das ist der
-            erste Eindruck nach dem Anmelden.
+        {/* Startseite ist IMMER der Feed - fuer alle, lokal wie online.
+            Wer HOOKCUT aufmacht, soll zuerst sehen, was in der Szene los
+            ist, und nicht seine eigene Werkbank. Das Dashboard hat eine
+            eigene Adresse.
             Bewusst eine Weiterleitung statt derselben Seite unter zwei
             Adressen: so gibt es eine kanonische URL und der Menuepunkt
             "Offene Projekte" ist auch wirklich hervorgehoben. */}
-        <Route index element={
-          darfRendern ? <DashboardPage /> : <Navigate to="/projekte-feed" replace />
-        } />
+        <Route index element={<Navigate to="/projekte-feed" replace />} />
         {/* Alles, was rendert, liegt hinter der Bezahlschranke. Sie ist nur
             die Hoeflichkeit - verlassen kann man sich auf den Server
             (auth.require_premium, 402). */}
         <Route element={<PremiumSchranke />}>
+          {/* Ohne Werkzeuge waere das Dashboard eine Seite mit toten
+              Knoepfen - dann lieber zurueck zum Feed. */}
+          <Route path="dashboard" element={
+            toolsEnabled ? <DashboardPage /> : <Navigate to="/projekte-feed" replace />
+          } />
           <Route path="hook" element={<HookPage />} />
           <Route path="canvas" element={<CanvasPage />} />
           <Route path="reels" element={<ReelsPage />} />

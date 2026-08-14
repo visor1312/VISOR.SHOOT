@@ -34,8 +34,11 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/", werkzeug: true },
+  // Der Feed steht oben und ist die Startseite. Das Werkzeug-Dashboard hat
+  // eine eigene Adresse (/dashboard) - wer HOOKCUT aufmacht, soll zuerst
+  // sehen, was in der Szene los ist, und nicht seine eigene Werkbank.
   { label: "Offene Projekte", icon: Users2, to: "/projekte-feed" },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", werkzeug: true },
   { label: "Mein Profil", icon: UserCircle, to: "/profil" },
   { label: "Hook Generator", icon: Zap, to: "/hook", werkzeug: true },
   { label: "Spotify Canvas", icon: Film, to: "/canvas", werkzeug: true },

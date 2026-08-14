@@ -20,9 +20,10 @@ echo.
 echo   Dein eigenes Konto hat noch KEINS - du siehst also gleich
 echo   genau das, was ein neuer Nutzer ohne Abo sieht:
 echo.
-echo     - Startseite ist der Feed, nicht das Dashboard
 echo     - "Wochen-Content" zeigt die Bezahlschranke
+echo     - "Dashboard" zeigt die Bezahlschranke
 echo     - in der Seitenleiste steht "Kostenlos"
+echo     - der Knopf "Reel erstellen" fehlt
 echo.
 echo   Willst du danach wieder durchkommen: hookcut-abo.bat
 echo   doppelklicken, Punkt 4 (unbefristet), deine E-Mail eingeben,

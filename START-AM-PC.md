@@ -37,8 +37,11 @@ unangetastet.
 Rechner kostet nichts etwas: es sind deine Werkzeuge und deine Rechenzeit.
 Die Bezahlschranke ist lokal **aus** (`HOOKCUT_PREMIUM_REQUIRED=0`).
 
-Sichtbar geändert hat sich nur Kleinkram:
+Sichtbar geändert hat sich:
 
+* **Die Startseite ist jetzt „Offene Projekte"** (der Feed), nicht mehr das
+  Dashboard. Das Dashboard steht weiterhin in der Seitenleiste und hat eine
+  eigene Adresse (`/dashboard`).
 * In der Seitenleiste stand unter deinem Namen früher hartkodiert „Free Plan".
   Jetzt steht dort, was der Server wirklich über das Konto sagt — bei dir
   „Admin".
@@ -77,8 +80,8 @@ Zwei Dinge, die absichtlich so sind:
 den Einstellungen, die online gelten. Dein Konto hat kein Abo, also siehst du
 das, was ein neuer Nutzer sieht:
 
-* Startseite ist der Feed statt des Dashboards,
-* „Wochen-Content" zeigt die Bezahlschranke statt des Werkzeugs,
+* „Wochen-Content" und „Dashboard" zeigen die Bezahlschranke statt des
+  Werkzeugs,
 * in der Seitenleiste steht „Kostenlos",
 * der Knopf „Reel erstellen" ist weg (er würde ins Leere fassen),
 * die Werkzeug-Einträge bleiben aber **sichtbar** — wer nicht sieht, was er
