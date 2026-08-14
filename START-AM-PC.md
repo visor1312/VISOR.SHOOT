@@ -33,15 +33,23 @@ unangetastet.
 
 ## 2. Was du nach dem Start siehst
 
-**Fast genau das wie vorher** — und das ist Absicht. Auf deinem eigenen
-Rechner kostet nichts etwas: es sind deine Werkzeuge und deine Rechenzeit.
-Die Bezahlschranke ist lokal **aus** (`HOOKCUT_PREMIUM_REQUIRED=0`).
+Auf deinem eigenen Rechner kostet weiterhin nichts etwas: es sind deine
+Werkzeuge und deine Rechenzeit. Die Bezahlschranke ist lokal **aus**
+(`HOOKCUT_PREMIUM_REQUIRED=0`).
 
 Sichtbar geändert hat sich:
 
-* **Die Startseite ist jetzt „Offene Projekte"** (der Feed), nicht mehr das
+* **Alles heißt jetzt selfsign** — Logo, Farben, Name, auch die
+  `.bat`-Dateien (`start-selfsign.bat`, `update-selfsign.bat`, …).
+  Das Logo ist von mir **nachgebaut**; wie du das Original eintauschst,
+  steht in `MARKE.md` (eine Datei ersetzen, sonst nichts).
+* **Die Startseite ist „Offene Projekte"** (der Feed), nicht mehr das
   Dashboard. Das Dashboard steht weiterhin in der Seitenleiste und hat eine
   eigene Adresse (`/dashboard`).
+* **Das Dashboard heißt „Deine Sachen"** und ist jetzt eine einzige Liste:
+  alles, was du erstellt hast — Reels, Wochen-Content, Canvas,
+  Hook-Analysen, Aufnahmen — neueste zuerst, mit Status und Download.
+  Die Zahlen-Kacheln sind weg; sie haben nie etwas gesagt.
 * In der Seitenleiste stand unter deinem Namen früher hartkodiert „Free Plan".
   Jetzt steht dort, was der Server wirklich über das Konto sagt — bei dir
   „Admin".

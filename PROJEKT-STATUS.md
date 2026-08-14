@@ -41,7 +41,7 @@ web/      React-Dashboard (Vite, Port 5173, /api-Proxy → 8000)
           → react-router: main.tsx BrowserRouter, App.tsx rendert eingeloggt
             die Routen in components/AppShell.tsx (Sidebar + <Outlet/>,
             Kontext in components/app-context.ts: user/setUser/openWizard).
-            Seiten in pages/: DashboardPage, HookPage, CanvasPage, ReelsPage, ProjektePage,
+            Seiten in pages/: DashboardPage (= Deine Sachen, GET /erstellt), HookPage, CanvasPage, ReelsPage, ProjektePage,
             EinstellungenPage (Konto + Admin), PacksPage + PackDetailPage
             (Wochen-Content), ComingSoonPage. Neue Seite ⇒ Route in App.tsx +
             NavLink in Sidebar.tsx. CreatePackWizard.tsx = Wochen-Content-Dialog.
@@ -279,6 +279,41 @@ Server-GPU-Render wäre fürs 10€-Preismodell zu teuer.
 Analyse-Pakete (librosa, faster_whisper). **Wird in Phase 3, Schritt 3
 umgebaut:** vom Item-Auftrag zum Pack-Auftrag, damit der Agent auch die
 Analyse übernimmt. Siehe `PHASE-3-PLAN.md`.
+
+## Marke: selfsign (August 2026)
+
+Aus HOOKCUT wurde **selfsign**, Claim *„Sign yourself."*. Details in
+`MARKE.md`; das Wichtigste hier:
+
+- **Bildmarke** liegt als Datei (`web/public/selfsign-mark.svg`), nicht als
+  eingebettetes SVG im Quelltext — damit der Austausch gegen das Original ein
+  Handgriff ist und keine Code-Änderung. `Logo.tsx` bindet sie überall ein
+  (Seitenleiste, Anmeldung, Ladebildschirm), `index.html` als Tab-Symbol.
+  **Die aktuelle Marke ist nachgebaut, nicht das Original.**
+- **Farben:** Acid Lime `#B7FF00`, Ink Black `#050505`, Off-White `#F7F7F5`.
+  Die Grauwerte dazwischen sind neutral (vorher grünstichig) — neben einem so
+  lauten Akzent wirkt jeder Farbstich schmutzig. Regel: **Text auf Lime immer
+  `text-ink-950`**, weiß wäre unlesbar.
+- **Nicht umbenannt** (Technik, kein Markenname): Umgebungsvariablen
+  `HOOKCUT_*`, Cookie `hookcut_session`, Hosting-Pfad `/var/hookcut`. Gründe
+  stehen in `MARKE.md`.
+
+## Dashboard: eine Liste statt fünf Tabellen
+
+Das alte Dashboard hatte vier Zahlen-Kacheln, drei Spalten, eine
+Reel-Sektion und noch ein Dreier-Raster — viel Struktur für wenig Auskunft,
+und mit wenig Daten wirkte es tot. Der Besitzer hat es beanstandet, zu Recht.
+
+Jetzt: **`GET /erstellt`** führt `edit_jobs`, `content_packs`, `canvas_jobs`,
+`hook_jobs` und `projects` zu **einer** nach Datum sortierten Liste zusammen —
+mit vereinheitlichtem Status (`fertig` / `laeuft` / `fehler` / `leer`),
+Fehlertext und fertigen Download-Links. Bewusst serverseitig
+zusammengeführt: sonst müsste die Oberfläche Sortierung und fünf
+Statuswörter nachbauen, und bei der nächsten Tabelle fängt es von vorne an.
+`Dashboard.tsx` (405 Zeilen) ist ersatzlos gelöscht.
+
+`/erstellt` hat **kein** `require_premium` — dieselbe Regel wie bei den
+Downloads: was in der bezahlten Zeit entstand, bleibt auffindbar.
 
 ## Phase 3: Premium-Abo (August 2026)
 

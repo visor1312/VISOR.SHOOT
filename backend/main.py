@@ -1085,6 +1085,131 @@ def download_canvas(job_id: str, user: dict = Depends(auth.get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# "Alles, was ich erstellt habe" - eine Liste statt fuenf
+#
+# Die Werkzeuge legen ihre Ergebnisse in fuenf verschiedenen Tabellen ab
+# (edit_jobs, content_packs, canvas_jobs, hook_jobs, projects). Fuer den
+# Besitzer ist das eine kuenstliche Trennung: er hat "Sachen gemacht" und
+# will sie wiederfinden, ohne sich zu merken, welches Werkzeug es war.
+#
+# Deshalb hier EINE Liste, nach Datum sortiert. Bewusst serverseitig
+# zusammengefuehrt und nicht im Browser aus fuenf Anfragen: sonst muesste
+# die Oberflaeche die Sortierung und fuenf verschiedene Statuswoerter
+# nachbauen, und bei der naechsten Tabelle faengt es von vorne an.
+
+
+def _status_einfach(status: str | None) -> str:
+    """Fuenf Werkzeuge, fuenf Statuswoerter - fuer die Liste reichen drei.
+    Was nicht fertig und nicht kaputt ist, laeuft noch."""
+    if status == "done":
+        return "fertig"
+    if status == "error":
+        return "fehler"
+    return "laeuft"
+
+
+def _erstellt_reels(user_id: str) -> list[dict]:
+    eintraege = []
+    for job in db.list_edit_jobs(user_id, limit=200):
+        outputs = _edit_outputs(job) or []
+        fertige = [o for o in outputs if o["ready"]]
+        eintraege.append({
+            "art": "reel", "id": job["id"], "titel": "Reel",
+            "detail": f"Stil: {job['style']}" if job["style"] else "",
+            "status": _status_einfach(job["status"]), "fehler": job["error"],
+            "created_at": job["created_at"], "seite": "/reels",
+            "downloads": [
+                {"label": o["name"], "url": f"/edit/{job['id']}/download?platform={o['platform']}"}
+                for o in fertige
+            ] or ([{"label": "Video", "url": f"/edit/{job['id']}/download"}]
+                  if job["output_path"] else []),
+        })
+    return eintraege
+
+
+def _erstellt_packs(user_id: str) -> list[dict]:
+    eintraege = []
+    for pack in db.list_content_packs(user_id, limit=200):
+        items = db.list_pack_items(pack["id"])
+        fertig = [i for i in items if i["status"] == "done"]
+        eintraege.append({
+            "art": "pack", "id": pack["id"], "titel": "Wochen-Content",
+            "detail": f"{len(fertig)} von {len(items)} Videos fertig" if items else "",
+            "status": _status_einfach(pack["status"]), "fehler": pack["error"],
+            "created_at": pack["created_at"], "seite": f"/wochen-content/{pack['id']}",
+            "downloads": [
+                {"label": f"Video {i['idx'] + 1}",
+                 "url": f"/packs/{pack['id']}/items/{i['idx']}/download"}
+                for i in fertig
+            ],
+        })
+    return eintraege
+
+
+def _erstellt_canvas(user_id: str) -> list[dict]:
+    eintraege = []
+    for job in db.list_canvas_jobs(user_id, limit=200):
+        eintraege.append({
+            "art": "canvas", "id": job["id"], "titel": "Spotify Canvas",
+            "detail": f"{job['duration_sec']:g} Sekunden" if job["duration_sec"] else "",
+            "status": _status_einfach(job["status"]), "fehler": job["error"],
+            "created_at": job["created_at"], "seite": "/canvas",
+            "downloads": ([{"label": "Canvas", "url": f"/canvas/{job['id']}/download"}]
+                          if job["status"] == "done" and job["output_path"] else []),
+        })
+    return eintraege
+
+
+def _erstellt_hooks(user_id: str) -> list[dict]:
+    eintraege = []
+    for job in db.list_hook_jobs(limit=200, user_id=user_id):
+        eintraege.append({
+            "art": "hook", "id": job["id"], "titel": "Hook-Analyse",
+            "detail": "", "status": _status_einfach(job["status"]),
+            "fehler": job["error"], "created_at": job["created_at"],
+            "seite": "/hook", "downloads": [],
+        })
+    return eintraege
+
+
+def _erstellt_aufnahmen(user_id: str) -> list[dict]:
+    eintraege = []
+    for projekt in db.list_projects(user_id=user_id):
+        takes = db.list_takes(projekt["id"])
+        fertig = [t for t in takes if t["status"] == "done" and t["output_path"]]
+        eintraege.append({
+            "art": "aufnahme", "id": projekt["id"], "titel": projekt["name"] or "Aufnahme",
+            "detail": f"{len(takes)} Take(s)" if takes else "noch kein Take",
+            # Ein Projekt selbst hat keinen Status - es zaehlt, ob etwas
+            # Fertiges drinliegt.
+            "status": "fertig" if fertig else ("laeuft" if takes else "leer"),
+            "fehler": None, "created_at": projekt["created_at"], "seite": "/projekte",
+            "downloads": [
+                {"label": f"Take {n + 1}",
+                 "url": f"/projects/{projekt['id']}/takes/{t['id']}/download"}
+                for n, t in enumerate(fertig)
+            ],
+        })
+    return eintraege
+
+
+@app.get("/erstellt")
+def liste_erstellt(user: dict = Depends(auth.get_current_user)):
+    """Alles, was dieses Konto erzeugt hat - neueste zuerst.
+
+    BEWUSST OHNE require_premium: was in der bezahlten Zeit entstanden ist,
+    muss auch danach auffindbar bleiben (dieselbe Regel wie bei den
+    Download-Routen, siehe Kommentarblock oben).
+    """
+    alle = (_erstellt_reels(user["id"]) + _erstellt_packs(user["id"])
+            + _erstellt_canvas(user["id"]) + _erstellt_hooks(user["id"])
+            + _erstellt_aufnahmen(user["id"]))
+    # created_at ist ueberall ISO-8601 in UTC - da sortiert der Text richtig.
+    alle.sort(key=lambda e: e["created_at"] or "", reverse=True)
+    return alle
+
+
+# ---------------------------------------------------------------------------
 # Oberflaeche mitausliefern (nur im Betrieb)
 #
 # Lokal uebernimmt das der Vite-Dev-Server (Port 5173). Online gibt es den

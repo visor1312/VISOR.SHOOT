@@ -914,3 +914,40 @@ export async function getProfile(handle: string): Promise<Profile> {
   const res = await requestOrExplain(`${BASE}/profiles/${encodeURIComponent(handle)}`);
   return jsonOrThrow<Profile>(res);
 }
+
+// ---------------------------------------------------------------------------
+// "Alles, was ich erstellt habe" - eine Liste ueber alle Werkzeuge hinweg.
+// Zusammengefuehrt wird SERVERSEITIG (GET /erstellt), damit die Oberflaeche
+// nicht fuenf Anfragen sortieren und fuenf Statuswoerter uebersetzen muss.
+
+export type ErstelltArt = "reel" | "pack" | "canvas" | "hook" | "aufnahme";
+
+export interface ErstelltDownload {
+  label: string;
+  /** Serverpfad OHNE Praefix - immer durch erstelltDownloadUrl() schicken. */
+  url: string;
+}
+
+export interface ErstelltEintrag {
+  art: ErstelltArt;
+  id: string;
+  titel: string;
+  /** Zusatz in einer Zeile, z.B. "3 von 6 Videos fertig". Kann leer sein. */
+  detail: string;
+  status: "fertig" | "laeuft" | "fehler" | "leer";
+  fehler: string | null;
+  created_at: string;
+  /** Wohin der Klick fuehrt (Route in der Oberflaeche). */
+  seite: string;
+  downloads: ErstelltDownload[];
+}
+
+export async function listErstellt(): Promise<ErstelltEintrag[]> {
+  const res = await requestOrExplain(`${BASE}/erstellt`);
+  return jsonOrThrow<ErstelltEintrag[]>(res);
+}
+
+/** Der Server liefert Pfade ohne /api-Praefix - im Dev-Betrieb fehlt es sonst. */
+export function erstelltDownloadUrl(pfad: string): string {
+  return `${BASE}${pfad}`;
+}
