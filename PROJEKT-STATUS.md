@@ -70,9 +70,17 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 
 ## Start (Windows, Doppelklick)
 
+**Für den Besitzer gibt es `START-AM-PC.md`** — die Schritt-für-Schritt-Seite
+zum Aktualisieren, Starten und Ausprobieren. Bei Änderungen an den `.bat`-Dateien
+oder am Ablauf dort mitziehen, sonst zeigt sie auf etwas, das es nicht mehr gibt.
+
 - `start-hookcut.bat` — Backend + Dashboard (der normale Weg)
 - `start-editor.bat` — Backend + Editor (nur für Editor-Arbeit)
-- `update-hookcut.bat` — git pull + Start; `cmd-hier.bat` — CMD im Ordner
+- `update-hookcut.bat` — git pull + pip install + `npm install` in `web/` + Start
+- `hookcut-premium-test.bat` — einmaliger Start mit `HOOKCUT_PREMIUM_REQUIRED=1`,
+  um die Bezahlschranke lokal zu sehen (über `_backend-premium.bat`)
+- `hookcut-abo.bat` — Abos von Hand vergeben/beenden/anzeigen
+- `cmd-hier.bat` — CMD im Ordner
 - `test-render.bat` — Machbarkeitstest headless-Render (Drag&Drop-Eingabe)
 - Einmalig: `pip install -r requirements.txt`, `npm install` in `web/` UND
   `editor/`. Braucht ffmpeg, Node 22+, Chrome (WebGPU!).

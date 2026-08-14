@@ -3,6 +3,10 @@
 **Das Multimedia-Tool für Independent Artists** — vom Handyvideo zum
 release-fertigen Social-Media-Clip.
 
+> **Gerade den Rechner angemacht?** → `START-AM-PC.md` ist die
+> Schritt-für-Schritt-Anleitung: aktualisieren, starten, ausprobieren.
+> Kurzfassung: **`update-hookcut.bat` doppelklicken.**
+
 Lokal laufendes Tool, um ein zum Playback mitgerapptes Handyvideo zeitlich
 exakt mit der fertig produzierten Songdatei zu synchronisieren und als
 9:16-Video (TikTok/Instagram) zu exportieren.
@@ -136,6 +140,11 @@ Die Video-Werkzeuge sind das kostenpflichtige Angebot, das Netzwerk bleibt
 frei. **Auf deinem eigenen Rechner kostet nichts etwas** — dort ist der
 Schalter `HOOKCUT_PREMIUM_REQUIRED` aus, es sind ja deine Werkzeuge und deine
 Rechenzeit. Online steht er auf `1`.
+
+**Selbst ansehen, was ein Kunde sieht:** `hookcut-premium-test.bat`
+doppelklicken. Startet HOOKCUT einmalig mit den Schaltern, die online gelten —
+dein Konto hat kein Abo, du siehst also die Bezahlschranke. Ändert nichts an
+deinen Daten; der nächste normale Start ist wieder wie vorher.
 
 Solange kein Zahlungsanbieter angebunden ist (das ist Schritt 5 aus
 `PHASE-3-PLAN.md`), vergibst du Abos von Hand: Rechnung schicken, Zahlung
