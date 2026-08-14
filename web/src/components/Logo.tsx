@@ -19,31 +19,36 @@ import { useState } from "react";
  *  dran, aber nicht dasselbe; deshalb ist die Lockup-Datei der bessere Weg.
  */
 
-/** Bild, das sich stillschweigend zurueckzieht, wenn es die Datei nicht gibt.
- *  Ohne das haette eine fehlende Lockup-Datei ein kaputtes Bild-Symbol
- *  hinterlassen. */
-function BildOderNichts(
-  { src, hoehe, onFehler }: { src: string; hoehe: number; onFehler: () => void },
+/** Bild, das erst .svg probiert, dann .png, und sich zuletzt stillschweigend
+ *  zurueckzieht.
+ *
+ *  Beide Endungen sind noetig, weil nicht jeder eine SVG zur Hand hat. Ohne
+ *  den PNG-Schritt blieb nach dem Einsetzen einer PNG ein kaputtes
+ *  Bild-Symbol stehen - genau das ist einmal passiert, und das Skript hat
+ *  dabei auch noch "funktioniert" gemeldet.
+ */
+function BildMitRueckfall(
+  { basis, hoehe, alt = "", className = "", onAufgeben }:
+  { basis: string; hoehe: number; alt?: string; className?: string; onAufgeben?: () => void },
 ) {
+  const [endung, setEndung] = useState<"svg" | "png">("svg");
   return (
-    <img src={src} alt="selfsign" style={{ height: hoehe, width: "auto" }}
-      onError={onFehler} />
+    <img
+      src={`${basis}.${endung}`}
+      alt={alt}
+      aria-hidden={alt ? undefined : true}
+      // Das Seitenverhaeltnis gibt die Datei vor - hier nur die Hoehe setzen,
+      // sonst verzerrt ein Austausch gegen das Original das Bild.
+      style={{ height: hoehe, width: "auto" }}
+      className={className}
+      onError={() => (endung === "svg" ? setEndung("png") : onAufgeben?.())}
+    />
   );
 }
 
 /** Nur die Bildmarke (Signalbalken + Unterschrift). */
 export function Mark({ size = 36, className = "" }: { size?: number; className?: string }) {
-  return (
-    <img
-      src="/selfsign-mark.svg"
-      alt=""
-      aria-hidden="true"
-      // Das Seitenverhaeltnis gibt die Datei vor - hier nur die Hoehe setzen,
-      // sonst verzerrt ein Austausch gegen das Original das Bild.
-      style={{ height: size, width: "auto" }}
-      className={className}
-    />
-  );
+  return <BildMitRueckfall basis="/selfsign-mark" hoehe={size} className={className} />;
 }
 
 /** Marke + Schriftzug nebeneinander (Seitenleiste, Kopfzeilen). */
@@ -51,8 +56,8 @@ export function LogoZeile({ size = 30 }: { size?: number }) {
   const [lockupFehlt, setLockupFehlt] = useState(false);
   if (!lockupFehlt) {
     return (
-      <BildOderNichts src="/selfsign-lockup-h.svg" hoehe={size * 1.15}
-        onFehler={() => setLockupFehlt(true)} />
+      <BildMitRueckfall basis="/selfsign-lockup-h" hoehe={size * 1.15}
+        alt="selfsign" onAufgeben={() => setLockupFehlt(true)} />
     );
   }
   return (
@@ -71,8 +76,8 @@ export function LogoBlock({ size = 64, claim = true }: { size?: number; claim?: 
   return (
     <div className="flex flex-col items-center gap-3">
       {!lockupFehlt ? (
-        <BildOderNichts src="/selfsign-lockup-v.svg" hoehe={size * 2.1}
-          onFehler={() => setLockupFehlt(true)} />
+        <BildMitRueckfall basis="/selfsign-lockup-v" hoehe={size * 2.1}
+          alt="selfsign" onAufgeben={() => setLockupFehlt(true)} />
       ) : (
         <>
           <Mark size={size} />

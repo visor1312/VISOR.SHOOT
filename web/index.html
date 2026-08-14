@@ -7,8 +7,10 @@
          (web/public/selfsign-mark.svg), zieht der Tab automatisch mit.
          Der zweite Eintrag faengt Browser ab, die stumpf /favicon.ico
          anfragen - ohne ihn steht dort ein 404 in der Konsole. -->
+    <!-- Beide Endungen, weil nicht jeder eine SVG zur Hand hat. Der Browser
+         nimmt, was er findet; die fehlende ignoriert er. -->
     <link rel="icon" type="image/svg+xml" href="/selfsign-mark.svg" />
-    <link rel="icon" href="/selfsign-mark.svg" sizes="any" />
+    <link rel="icon" type="image/png" href="/selfsign-mark.png" />
     <meta name="theme-color" content="#050505" />
     <meta name="description" content="selfsign - Sign yourself. Das Netzwerk für Independent-Musiker, mit den Werkzeugen für fertige Social-Media-Clips." />
     <title>selfsign</title>
