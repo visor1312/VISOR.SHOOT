@@ -52,6 +52,26 @@ def test_testmodus_setzt_den_richtigen_schalter():
     assert text.index("HOOKCUT_PREMIUM_REQUIRED=1") < text.index("uvicorn")
 
 
+def test_logo_skript_kennt_alle_drei_zieldateien():
+    """MARKE.md nennt drei Dateinamen - logo-einsetzen.bat muss genau die
+    erzeugen und Logo.tsx genau die laden. Sonst legt das Skript das Logo an
+    eine Stelle, die niemand liest, und der Besitzer sucht den Fehler bei
+    sich."""
+    skript = (PROJEKT / "logo-einsetzen.bat").read_text(encoding="utf-8")
+    logo = (PROJEKT / "web/src/components/Logo.tsx").read_text(encoding="utf-8")
+    for name in ("mark", "lockup-h", "lockup-v"):
+        assert f"selfsign-%ZIEL%" in skript or name in skript, \
+            f"logo-einsetzen.bat kennt {name} nicht"
+        assert f"/selfsign-{name}." in logo, f"Logo.tsx laedt selfsign-{name} nicht"
+
+
+def test_nachgebaute_marke_ist_als_solche_gekennzeichnet():
+    """Sonst haelt sie irgendwann jemand fuer das Original - auch ich beim
+    naechsten Mal."""
+    svg = (PROJEKT / "web/public/selfsign-mark.svg").read_text(encoding="utf-8")
+    assert "NACHGEBAUT" in svg.upper()
+
+
 def test_abo_skript_ruft_die_echten_befehle():
     """Die Menuepunkte muessen zu backend/admin.py passen."""
     text = (PROJEKT / "selfsign-abo.bat").read_text(encoding="utf-8")

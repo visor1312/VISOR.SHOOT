@@ -41,8 +41,10 @@ Sichtbar geändert hat sich:
 
 * **Alles heißt jetzt selfsign** — Logo, Farben, Name, auch die
   `.bat`-Dateien (`start-selfsign.bat`, `update-selfsign.bat`, …).
-  Das Logo ist von mir **nachgebaut**; wie du das Original eintauschst,
-  steht in `MARKE.md` (eine Datei ersetzen, sonst nichts).
+* **Das Logo ist von mir nachgebaut, nicht das Original.** Ich kann Bilder
+  aus dem Chat nur ansehen, nicht als Datei speichern. **Zieh deine
+  Original-Logodatei auf `logo-einsetzen.bat`** — das setzt sie ein und
+  fragt, ob sie gleich mit hochgeladen werden soll. Details: `MARKE.md`.
 * **Die Startseite ist „Offene Projekte"** (der Feed), nicht mehr das
   Dashboard. Das Dashboard steht weiterhin in der Seitenleiste und hat eine
   eigene Adresse (`/dashboard`).

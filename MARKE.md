@@ -8,33 +8,55 @@ selbst signierte Identität.
 
 ---
 
-## Das Logo austauschen — ein Handgriff
+## Das Original-Logo einsetzen
 
-> **Wichtig:** Die Bildmarke im Projekt ist **nachgebaut**, nicht die
-> Originaldatei. Ich habe sie anhand deines Marken-Blatts rekonstruiert; sie
-> trifft die Idee und die Proportionen, ist aber nicht Kurve für Kurve
-> identisch.
+> **Wichtig:** Das Logo im Projekt ist **nachgebaut**, nicht das Original.
+> Ich kann Bilder aus dem Chat nur *ansehen*, nicht als Datei speichern —
+> also habe ich die Kurven nach Augenmaß nachgezogen. Das wird ähnlich, nie
+> identisch. Die Originaldatei muss von deinem Rechner kommen.
 
-**So wird sie exakt:** die Originaldatei über diese Datei kopieren —
+### Der einfache Weg: Datei draufziehen
 
-```
-web/public/selfsign-mark.svg
-```
+**Zieh deine Logodatei mit der Maus auf `logo-einsetzen.bat`** und lass sie
+los. Das Skript legt sie an die richtige Stelle, räumt die alte weg und
+fragt, ob es sie gleich ins Projekt speichern und hochladen soll.
 
-Dateiname genau so beibehalten. Danach ziehen automatisch mit:
+*Nicht doppelklicken* — dann weiß es nicht, welche Datei gemeint ist.
 
-* die Seitenleiste (oben links)
-* die Anmeldemaske und der Ladebildschirm
-* das Symbol im Browser-Tab
+Danach im Browser einmal **Strg+F5**. Fertig.
 
-Kein Code muss angefasst werden. Am besten eine **SVG** — die bleibt in jeder
-Größe scharf. Zur Not tut es auch eine PNG mit durchsichtigem Hintergrund;
-dann muss in `web/index.html` und `web/src/components/Logo.tsx` die Endung
-angepasst werden.
+### Welche Dateien sich lohnen
 
-Brauchst du zusätzlich eine schwarze oder weiße Fassung (für helle
-Hintergründe), leg sie als `selfsign-mark-schwarz.svg` bzw.
-`selfsign-mark-weiss.svg` daneben — dann baue ich die Umschaltung ein.
+Von deinem Marken-Blatt kannst du bis zu drei einsetzen:
+
+| Datei | Wofür | Nötig? |
+|---|---|---|
+| `selfsign-mark.svg` | nur die Bildmarke (Balken + Unterschrift) | **ja** |
+| `selfsign-lockup-h.svg` | Marke **neben** dem Schriftzug (waagerecht) | empfohlen |
+| `selfsign-lockup-v.svg` | Marke **über** dem Schriftzug (senkrecht) | empfohlen |
+
+Die beiden Lockups lohnen sich, weil dann auch der **Schriftzug im
+Original-Font** erscheint. Ohne sie setzt die Oberfläche „selfsign" in der
+System-Schrift daneben — nah dran, aber nicht dasselbe.
+
+Fehlt eine Lockup-Datei, fällt die Oberfläche still auf Marke + Text zurück.
+Es geht also nichts kaputt, wenn du nur die Bildmarke hast.
+
+### Der Weg über den Chat
+
+Wenn deine Logodatei eine **SVG** ist, geht es auch ohne `.bat`: SVG ist
+Text. Rechtsklick auf die Datei → *Öffnen mit* → *Editor*, alles markieren
+(Strg+A), kopieren (Strg+C) und mir hier in den Chat einfügen. Dann schreibe
+ich sie Zeichen für Zeichen ins Projekt — das ist dann wirklich das Original.
+
+### Format
+
+Am besten **SVG** — bleibt in jeder Größe scharf, auch als Tab-Symbol.
+Eine **PNG mit durchsichtigem Hintergrund** geht auch; `logo-einsetzen.bat`
+kommt mit beidem klar.
+
+Brauchst du später eine schwarze oder weiße Fassung für helle Hintergründe,
+sag Bescheid — dann baue ich die Umschaltung ein.
 
 ---
 
