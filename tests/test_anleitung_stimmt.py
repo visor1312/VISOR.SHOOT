@@ -24,9 +24,16 @@ def test_anleitung_existiert():
     assert ANLEITUNG.exists(), "START-AM-PC.md fehlt - README verweist darauf"
 
 
+# Dateien, die die Anleitung ABSICHTLICH nennt, obwohl es sie nicht mehr
+# gibt: der Besitzer hat sie noch auf seiner Platte, solange er nicht
+# aktualisiert hat, und muss wissen, was damit ist. Ohne diese Liste wuerde
+# der Test unten sie als Fehler melden.
+ALTE_NAMEN = {"update-hookcut.bat"}
+
+
 def _erwaehnte_dateien(text: str) -> set[str]:
     """Alle .bat- und .md-Dateien, die im Text genannt werden."""
-    return set(re.findall(r"`([\w.-]+\.(?:bat|md))`", text))
+    return set(re.findall(r"`([\w.-]+\.(?:bat|md))`", text)) - ALTE_NAMEN
 
 
 @pytest.mark.parametrize("datei", sorted(_erwaehnte_dateien(
@@ -34,6 +41,14 @@ def _erwaehnte_dateien(text: str) -> set[str]:
 def test_genannte_datei_gibt_es(datei):
     assert (PROJEKT / datei).exists(), (
         f"START-AM-PC.md nennt {datei}, die Datei gibt es aber nicht")
+
+
+@pytest.mark.parametrize("alt", sorted(ALTE_NAMEN))
+def test_alte_namen_sind_wirklich_weg(alt):
+    """Gegenprobe zur Ausnahmeliste: taucht ein alter Name wieder auf, ist die
+    Ausnahme falsch und wuerde einen echten Fehler verdecken."""
+    assert not (PROJEKT / alt).exists(), (
+        f"{alt} gibt es wieder - dann raus aus ALTE_NAMEN")
 
 
 def test_update_skript_installiert_auch_npm():
