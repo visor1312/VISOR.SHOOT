@@ -71,7 +71,7 @@ export default function CreatePackWizard({
 
         <div className="p-6 space-y-4 overflow-y-auto">
           <p className="text-sm text-muted leading-relaxed">
-            Ein Song + Video → mehrere fertige Posts auf einen Schlag. HOOKCUT
+            Ein Song + Video → mehrere fertige Posts auf einen Schlag. selfsign
             kombiniert die besten Hook-Stellen mit deinen Looks und Formaten.
           </p>
 

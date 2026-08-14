@@ -61,7 +61,7 @@ was er dem Kunden abverlangt.
 
 ### Modell A — Jeder Abonnent rendert auf dem eigenen PC
 
-Der Abonnent installiert ein kleines HOOKCUT-Programm auf seinem Windows-Rechner.
+Der Abonnent installiert ein kleines selfsign-Programm auf seinem Windows-Rechner.
 Es meldet sich mit seinem Konto an, holt sich Aufträge, rendert, lädt das Ergebnis
 hoch.
 
@@ -199,7 +199,7 @@ schon verkauft werden kann** — von Hand, ohne Zahlungsanbieter.
   Anbieter-IDs).
 * `auth.require_premium()` als Sperre mit ehrlicher deutscher Meldung.
 * `/auth/me` liefert `premium` und `premium_bis` mit.
-* `hookcut-abo.bat`: Abo von Hand vergeben und entziehen.
+* `selfsign-abo.bat`: Abo von Hand vergeben und entziehen.
 * **Damit kannst du die ersten Kunden von Hand aufnehmen** — Rechnung per
   Überweisung oder PayPal, Abo per Doppelklick freischalten. Genau so findet man
   heraus, ob überhaupt jemand zahlen will, bevor man einen Zahlungsanbieter
@@ -224,7 +224,7 @@ schon verkauft werden kann** — von Hand, ohne Zahlungsanbieter.
 * Warteschlangen-Anzeige für den Kunden.
 
 ### Schritt 4 — Render-Agent für Windows
-* `hookcut-agent.bat` zum Doppelklicken, ein Fenster, das sagt was es tut.
+* `selfsign-agent.bat` zum Doppelklicken, ein Fenster, das sagt was es tut.
 * Meldet sich mit dem Agent-Token an, holt Aufträge, rendert, lädt hoch.
 * Übersteht Neustart und Verbindungsabbruch; ein kaputter Auftrag stoppt nicht
   die Schlange.

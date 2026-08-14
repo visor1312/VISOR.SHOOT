@@ -1,4 +1,4 @@
-# HOOKCUT — Hinweise für Claude
+# selfsign — Hinweise für Claude
 
 Kurzanleitung für jede neue Session. Tiefe Details stehen in
 `PROJEKT-STATUS.md` (Architektur, Fahrplan, gelernte Lektionen, Sicherheit)
@@ -62,10 +62,10 @@ Alle drei müssen grün sein, bevor committet wird.
 `test_upscale` braucht torch (optional, siehe README) — deshalb ausgelassen.
 
 **Auf dem Windows-Rechner des Besitzers:**
-- Starten: `start-hookcut.bat` doppelklicken (Backend + Dashboard).
+- Starten: `start-selfsign.bat` doppelklicken (Backend + Dashboard).
 - PowerShell blockiert `npm.ps1` → CMD benutzen oder `npm.cmd`.
 - Python liegt ggf. unter `%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe`
-  (so macht es `update-hookcut.bat`).
+  (so macht es `update-selfsign.bat`).
 - Immer `localhost:5173` aufrufen, **nicht** `127.0.0.1` — das Session-Cookie
   hängt am Hostnamen.
 
@@ -76,7 +76,7 @@ Alle drei müssen grün sein, bevor committet wird.
 | Video-Render (Chrome/WebGPU) | **geht nicht** | geht — hier wird es wirklich geprüft |
 | Modelle (Demucs, Whisper) | Download blockiert | laden beim ersten Lauf |
 | Backend, Tests, Web-Build | voll testbar | voll testbar |
-| Abhängigkeiten | `.claude/hooks/session-start.sh` installiert sie automatisch | `update-hookcut.bat` erledigt das |
+| Abhängigkeiten | `.claude/hooks/session-start.sh` installiert sie automatisch | `update-selfsign.bat` erledigt das |
 
 **In der Cloud kann der Container auf einen alten Stand zurückfallen**
 (mehrfach passiert). Sehen Dateien alt aus oder fehlen: `git fetch origin

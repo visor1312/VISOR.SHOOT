@@ -78,7 +78,7 @@ export default function ProfilAnsichtPage() {
 
       <div className="mt-5 bg-ink-850 border border-ink-700 rounded-2xl p-6">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0 flex items-center justify-center text-lg font-bold text-white">
+          <div className="w-16 h-16 rounded-full bg-brand-500 shrink-0 flex items-center justify-center text-lg font-bold text-ink-950">
             {profil.artist_name.trim().slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

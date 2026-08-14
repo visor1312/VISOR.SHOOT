@@ -60,7 +60,7 @@ export default function BestaetigenPage() {
             </p>
             <Link to="/"
               className="inline-block mt-6 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors">
-              Zu HOOKCUT
+              Zu selfsign
             </Link>
           </>
         )}

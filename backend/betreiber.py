@@ -37,7 +37,7 @@ TELEFON: str = os.environ.get("HOOKCUT_BETREIBER_TELEFON", "")
 # Wie die Plattform nach aussen heisst. Steht hier, damit eine spaetere
 # Umbenennung (eigener Name, eigene Domain) eine Zeile ist und keine Suche
 # quer durch die Oberflaeche.
-PLATTFORM_NAME: str = os.environ.get("HOOKCUT_PLATTFORM_NAME", "HOOKCUT")
+PLATTFORM_NAME: str = os.environ.get("HOOKCUT_PLATTFORM_NAME", "selfsign")
 
 # Wer den Dienst technisch betreibt. Gehoert in die Datenschutzerklaerung,
 # weil dort Daten verarbeitet werden (Auftragsverarbeitung).

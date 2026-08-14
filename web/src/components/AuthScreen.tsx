@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Loader2, LogIn, Mic2, Ticket, UserPlus } from "lucide-react";
+import { Loader2, LogIn, Ticket, UserPlus } from "lucide-react";
 import { getAuthConfig, login, register, type User } from "../api";
 import Footer from "./Footer";
+import { LogoBlock } from "./Logo";
 
 type Mode = "login" | "register";
 
-/** Vollbild-Login/Registrierung im HOOKCUT-Look. Ob ein Einladungscode noetig
+/** Vollbild-Login/Registrierung im selfsign-Look. Ob ein Einladungscode noetig
  * ist, sagt der Server (/auth/config): das lokale Werkzeug verlangt einen,
  * die offene Plattform nicht. */
 export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => void }) {
@@ -57,12 +58,9 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
   return (
     <div className="min-h-screen bg-ink-950 text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo wie im Sidebar-Header */}
-        <div className="flex items-center justify-center gap-2.5 mb-6">
-          <div className="w-11 h-11 rounded-xl bg-brand-500 flex items-center justify-center">
-            <Mic2 size={24} className="text-ink-950" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight">HOOKCUT</span>
+        {/* Der erste Eindruck: Marke gross, mit Claim. */}
+        <div className="mb-7">
+          <LogoBlock size={68} />
         </div>
 
         <div className="bg-ink-850 border border-ink-700 rounded-2xl p-8">
@@ -91,7 +89,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
                     <div className="relative">
                       <Ticket size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                       <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)}
-                        placeholder="Code aus hookcut-einladung.bat" autoComplete="off"
+                        placeholder="Code aus selfsign-einladung.bat" autoComplete="off"
                         className="w-full text-sm bg-ink-800 border border-ink-700 focus:border-brand-500 rounded-xl pl-9 pr-3 py-2.5 outline-none" />
                     </div>
                   </Field>
@@ -145,7 +143,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (user: User) => voi
         </div>
 
         <p className="text-center text-xs text-ink-600 mt-4">
-          Passwort vergessen? Am HOOKCUT-Rechner „hookcut-passwort-reset.bat" doppelklicken.
+          Passwort vergessen? Am selfsign-Rechner „selfsign-passwort-reset.bat" doppelklicken.
         </p>
 
         {/* Impressum und Datenschutz muessen auch OHNE Konto erreichbar sein -

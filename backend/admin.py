@@ -111,9 +111,9 @@ def _cmd_abo_geben(args: argparse.Namespace) -> None:
         print(str(e))
         return
     if ende is None:
-        print(f"{email} hat jetzt HOOKCUT Premium - unbefristet.")
+        print(f"{email} hat jetzt selfsign Premium - unbefristet.")
     else:
-        print(f"{email} hat jetzt HOOKCUT Premium bis {ende[:10]}.")
+        print(f"{email} hat jetzt selfsign Premium bis {ende[:10]}.")
 
 
 def _cmd_abo_nehmen(args: argparse.Namespace) -> None:
@@ -190,7 +190,7 @@ def _cmd_reset_password(args: argparse.Namespace) -> None:
 
 def _main() -> None:
     p = argparse.ArgumentParser(prog="python -m backend.admin",
-                                description="HOOKCUT Admin-Werkzeuge (Konten & Einladungen)")
+                                description="selfsign Admin-Werkzeuge (Konten & Einladungen)")
     sub = p.add_subparsers(dest="command", required=True)
 
     ci = sub.add_parser("create-invite", help="Einladungscode(s) erzeugen")
@@ -207,7 +207,7 @@ def _main() -> None:
     rp.add_argument("email", nargs="?", default=None)
     rp.set_defaults(func=_cmd_reset_password)
 
-    ag = sub.add_parser("abo-geben", help="HOOKCUT Premium freischalten")
+    ag = sub.add_parser("abo-geben", help="selfsign Premium freischalten")
     ag.add_argument("email", nargs="?", default=None)
     ag.add_argument("--monate", type=int, default=1,
                     help="Laufzeit in Monaten zu je 30 Tagen (Standard: 1)")
@@ -215,7 +215,7 @@ def _main() -> None:
                     help="Ohne Enddatum - fuer eigene Konten und Tests")
     ag.set_defaults(func=_cmd_abo_geben)
 
-    an = sub.add_parser("abo-nehmen", help="HOOKCUT Premium sofort beenden")
+    an = sub.add_parser("abo-nehmen", help="selfsign Premium sofort beenden")
     an.add_argument("email", nargs="?", default=None)
     an.set_defaults(func=_cmd_abo_nehmen)
 

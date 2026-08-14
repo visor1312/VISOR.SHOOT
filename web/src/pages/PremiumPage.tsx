@@ -31,7 +31,7 @@ export default function PremiumPage() {
 
   return (
     <main className="flex-1 px-8 py-8 max-w-4xl">
-      <h1 className="text-2xl font-bold tracking-tight">HOOKCUT Premium</h1>
+      <h1 className="text-2xl font-bold tracking-tight">selfsign Premium</h1>
       <p className="text-muted mt-1.5 max-w-2xl">
         Das Netzwerk ist und bleibt kostenlos. Bezahlt werden die
         Video-Werkzeuge – sie rechnen für dich, und zwar auf echter Hardware.
@@ -58,7 +58,7 @@ export default function PremiumPage() {
               Findet die Stelle im Song, die als Erstes sitzt.
             </Leistung>
             <Leistung icon={Music2} titel="Reel-Assistent">
-              Video und Song hochladen, den Rest macht HOOKCUT.
+              Video und Song hochladen, den Rest macht selfsign.
             </Leistung>
           </ul>
         </div>
@@ -97,8 +97,8 @@ export default function PremiumPage() {
           danach die Freischaltung.
         </p>
         {betreiber?.email && (
-          <a href={`mailto:${betreiber.email}?subject=HOOKCUT%20Premium&body=${
-            encodeURIComponent(`Hallo,\n\nich möchte HOOKCUT Premium.\nMeine Konto-Adresse: ${user.email}\n\nViele Grüße`)
+          <a href={`mailto:${betreiber.email}?subject=selfsign%20Premium&body=${
+            encodeURIComponent(`Hallo,\n\nich möchte selfsign Premium.\nMeine Konto-Adresse: ${user.email}\n\nViele Grüße`)
           }`}
             className="inline-flex items-center gap-2 mt-4 bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold px-4 py-2.5 rounded-xl transition-colors">
             <Mail size={16} />

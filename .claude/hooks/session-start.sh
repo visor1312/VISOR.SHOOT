@@ -7,7 +7,7 @@
 # dann z.B. react-router-dom oder bcrypt, und der erste Build/Test bricht ab.
 #
 # Laeuft NUR in der Cloud-Umgebung - auf dem Windows-Rechner des Besitzers
-# machen das start-hookcut.bat / update-hookcut.bat.
+# machen das start-selfsign.bat / update-selfsign.bat.
 set -euo pipefail
 
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
@@ -26,10 +26,10 @@ REQ_TMP="$(mktemp)"
 trap 'rm -f "$REQ_TMP"' EXIT
 grep -v '^demucs' requirements.txt > "$REQ_TMP"
 
-echo "[HOOKCUT] Python-Pakete installieren (ohne demucs, siehe Kommentar)..."
+echo "[selfsign] Python-Pakete installieren (ohne demucs, siehe Kommentar)..."
 python -m pip install --quiet --disable-pip-version-check -r "$REQ_TMP"
 
-echo "[HOOKCUT] npm-Pakete fuer web/ installieren..."
+echo "[selfsign] npm-Pakete fuer web/ installieren..."
 npm install --prefix web --no-audit --no-fund --silent
 
 # editor/ (FreeCut-Fork) wird bewusst ausgelassen: der Render laeuft nur auf
@@ -42,7 +42,7 @@ import importlib.util
 fehlt = [m for m in ("fastapi", "bcrypt", "librosa", "pytest")
          if not importlib.util.find_spec(m)]
 if fehlt:
-    raise SystemExit("[HOOKCUT] FEHLER: Pakete fehlen: " + ", ".join(fehlt))
+    raise SystemExit("[selfsign] FEHLER: Pakete fehlen: " + ", ".join(fehlt))
 PY
 
-echo "[HOOKCUT] Fertig."
+echo "[selfsign] Fertig."

@@ -138,7 +138,7 @@ export default function CreateReelWizard({ onClose }: { onClose: () => void }) {
                 )}
               </div>
               <p className="text-sm text-muted">
-                Soll HOOKCUT den <span className="text-white font-medium">viralsten Teil</span> deines
+                Soll selfsign den <span className="text-white font-medium">viralsten Teil</span> deines
                 Songs suchen und das Reel darauf zuschneiden?
               </p>
               <div className="grid grid-cols-2 gap-3">

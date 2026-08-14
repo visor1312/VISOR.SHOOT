@@ -5,7 +5,7 @@ anmacht. Wird eine .bat-Datei umbenannt oder geloescht, steht dort eine
 Anweisung, die ins Leere fuehrt - und er sitzt vor einem Doppelklick, der
 nichts tut. Genau dieser Fall ist hier abgesichert.
 
-Anlass: in update-hookcut.bat stand jahrelang der Kommentar, _frontend.bat
+Anlass: in update-selfsign.bat stand jahrelang der Kommentar, _frontend.bat
 ziehe die npm-Pakete beim Start nach. Das stimmte nie - _frontend.bat ruft
 "npm run dev" auf, und das installiert nichts.
 """
@@ -39,7 +39,7 @@ def test_genannte_datei_gibt_es(datei):
 def test_update_skript_installiert_auch_npm():
     """Ohne diesen Schritt bricht der Start mit "Cannot find module", sobald
     eine neue Oberflaechen-Bibliothek dazukommt."""
-    text = (PROJEKT / "update-hookcut.bat").read_text(encoding="utf-8")
+    text = (PROJEKT / "update-selfsign.bat").read_text(encoding="utf-8")
     assert "npm install" in text
     assert "pip install -r requirements.txt" in text
 
@@ -54,7 +54,7 @@ def test_testmodus_setzt_den_richtigen_schalter():
 
 def test_abo_skript_ruft_die_echten_befehle():
     """Die Menuepunkte muessen zu backend/admin.py passen."""
-    text = (PROJEKT / "hookcut-abo.bat").read_text(encoding="utf-8")
+    text = (PROJEKT / "selfsign-abo.bat").read_text(encoding="utf-8")
     for befehl in ("abo-liste", "abo-geben", "abo-nehmen"):
-        assert befehl in text, f"hookcut-abo.bat ruft {befehl} nicht auf"
+        assert befehl in text, f"selfsign-abo.bat ruft {befehl} nicht auf"
     assert "--unbefristet" in text

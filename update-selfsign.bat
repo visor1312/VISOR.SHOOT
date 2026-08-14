@@ -1,6 +1,6 @@
 @echo off
 REM ===================================================================
-REM  Holt die neueste Version (git pull) und startet HOOKCUT neu.
+REM  Holt die neueste Version (git pull) und startet selfsign neu.
 REM  Einfach doppelklicken, wenn ich dir gesagt habe "git pull + neu
 REM  starten". Nimmt dir beide Schritte ab.
 REM ===================================================================
@@ -38,5 +38,5 @@ call npm install
 popd
 
 echo.
-echo === HOOKCUT wird gestartet ===
-call "%~dp0start-hookcut.bat"
+echo === selfsign wird gestartet ===
+call "%~dp0start-selfsign.bat"

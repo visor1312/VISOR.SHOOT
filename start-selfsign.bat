@@ -1,6 +1,6 @@
 @echo off
 REM ===================================================================
-REM  HOOKCUT starten (Windows) - einfach doppelklicken.
+REM  selfsign starten (Windows) - einfach doppelklicken.
 REM  Startet Backend (Port 8000) + Frontend (Port 5173) in zwei
 REM  Fenstern und oeffnet danach den Browser.
 REM
@@ -11,8 +11,8 @@ REM    - Frontend-Pakete: im Ordner web einmal  npm install
 REM ===================================================================
 cd /d "%~dp0"
 
-start "HOOKCUT Backend"  cmd /k "%~dp0_backend.bat"
-start "HOOKCUT Frontend" cmd /k "%~dp0_frontend.bat"
+start "selfsign Backend"  cmd /k "%~dp0_backend.bat"
+start "selfsign Frontend" cmd /k "%~dp0_frontend.bat"
 
 echo.
 echo Backend und Frontend werden gestartet...

@@ -11,7 +11,7 @@ export default function ComingSoonPage({ title }: { title: string }) {
         </div>
         <h2 className="text-lg font-medium text-muted mt-5">Feature coming soon</h2>
         <p className="text-sm text-ink-600 mt-1 max-w-sm">
-          Dieser Bereich ist in Arbeit. Wir bauen HOOKCUT Schritt für Schritt zur
+          Dieser Bereich ist in Arbeit. Wir bauen selfsign Schritt für Schritt zur
           kompletten Plattform aus.
         </p>
         <span className="mt-5 text-xs px-3 py-1.5 rounded-lg bg-ink-800 text-ink-600">

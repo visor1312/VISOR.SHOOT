@@ -98,14 +98,14 @@ function AboCard({ user }: { user: import("../api").User }) {
       {user.premium ? (
         <p className="text-sm text-muted">
           {user.premium_status === "canceled"
-            ? <>Gekündigt – <span className="text-white">HOOKCUT Premium</span> läuft
+            ? <>Gekündigt – <span className="text-white">selfsign Premium</span> läuft
                 {bis ? <> noch bis {bis}</> : " aus"}.</>
-            : <><span className="text-white">HOOKCUT Premium</span> läuft
+            : <><span className="text-white">selfsign Premium</span> läuft
                 {bis ? <> bis {bis}</> : " – ohne Enddatum"}.</>}
         </p>
       ) : (
         <p className="text-sm text-muted">
-          Du nutzt HOOKCUT kostenlos. Das Netzwerk bleibt frei; die
+          Du nutzt selfsign kostenlos. Das Netzwerk bleibt frei; die
           Video-Werkzeuge gehören zu Premium ({preis} pro Monat).
         </p>
       )}

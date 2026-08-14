@@ -1,5 +1,5 @@
 @echo off
-REM Hilfsskript - wird von start-hookcut.bat aufgerufen.
+REM Hilfsskript - wird von start-selfsign.bat aufgerufen.
 REM Startet den Vite-Dev-Server aus dem Ordner web.
 cd /d "%~dp0web"
 
@@ -16,5 +16,5 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo === HOOKCUT Frontend (Port 5173) ===
+echo === selfsign Frontend (Port 5173) ===
 call npm run dev

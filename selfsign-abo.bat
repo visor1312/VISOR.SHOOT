@@ -1,5 +1,5 @@
 @echo off
-REM HOOKCUT Premium von Hand verwalten - solange kein Zahlungsanbieter
+REM selfsign Premium von Hand verwalten - solange kein Zahlungsanbieter
 REM angebunden ist (Rechnung per Ueberweisung, hier freischalten).
 cd /d "%~dp0"
 
@@ -11,7 +11,7 @@ if not exist "%PY%" set "PY=python"
 :menue
 cls
 echo ============================================
-echo   HOOKCUT Premium - Abos verwalten
+echo   selfsign Premium - Abos verwalten
 echo ============================================
 echo.
 echo   1  Alle Abos anzeigen

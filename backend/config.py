@@ -1,7 +1,7 @@
 """Zentrale Konfiguration ueber Umgebungsvariablen (fuer das spaetere Hosting).
 
 Lokal laeuft alles mit den Defaults; beim Hosting werden die Werte per
-Umgebungsvariablen gesetzt. So muss kein Code angefasst werden, um HOOKCUT
+Umgebungsvariablen gesetzt. So muss kein Code angefasst werden, um selfsign
 online zu stellen.
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ PROJECTS_DIR: Path = Path(
 )
 
 # Erlaubte Browser-Herkuenfte (CORS). Lokal der Vite-Dev-Server; beim Hosting
-# die echte Domain(s) via HOOKCUT_CORS_ORIGINS="https://app.hookcut.de,...".
+# die echte Domain(s) via HOOKCUT_CORS_ORIGINS="https://app.selfsign.de,...".
 CORS_ORIGINS: list[str] = _env_list(
     "HOOKCUT_CORS_ORIGINS",
     ["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -119,7 +119,7 @@ EMAIL_VERIFICATION: bool = _env_bool("HOOKCUT_EMAIL_VERIFICATION", False)
 # Wie wird zugestellt? "log" schreibt die Mail ins Serverfenster (zum
 # Ausprobieren ohne Domain), "resend" verschickt wirklich, "aus" tut nichts.
 MAIL_BACKEND: str = os.environ.get("HOOKCUT_MAIL_BACKEND", "log").strip().lower()
-MAIL_FROM: str = os.environ.get("HOOKCUT_MAIL_FROM", "HOOKCUT <noreply@example.com>")
+MAIL_FROM: str = os.environ.get("HOOKCUT_MAIL_FROM", "selfsign <noreply@example.com>")
 RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
 
 # Unter welcher Adresse ist die Plattform erreichbar? Wird fuer die Links in

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, Mic2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import AppShell from "./components/AppShell";
+import { LogoBlock, LogoZeile } from "./components/Logo";
 import PremiumSchranke from "./components/PremiumSchranke";
 import Footer from "./components/Footer";
 import AuthScreen from "./components/AuthScreen";
@@ -82,12 +83,7 @@ function App() {
   if (authPhase === "loading") {
     return (
       <div className="min-h-screen bg-ink-950 text-white flex flex-col items-center justify-center gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-11 h-11 rounded-xl bg-brand-500 flex items-center justify-center">
-            <Mic2 size={24} className="text-ink-950" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight">HOOKCUT</span>
-        </div>
+        <LogoBlock size={72} />
         <Loader2 size={24} className="text-brand-400 animate-spin" />
       </div>
     );
@@ -126,7 +122,7 @@ function App() {
           toolsEnabled={toolsEnabled} premiumRequired={premiumRequired} />
       }>
         {/* Startseite ist IMMER der Feed - fuer alle, lokal wie online.
-            Wer HOOKCUT aufmacht, soll zuerst sehen, was in der Szene los
+            Wer selfsign aufmacht, soll zuerst sehen, was in der Szene los
             ist, und nicht seine eigene Werkbank. Das Dashboard hat eine
             eigene Adresse.
             Bewusst eine Weiterleitung statt derselben Seite unter zwei
@@ -178,11 +174,8 @@ function OeffentlichesGeruest() {
   return (
     <div className="min-h-screen bg-ink-950 text-white flex flex-col">
       <header className="px-8 py-5 flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
-            <Mic2 size={20} className="text-ink-950" />
-          </div>
-          <span className="text-lg font-bold tracking-tight">HOOKCUT</span>
+        <Link to="/">
+          <LogoZeile size={26} />
         </Link>
       </header>
       <Outlet />

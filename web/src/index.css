@@ -1,20 +1,28 @@
 @import "tailwindcss";
 
-/* HOOKCUT Design-Tokens (aus dem Banani-Mockup abgeleitet).
-   Dark-Theme mit kraeftigem Gruen als Akzent. */
+/* selfsign Design-Tokens - aus dem Marken-Blatt.
+   Drei Farben tragen alles: Acid Lime, Ink Black, Off-White.
+
+   Die Zwischentoene der Ink-Reihe sind bewusst NEUTRAL grau (frueher hatten
+   sie einen Gruenstich). Neben einem so lauten Akzent wie Acid Lime wirkt
+   jeder Farbstich im Hintergrund schmutzig - das Gruen soll die einzige
+   Farbe im Bild sein. */
 @theme {
-  --color-ink-950: #0a0b0a;   /* App-Hintergrund */
-  --color-ink-900: #0f100f;   /* Sidebar */
-  --color-ink-850: #141614;   /* Card-Hintergrund */
-  --color-ink-800: #1a1c1a;   /* Card-Hover / Felder */
-  --color-ink-700: #262826;   /* Rahmen */
-  --color-ink-600: #3a3d3a;
+  --color-ink-950: #050505;   /* Ink Black - App-Hintergrund */
+  --color-ink-900: #0c0c0c;   /* Seitenleiste */
+  --color-ink-850: #131313;   /* Karten */
+  --color-ink-800: #1a1a1a;   /* Karten-Hover / Eingabefelder */
+  --color-ink-700: #262626;   /* Rahmen */
+  --color-ink-600: #3a3a3a;
 
-  --color-brand-400: #4ade80;
-  --color-brand-500: #22e06b;  /* Haupt-Gruen (Buttons, aktive Nav) */
-  --color-brand-600: #16b657;
+  /* Acid Lime. 500 ist der Markenwert, 400 haelt als Textfarbe auf dunklem
+     Grund den Kontrast, 600 ist der gedrueckte Knopf. */
+  --color-brand-400: #c9ff4d;
+  --color-brand-500: #b7ff00;  /* Acid Lime - Knoepfe, aktive Navigation */
+  --color-brand-600: #93cc00;
 
-  --color-muted: #8b928b;      /* sekundaerer Text */
+  --color-off-white: #f7f7f5;  /* Off-White - Fliesstext */
+  --color-muted: #8a8a85;      /* sekundaerer Text */
 }
 
 html,
@@ -26,7 +34,7 @@ body,
 body {
   margin: 0;
   background-color: var(--color-ink-950);
-  color: #f4f6f4;
+  color: var(--color-off-white);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }

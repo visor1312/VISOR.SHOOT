@@ -1,4 +1,4 @@
-# HOOKCUT online stellen
+# selfsign online stellen
 
 Schritt-für-Schritt-Anleitung für den ersten Livegang. Alles, was der Server
 braucht, steht schon im Projekt (`Dockerfile`, `render.yaml`,
@@ -22,7 +22,7 @@ den man selbst noch nicht kennt.
 
 1. Im Render-Dashboard: **New → Blueprint**.
 2. Das Repository auswählen. Render liest `render.yaml` und schlägt einen
-   Dienst namens `hookcut` vor.
+   Dienst namens `selfsign` vor.
 3. **Plan prüfen:** Es muss der bezahlte **Starter**-Plan sein (~7 $/Monat).
    Grund: Nur bezahlte Pläne können eine **dauerhafte Festplatte** einbinden.
    Auf der Gratis-Stufe wären Konten, Beiträge und Hörproben nach jedem
@@ -43,7 +43,7 @@ den man selbst noch nicht kennt.
 
 ## 3. Erster Blick
 
-Render zeigt eine Adresse der Form `https://hookcut-xxxx.onrender.com`.
+Render zeigt eine Adresse der Form `https://selfsign-xxxx.onrender.com`.
 Die eigene Domain kommt später — der Name muss den Start nicht aufhalten.
 
 Diese Punkte einmal durchgehen:
@@ -64,7 +64,7 @@ eingebunden — dann nicht weitermachen, sondern das zuerst klären.
 
 ## 4. Einladungscodes erzeugen
 
-`hookcut-einladung.bat` auf deinem Rechner erzeugt Codes für die **lokale**
+`selfsign-einladung.bat` auf deinem Rechner erzeugt Codes für die **lokale**
 Datenbank — die kennt der Server nicht.
 
 Für den Server: im Render-Dashboard beim Dienst auf **Shell** gehen und
@@ -84,10 +84,10 @@ Wer schon ein Konto hat, sieht die Codes auch im Verzeichnis
 Ohne diesen Schritt läuft alles — aber es gibt **keine Sicherung** der
 Datenbank. Sobald du ein Cloudflare-Konto hast:
 
-1. Bei Cloudflare **R2** einen Bucket anlegen (10 GB gratis), z. B. `hookcut-backup`.
+1. Bei Cloudflare **R2** einen Bucket anlegen (10 GB gratis), z. B. `selfsign-backup`.
 2. Dort einen API-Token mit Schreibrechten erzeugen.
 3. In Render unter **Environment** drei Werte eintragen:
-   - `LITESTREAM_REPLICA_URL` = `s3://hookcut-backup/db?endpoint=<deine-R2-Adresse>`
+   - `LITESTREAM_REPLICA_URL` = `s3://selfsign-backup/db?endpoint=<deine-R2-Adresse>`
    - `LITESTREAM_ACCESS_KEY_ID`
    - `LITESTREAM_SECRET_ACCESS_KEY`
 4. Neu ausrollen. Im Log muss stehen: „Litestream aktiv: …".
@@ -120,7 +120,7 @@ Ablauf, bevor irgendetwas online steht.
 2. In Render unter **Environment** eintragen:
    - `HOOKCUT_MAIL_BACKEND` = `resend`
    - `RESEND_API_KEY` = dein Schlüssel von Resend
-   - `HOOKCUT_MAIL_FROM` = z. B. `HOOKCUT <noreply@deine-domain.de>`
+   - `HOOKCUT_MAIL_FROM` = z. B. `selfsign <noreply@deine-domain.de>`
    - `HOOKCUT_PUBLIC_URL` = die echte Adresse der Seite (steht im Link!)
 3. Erst **danach** `HOOKCUT_EMAIL_VERIFICATION` auf `1` — und sofort selbst ein
    Testkonto anlegen, um zu sehen, ob die Mail ankommt.
@@ -180,7 +180,7 @@ Schalter verschiebt beides, Datenbank und Dateien.
   Daten ein Update überleben.
 - **Die Video-Werkzeuge gibt es online nicht** und sie sind auch nicht
   geplant: Sie brauchen Chrome mit WebGPU und mehrere GB an Modellen. Sie
-  bleiben auf deinem Rechner (`start-hookcut.bat`).
+  bleiben auf deinem Rechner (`start-selfsign.bat`).
 - **Die Rechtstexte sind nicht anwaltlich geprüft.** Impressum,
   Datenschutzerklärung, Nutzungsbedingungen, Meldeknopf und „Konto löschen"
   stehen (Phase 2, Schritt 5) und sind nah am tatsächlichen Verhalten der

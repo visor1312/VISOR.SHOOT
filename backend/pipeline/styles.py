@@ -1,4 +1,4 @@
-"""Bearbeitungs-Styles fuer die HOOKCUT-All-in-One-Pipeline.
+"""Bearbeitungs-Styles fuer die selfsign-All-in-One-Pipeline.
 
 Ein Style ist ein Stapel FreeCut-GPU-Effekte (gpu-effect-IDs aus
 editor/src/infrastructure/gpu-effects/), der beim Hintergrund-Rendern auf den

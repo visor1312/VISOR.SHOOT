@@ -13,7 +13,6 @@ import {
   BarChart3,
   Users,
   DollarSign,
-  Mic2,
   Users2,
   UserCircle,
   Settings,
@@ -22,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { User } from "../api";
+import { LogoZeile } from "./Logo";
 
 interface NavItem {
   label: string;
@@ -35,7 +35,7 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   // Der Feed steht oben und ist die Startseite. Das Werkzeug-Dashboard hat
-  // eine eigene Adresse (/dashboard) - wer HOOKCUT aufmacht, soll zuerst
+  // eine eigene Adresse (/dashboard) - wer selfsign aufmacht, soll zuerst
   // sehen, was in der Szene los ist, und nicht seine eigene Werkbank.
   { label: "Offene Projekte", icon: Users2, to: "/projekte-feed" },
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", werkzeug: true },
@@ -52,7 +52,7 @@ const mainNav: NavItem[] = [
 // Steht nur in der Navigation, solange kein Abo laeuft - wer bezahlt hat,
 // braucht keine Werbung mehr. Erreichbar bleibt /premium trotzdem (ueber die
 // Einstellungen), damit man Laufzeit und Leistungen nachsehen kann.
-const premiumNav: NavItem = { label: "HOOKCUT Premium", icon: Sparkles, to: "/premium" };
+const premiumNav: NavItem = { label: "selfsign Premium", icon: Sparkles, to: "/premium" };
 
 const analyticsNav: NavItem[] = [
   { label: "Spotify Streaming Dashboard", icon: TrendingUp, to: "/spotify", soon: true },
@@ -147,12 +147,9 @@ export default function Sidebar({
   return (
     <aside className="w-64 shrink-0 h-screen sticky top-0 bg-ink-900 border-r border-ink-700 flex flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
-        <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
-          <Mic2 size={20} className="text-ink-950" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">HOOKCUT</span>
-      </div>
+      <NavLink to="/projekte-feed" className="px-5 h-16 shrink-0 flex items-center">
+        <LogoZeile size={26} />
+      </NavLink>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         <div className="space-y-1 pt-2">
@@ -201,7 +198,9 @@ export default function Sidebar({
           title="Einstellungen"
           className="flex items-center gap-3 flex-1 min-w-0 group"
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-700 shrink-0 flex items-center justify-center text-xs font-bold text-white">
+          {/* Frueher ein Orange-Verlauf - der biss sich mit dem Acid Lime.
+              Die Marke hat genau EINE Farbe, die soll sie behalten. */}
+          <div className="w-9 h-9 rounded-full bg-brand-500 shrink-0 flex items-center justify-center text-xs font-bold text-ink-950">
             {initials(user.display_name)}
           </div>
           <div className="flex-1 min-w-0">

@@ -9,7 +9,7 @@ sitze?* Alles andere steht in `README.md` (Bedienung) und
 
 ## 1. Aktualisieren und starten — ein Doppelklick
 
-**`update-hookcut.bat` doppelklicken.** Das war's. Das Skript macht der Reihe
+**`update-selfsign.bat` doppelklicken.** Das war's. Das Skript macht der Reihe
 nach:
 
 1. holt die neuen Änderungen (`git pull`),
@@ -55,7 +55,7 @@ Sichtbar geändert hat sich:
 
 ### a) Abos von Hand vergeben
 
-**`hookcut-abo.bat` doppelklicken.** Ein Menü mit fünf Punkten:
+**`selfsign-abo.bat` doppelklicken.** Ein Menü mit fünf Punkten:
 
 1. Alle Abos anzeigen
 2. Premium freischalten (1 Monat)
@@ -76,7 +76,7 @@ Zwei Dinge, die absichtlich so sind:
 
 ### b) Sehen, was ein Kunde ohne Abo sieht
 
-**`hookcut-premium-test.bat` doppelklicken.** Startet HOOKCUT genau einmal mit
+**`selfsign-premium-test.bat` doppelklicken.** Startet selfsign genau einmal mit
 den Einstellungen, die online gelten. Dein Konto hat kein Abo, also siehst du
 das, was ein neuer Nutzer sieht:
 
@@ -87,11 +87,11 @@ das, was ein neuer Nutzer sieht:
 * die Werkzeug-Einträge bleiben aber **sichtbar** — wer nicht sieht, was er
   kaufen könnte, kauft es nicht.
 
-Dann `hookcut-abo.bat` → Punkt **4** → deine E-Mail → im Browser **F5**. Jetzt
+Dann `selfsign-abo.bat` → Punkt **4** → deine E-Mail → im Browser **F5**. Jetzt
 bist du durch, und alles funktioniert wie gewohnt.
 
 **Zum Zurückschalten:** Fenster schließen und wieder ganz normal mit
-`start-hookcut.bat` (oder `update-hookcut.bat`) starten. Der Testmodus gilt
+`start-selfsign.bat` (oder `update-selfsign.bat`) starten. Der Testmodus gilt
 nur für den einen Start, an deinen Daten ändert er nichts.
 
 ---
@@ -100,11 +100,11 @@ nur für den einen Start, an deinen Daten ändert er nichts.
 
 | Was du siehst | Was zu tun ist |
 |---|---|
-| `No module named 'bcrypt'` o.ä. im Backend-Fenster | `update-hookcut.bat` nochmal — der pip-Schritt war wohl nicht durch |
-| `Cannot find module` im Frontend-Fenster | Ordner `web` → `npm install` (macht `update-hookcut.bat` jetzt mit) |
+| `No module named 'bcrypt'` o.ä. im Backend-Fenster | `update-selfsign.bat` nochmal — der pip-Schritt war wohl nicht durch |
+| `Cannot find module` im Frontend-Fenster | Ordner `web` → `npm install` (macht `update-selfsign.bat` jetzt mit) |
 | Browser zeigt „Seite nicht erreichbar" | Die zwei schwarzen Fenster brauchen ein paar Sekunden. Neu laden. |
 | Fehler beim `git pull` | Meldung im Fenster abfotografieren und mir schicken — nicht raten |
-| Anmeldung geht nicht | `hookcut-passwort-reset.bat` |
+| Anmeldung geht nicht | `selfsign-passwort-reset.bat` |
 
 Das Backend-Fenster ist die ehrlichste Auskunft: Was dort rot steht, ist der
 eigentliche Fehler.
@@ -119,7 +119,7 @@ Claude Code im Projektordner starten. Der Einstiegssatz, der immer passt:
 > stehen."
 
 Der Zweig, auf dem alles liegt: **`claude/rap-video-auto-editor-s9xfvt`**.
-`update-hookcut.bat` zeigt ihn beim Start an — steht dort etwas anderes,
+`update-selfsign.bat` zeigt ihn beim Start an — steht dort etwas anderes,
 sag Bescheid, bevor du weitermachst.
 
 **Wo der Stand dokumentiert ist:**
@@ -129,6 +129,8 @@ sag Bescheid, bevor du weitermachst.
 * `PROJEKT-STATUS.md`, Abschnitt „Phase 3: Premium-Abo" — was Schritt 1 und 2
   genau gebaut haben, inklusive der Fehler, die dabei gefunden wurden
 * `README.md`, Abschnitt „Premium-Abo (Handbetrieb)" — die Bedienung
+* `MARKE.md` — Logo, Farben, Claim. **Und wie du das Original-Logo
+  eintauschst: eine Datei ersetzen, sonst nichts.**
 
 **Als Nächstes dran** (Schritt 3 und 4 aus dem Plan): der Auftrags-Vertrag
 wird umgebaut, damit dein PC die Aufträge aus der Cloud abholen kann, und

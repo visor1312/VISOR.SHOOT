@@ -22,7 +22,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-_TEST_DATEN = Path(tempfile.mkdtemp(prefix="hookcut-tests-"))
+_TEST_DATEN = Path(tempfile.mkdtemp(prefix="selfsign-tests-"))
 os.environ.setdefault("HOOKCUT_PROJECTS_DIR", str(_TEST_DATEN))
 os.environ.setdefault("HOOKCUT_DB", str(_TEST_DATEN / "state.db"))
 # Die Bremse gegen massenhaft angelegte Konten greift pro Adresse - und aus

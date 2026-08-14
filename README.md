@@ -1,11 +1,14 @@
-# HOOKCUT
+# selfsign — *Sign yourself.*
 
-**Das Multimedia-Tool für Independent Artists** — vom Handyvideo zum
-release-fertigen Social-Media-Clip.
+**Das Netzwerk für Independent Artists**, mit den Werkzeugen dahinter —
+vom Handyvideo zum release-fertigen Social-Media-Clip.
 
 > **Gerade den Rechner angemacht?** → `START-AM-PC.md` ist die
 > Schritt-für-Schritt-Anleitung: aktualisieren, starten, ausprobieren.
-> Kurzfassung: **`update-hookcut.bat` doppelklicken.**
+> Kurzfassung: **`update-selfsign.bat` doppelklicken.**
+>
+> **Logo, Farben, Name:** `MARKE.md`. Dort steht auch, wie du die
+> Original-Logodatei mit einem Handgriff eintauschst.
 
 Lokal laufendes Tool, um ein zum Playback mitgerapptes Handyvideo zeitlich
 exakt mit der fertig produzierten Songdatei zu synchronisieren und als
@@ -26,7 +29,7 @@ Grading, Upscaling)** und die **Hook-Erkennung** sind fertig und lauffähig.
 
 ## Neu: das Netzwerk für Musiker
 
-Seit August 2026 ist HOOKCUT nicht mehr nur ein Werkzeug für dich allein,
+Seit August 2026 ist selfsign nicht mehr nur ein Werkzeug für dich allein,
 sondern der Anfang einer **Plattform für Independent-Musiker**.
 
 Unter **„Offene Projekte"** in der Seitenleiste kannst du posten, woran du
@@ -51,7 +54,7 @@ sehen: Künstlername, Stadt, Genres, Kurzbeschreibung und deine Links.
 Deine E-Mail bleibt privat. Trag die Links ein — darüber melden sich Leute
 bei dir.
 
-> **Hinweis:** Solange HOOKCUT nur auf deinem Rechner läuft, bist du der
+> **Hinweis:** Solange selfsign nur auf deinem Rechner läuft, bist du der
 > einzige Nutzer. Das Netzwerk entfaltet seinen Sinn erst, wenn es online
 > steht — das ist der nächste große Schritt (siehe `PROJEKT-STATUS.md`,
 > Abschnitt „Fahrplan").
@@ -61,7 +64,7 @@ Die alte Seite „Offene Projekte" für deine **eigenen** Aufnahmen heißt jetzt
 
 ## Anmeldung & Konten
 
-HOOKCUT hat ein Benutzer-System: Login, Registrierung und pro Konto ein
+selfsign hat ein Benutzer-System: Login, Registrierung und pro Konto ein
 eigenes Dashboard (jeder sieht nur seine eigenen Projekte, Reels und
 Hook-Analysen). Es ist bewusst schon „online-tauglich" gebaut (sichere
 Passwort-Speicherung, Sitzungen, saubere Datentrennung), läuft aber komplett
@@ -73,9 +76,9 @@ lokal auf deinem Rechner.
    Bibliothek dazu (`bcrypt`, fürs sichere Passwort-Speichern). **Ohne diesen
    Schritt startet das Backend nicht** (es meldet dann `No module named
    'bcrypt'` im Backend-Fenster).
-2. `hookcut-einladung.bat` doppelklicken → es erscheint ein **Einladungscode**.
+2. `selfsign-einladung.bat` doppelklicken → es erscheint ein **Einladungscode**.
    Registrierung geht nur mit so einem Code (du vergibst sie als Betreiber).
-3. HOOKCUT starten (`start-hookcut.bat`), die Login-Seite öffnet sich →
+3. selfsign starten (`start-selfsign.bat`), die Login-Seite öffnet sich →
    „Mit Einladungscode registrieren" → Code, E-Mail, Anzeigename und Passwort
    eingeben. **Das erste Konto wird automatisch Admin und übernimmt alle schon
    vorhandenen Projekte/Reels.**
@@ -86,9 +89,9 @@ anlegen könnte. Die spätere öffentliche Plattform setzt die Umgebungsvariable
 `HOOKCUT_INVITE_ONLY=0`, dann ist die Registrierung für alle offen und das
 Code-Feld verschwindet automatisch aus der Login-Maske.
 
-**Weitere Konten:** am bequemsten direkt in HOOKCUT unter **Einstellungen →
+**Weitere Konten:** am bequemsten direkt in selfsign unter **Einstellungen →
 Einladungscodes → „Neuen Code erzeugen"** (nur als Admin sichtbar). Alternativ
-weiterhin per `hookcut-einladung.bat`.
+weiterhin per `selfsign-einladung.bat`.
 
 **Die Oberfläche hat jetzt echte Seiten** (über die Sidebar, mit eigenen
 Adressen wie `/reels`, `/einstellungen`): Dashboard, Hook Generator,
@@ -100,7 +103,7 @@ Datenbanken …), zeigen eine ehrliche „Demnächst"-Seite statt eines toten Li
 
 **Wochen-Content (Content-Pakete):** Der Baustein gegen das größte Problem
 von Indie-Musikern — konsistent posten, ohne auszubrennen. Ein Song + Video →
-mehrere fertige Posts auf einen Schlag: HOOKCUT kombiniert automatisch die
+mehrere fertige Posts auf einen Schlag: selfsign kombiniert automatisch die
 besten Hook-Stellen mit den gewählten Looks und Formaten (z.B. 2 Hooks × 3
 Styles × 2 Formate = 12 Videos), genug für eine ganze Woche. Jedes Video wird
 einzeln gerendert (der Assistent zeigt live „x/y fertig") und ist einzeln
@@ -111,18 +114,18 @@ Rendern deshalb bewusst lokal (siehe unten).
 **Spotify Canvas:** Ein kurzer (3–8 Sekunden), sich wiederholender, **stummer**
 9:16-Clip, der auf Spotify das Cover ersetzt — Tracks mit Canvas bekommen
 deutlich mehr Streams. Video + Song hochladen, Länge und Look wählen, „auf den
-Hook schneiden" → HOOKCUT nimmt den energiereichsten Moment, rendert ihn als
+Hook schneiden" → selfsign nimmt den energiereichsten Moment, rendert ihn als
 9:16 und entfernt den Ton (Spotify spielt den Song selbst). Danach in **Spotify
 for Artists** beim Track „Canvas hinzufügen" und die heruntergeladene Datei
 wählen. Menü in der Sidebar: **„Spotify Canvas"**.
 
-**Passwort vergessen:** Solange HOOKCUT nur lokal läuft, gibt es bewusst
+**Passwort vergessen:** Solange selfsign nur lokal läuft, gibt es bewusst
 keinen „Passwort vergessen"-Link (dafür bräuchte es einen E-Mail-Versand, der
-erst mit dem späteren Online-Hosting kommt). Stattdessen am HOOKCUT-Rechner
-`hookcut-passwort-reset.bat` doppelklicken und den Anweisungen folgen.
+erst mit dem späteren Online-Hosting kommt). Stattdessen am selfsign-Rechner
+`selfsign-passwort-reset.bat` doppelklicken und den Anweisungen folgen.
 
 **Wichtig:** Immer über `http://localhost:5173` einloggen (so öffnet auch
-`start-hookcut.bat` den Browser), nicht über `127.0.0.1:5173` — die Anmeldung
+`start-selfsign.bat` den Browser), nicht über `127.0.0.1:5173` — die Anmeldung
 ist an die Adresse gebunden, über die du dich eingeloggt hast.
 
 Admin-Werkzeuge auf der Kommandozeile (optional):
@@ -141,14 +144,14 @@ frei. **Auf deinem eigenen Rechner kostet nichts etwas** — dort ist der
 Schalter `HOOKCUT_PREMIUM_REQUIRED` aus, es sind ja deine Werkzeuge und deine
 Rechenzeit. Online steht er auf `1`.
 
-**Selbst ansehen, was ein Kunde sieht:** `hookcut-premium-test.bat`
-doppelklicken. Startet HOOKCUT einmalig mit den Schaltern, die online gelten —
+**Selbst ansehen, was ein Kunde sieht:** `selfsign-premium-test.bat`
+doppelklicken. Startet selfsign einmalig mit den Schaltern, die online gelten —
 dein Konto hat kein Abo, du siehst also die Bezahlschranke. Ändert nichts an
 deinen Daten; der nächste normale Start ist wieder wie vorher.
 
 Solange kein Zahlungsanbieter angebunden ist (das ist Schritt 5 aus
 `PHASE-3-PLAN.md`), vergibst du Abos von Hand: Rechnung schicken, Zahlung
-abwarten, freischalten. **`hookcut-abo.bat` doppelklicken** — es erscheint ein
+abwarten, freischalten. **`selfsign-abo.bat` doppelklicken** — es erscheint ein
 Menü:
 
 1. Alle Abos anzeigen
@@ -211,12 +214,12 @@ pip install --no-build-isolation basicsr realesrgan
 
 ## Nutzung
 
-### HOOKCUT-Editor (neuer Produkt-Kern, `editor/`)
+### selfsign-Editor (neuer Produkt-Kern, `editor/`)
 
 Vollwertiger Browser-Video-Editor (Fork von [FreeCut](https://github.com/walterlow/freecut),
 MIT — Timeline, ~60 GPU-Effekte, Übergänge, Untertitel mit manueller
 Korrektur, 9:16-Export) plus unser Alleinstellungsmerkmal als Toolbar-Button
-**„⚡ HOOKCUT"**: Video + Song aus der Media-Library wählen → die lokale
+**„⚡ selfsign"**: Video + Song aus der Media-Library wählen → die lokale
 Python-Analyse berechnet Sync-Versatz + beste Hook-Stelle → ein Klick legt
 beides fertig synchron und auf den Hook getrimmt auf zwei neue Spuren
 (Video stumm, Song an). Danach normal im Editor verfeinern und exportieren.
@@ -224,15 +227,15 @@ beides fertig synchron und auf den Hook getrimmt auf zwei neue Spuren
 Start: `start-editor.bat` doppelklicken (startet Analyse-Backend auf Port
 8000 + Editor auf Port 5173, öffnet Chrome). Einmalig vorher: im Ordner
 `editor/` ein `npm install`. **Nur Chrome/Edge** (WebGPU). Details:
-`editor/HOOKCUT-FORK.md`.
+`editor/selfsign-FORK.md`.
 
 ### React-Dashboard (primäre Oberfläche, `web/`)
 
-Das designte HOOKCUT-Dashboard (React + Vite + Tailwind, Dark-Theme) liegt
+Das designte selfsign-Dashboard (React + Vite + Tailwind, Dark-Theme) liegt
 unter `web/`. Es ist **die primäre Produkt-Oberfläche** und spricht das
 FastAPI-Backend (`backend/main.py`) über `/api/...` an (im Dev-Server als
 Proxy auf `127.0.0.1:8000` konfiguriert). Bequemster Start: einfach
-`start-hookcut.bat` doppelklicken (startet Backend + Frontend + Browser).
+`start-selfsign.bat` doppelklicken (startet Backend + Frontend + Browser).
 
 ```bash
 cd web
@@ -519,7 +522,7 @@ Nützliche erste Sätze für einen neuen Chat:
 **Wenn beim Start eine Fehlermeldung zu `.claude/hooks/session-start.sh`
 kommt:** Dieses Skript installiert in der Cloud-Umgebung automatisch die
 Abhängigkeiten. Auf Windows wird es nicht gebraucht (das macht
-`update-hookcut.bat`) und es beendet sich sofort selbst — falls Windows es
+`update-selfsign.bat`) und es beendet sich sofort selbst — falls Windows es
 trotzdem nicht ausführen kann, kannst du die Datei `.claude/settings.json`
 gefahrlos löschen. Am Projekt ändert sich dadurch nichts.
 

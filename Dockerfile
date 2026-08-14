@@ -1,4 +1,4 @@
-# HOOKCUT als EIN Dienst: Node baut die Oberflaeche, Python liefert sie
+# selfsign als EIN Dienst: Node baut die Oberflaeche, Python liefert sie
 # zusammen mit der API aus. Zwei Stufen, damit Node und die halbe
 # npm-Welt nicht im fertigen Image landen.
 #

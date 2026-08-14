@@ -20,7 +20,7 @@ from backend import db
 # Es gibt vorerst genau einen Plan. Eine Liste waere ehrlicher, wenn es
 # mehrere gaebe - solange es einer ist, ist eine Liste nur Ballast.
 PLAN_KEY = "premium"
-PLAN_NAME = "HOOKCUT Premium"
+PLAN_NAME = "selfsign Premium"
 PLAN_PREIS_CENT = 1000          # 10,00 EUR pro Monat
 PLAN_WAEHRUNG = "EUR"
 PLAN_INTERVALL = "monat"

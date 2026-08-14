@@ -118,7 +118,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 # bekannter E-Mail gleich lang - sonst wuerde die Antwortzeit verraten, welche
 # Adressen registriert sind (Timing-Seitenkanal / User-Enumeration), trotz
 # einheitlicher Fehlermeldung.
-_DUMMY_HASH = bcrypt.hashpw(b"hookcut-timing-guard", bcrypt.gensalt(rounds=12)).decode("ascii")
+_DUMMY_HASH = bcrypt.hashpw(b"selfsign-timing-guard", bcrypt.gensalt(rounds=12)).decode("ascii")
 
 
 def _hash_token(token: str) -> str:
@@ -557,7 +557,7 @@ def bestaetigung_verschicken(user: dict) -> None:
         mailer.send(user["email"], "Bitte bestaetige deine E-Mail-Adresse",
                     mailer.bestaetigungs_mail(user["email"], user["display_name"], link))
     except mailer.MailFehler as e:
-        print(f"[HOOKCUT] Bestaetigungsmail an {user['email']} fehlgeschlagen: {e}",
+        print(f"[selfsign] Bestaetigungsmail an {user['email']} fehlgeschlagen: {e}",
               flush=True)
 
 
@@ -600,7 +600,7 @@ def require_premium(user: dict = Depends(get_current_user)) -> dict:
     if not abo.ist_aktiv(db.get_subscription(user["id"])):
         raise HTTPException(
             402,
-            "Dafuer brauchst du HOOKCUT Premium. Unter Einstellungen findest "
+            "Dafuer brauchst du selfsign Premium. Unter Einstellungen findest "
             "du, was dazugehoert und was es kostet.")
     return user
 

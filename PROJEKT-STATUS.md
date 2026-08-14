@@ -1,11 +1,11 @@
-# HOOKCUT — Projekt-Übergabe / Status
+# selfsign — Projekt-Übergabe / Status
 
 > **Für jeden neuen Coding-Agenten (oder neuen Chat): ZUERST `CLAUDE.md`
 > lesen (kurz), dann dieses Dokument (tief), dann README.md (Bedienung).**
 > Stand: **August 2026**, Branch `claude/rap-video-auto-editor-s9xfvt`
 > (alles committed und gepusht).
 
-## Was ist HOOKCUT?
+## Was ist selfsign?
 
 **Zwei Dinge in einem Projekt:**
 
@@ -57,10 +57,10 @@ backend/  Python FastAPI (Port 8000). Bewusst nach Produkt getrennt:
           (Beats -> AudioPulse-Frames), freecut_workspace
           (baut FreeCut-Projekt), render_pipeline
 editor/   Fork von FreeCut (MIT, © FreeCut — LICENSE MUSS bleiben).
-          Browser-Video-Editor, als HOOKCUT gebrandet. Wird als UNSICHTBARE
+          Browser-Video-Editor, als selfsign gebrandet. Wird als UNSICHTBARE
           Render-Engine benutzt: headless/render.mjs rendert per headless
           Chrome ein von backend generiertes project.json (--quality ultra,
-          1080x1920). Hat auch einen ⚡HOOKCUT-Button im Editor (Etappe 3),
+          1080x1920). Hat auch einen ⚡selfsign-Button im Editor (Etappe 3),
           aber Produktrichtung ist der Assistent, nicht der Editor.
 ```
 
@@ -74,12 +74,12 @@ Datenfluss Render: backend/freecut_workspace.py schreibt
 zum Aktualisieren, Starten und Ausprobieren. Bei Änderungen an den `.bat`-Dateien
 oder am Ablauf dort mitziehen, sonst zeigt sie auf etwas, das es nicht mehr gibt.
 
-- `start-hookcut.bat` — Backend + Dashboard (der normale Weg)
+- `start-selfsign.bat` — Backend + Dashboard (der normale Weg)
 - `start-editor.bat` — Backend + Editor (nur für Editor-Arbeit)
-- `update-hookcut.bat` — git pull + pip install + `npm install` in `web/` + Start
-- `hookcut-premium-test.bat` — einmaliger Start mit `HOOKCUT_PREMIUM_REQUIRED=1`,
+- `update-selfsign.bat` — git pull + pip install + `npm install` in `web/` + Start
+- `selfsign-premium-test.bat` — einmaliger Start mit `HOOKCUT_PREMIUM_REQUIRED=1`,
   um die Bezahlschranke lokal zu sehen (über `_backend-premium.bat`)
-- `hookcut-abo.bat` — Abos von Hand vergeben/beenden/anzeigen
+- `selfsign-abo.bat` — Abos von Hand vergeben/beenden/anzeigen
 - `cmd-hier.bat` — CMD im Ordner
 - `test-render.bat` — Machbarkeitstest headless-Render (Drag&Drop-Eingabe)
 - Einmalig: `pip install -r requirements.txt`, `npm install` in `web/` UND
@@ -185,7 +185,7 @@ Interesse zeigen, kommentieren.
 - **DB:** neue Tabellen users/sessions/invite_codes/login_attempts + user_id
   auf projects/hook_jobs/analyze_jobs/edit_jobs (Mini-Migration). `create_*`
   nehmen user_id; `update_*`-Allow-Lists enthalten user_id NICHT (unveränderlich).
-- **backend/admin.py** (+ hookcut-einladung.bat / hookcut-passwort-reset.bat):
+- **backend/admin.py** (+ selfsign-einladung.bat / selfsign-passwort-reset.bat):
   create-invite / list-invites / list-users / reset-password.
 - **Konto/Admin im Browser** (Einstellungen-Seite): `PATCH /auth/me`
   (Anzeigename), `POST /auth/change-password` (prueft altes PW, rotiert ALLE
@@ -307,7 +307,7 @@ Zwei Entscheidungen des Besitzers, hergeleitet in `PHASE-3-PLAN.md`:
   eine sagt „das kostet", die andere „das läuft hier nicht".
 - **`HOOKCUT_PREMIUM_REQUIRED`** (Default `0`, online `1`): lokal soll sich
   niemand aus seinen eigenen Werkzeugen aussperren.
-- **`hookcut-abo.bat`** + `abo-geben` / `abo-nehmen` / `abo-liste`: Verkauf
+- **`selfsign-abo.bat`** + `abo-geben` / `abo-nehmen` / `abo-liste`: Verkauf
   von Hand, bevor ein Zahlungsanbieter existiert. Freischalten **verlängert**
   ab dem bisherigen Ende, statt Resttage zu verschlucken.
 - Nebenbei gefunden und behoben: `delete_user_completely` räumte
@@ -586,7 +586,7 @@ Bewusst offen (lokal unkritisch, vor dem Hosting zu klären):
   (`_save_upload_capped`, 8 MB + Endungs-Positivliste + Längenprüfung).
 - Nach einer abgelaufenen Sperre bleibt fail_count stehen: der nächste
   Fehlversuch sperrt sofort wieder für 15 min. Für den Besitzer harmlos
-  (hookcut-passwort-reset.bat), online aber ein Ärgernis-Hebel gegen fremde
+  (selfsign-passwort-reset.bat), online aber ein Ärgernis-Hebel gegen fremde
   Konten.
 - Die „erstes Konto wird Admin"-Prüfung ist selbst nicht renn-sicher; bei
   zwei exakt gleichzeitigen Erst-Registrierungen könnten zwei Admins
@@ -644,7 +644,7 @@ durchführen (`HOSTING.md`); die Tür bleibt dabei zu.
 5. Bilder an Beiträgen — erst wenn der Object Storage steht; die lokale
    Platte ist dafür der falsche Ort.
 6. Blockieren/Stummschalten von Nutzern.
-7. i18n der neuen Editor-Strings (TODO in editor/HOOKCUT-FORK.md).
+7. i18n der neuen Editor-Strings (TODO in editor/selfsign-FORK.md).
 8. Ideen: all-in-one-Strukturmodell als Pro-Backend (NATTEN/HF-Blocker
    beachten), Wort-Karaoke-Highlight.
 

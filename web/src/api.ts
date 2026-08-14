@@ -1,4 +1,4 @@
-// Typisierter Client fuer das HOOKCUT-FastAPI-Backend (backend/main.py).
+// Typisierter Client fuer das selfsign-FastAPI-Backend (backend/main.py).
 //
 // WICHTIG - der Pfad unterscheidet sich zwischen Entwicklung und Betrieb:
 // Im Dev-Server faengt Vite alles unter /api ab und leitet es ans Backend
@@ -35,7 +35,7 @@ export interface Take {
 // Uebersetzt technische Netzwerkfehler in Meldungen, mit denen auch
 // Nicht-Techniker etwas anfangen koennen (Zielgruppe: Musiker, keine Devs).
 const HINT_RESTART =
-  "Bitte beide Server-Fenster schliessen und start-hookcut.bat neu starten, " +
+  "Bitte beide Server-Fenster schliessen und start-selfsign.bat neu starten, " +
   "dann die Seite neu laden.";
 
 /** Sitzung abgelaufen/nicht angemeldet - App zeigt wieder die Login-Maske. */
@@ -62,16 +62,16 @@ async function requestOrExplain(
     res = await fetch(input, init);
   } catch {
     // "Failed to fetch": nicht mal der Frontend-Server (Port 5173) war
-    // erreichbar - HOOKCUT laeuft nicht (mehr) oder wurde neu gestartet.
+    // erreichbar - selfsign laeuft nicht (mehr) oder wurde neu gestartet.
     throw new Error(
-      "Keine Verbindung zu HOOKCUT. Laufen die beiden Server-Fenster noch? " +
+      "Keine Verbindung zu selfsign. Laufen die beiden Server-Fenster noch? " +
         HINT_RESTART,
     );
   }
   if (res.status === 502 || res.status === 504) {
     // Vite-Proxy erreicht das Backend (Port 8000) nicht.
     throw new Error(
-      "Das Backend (Fenster \"HOOKCUT Backend\") ist nicht erreichbar. " +
+      "Das Backend (Fenster \"selfsign Backend\") ist nicht erreichbar. " +
         HINT_RESTART,
     );
   }

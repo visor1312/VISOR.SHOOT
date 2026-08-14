@@ -1,7 +1,7 @@
-# FreeCut-Evaluation für HOOKCUT — Ergebnis (Teil A)
+# FreeCut-Evaluation für selfsign — Ergebnis (Teil A)
 
 **Frage:** Kann [walterlow/freecut](https://github.com/walterlow/freecut) (MIT)
-der Video-Editor-Baustein für HOOKCUT werden — und lässt sich unsere
+der Video-Editor-Baustein für selfsign werden — und lässt sich unsere
 automatische Analyse programmatisch in eine FreeCut-Timeline füttern?
 
 **Kurzantwort: JA (klarer GO für die technische Machbarkeit).**
@@ -24,7 +24,7 @@ einem Chrome-Rechner — das kann die Sandbox nicht testen).
   `--resolution 1080x1920` erzeugt **9:16 direkt**.
 
 ### 2. Das Datenmodell passt fast 1:1 auf unsere Analyse-Ausgabe
-| HOOKCUT (Python, heute schon da) | FreeCut-Projekt |
+| selfsign (Python, heute schon da) | FreeCut-Projekt |
 |---|---|
 | `compute_offset()` → `offset_ms` | Startversatz der Song-Tonspur |
 | `detect_hook()` → `start/end_sec` | Trim von Video + Ton auf den Hook |
@@ -42,7 +42,7 @@ Cues relativ zum Clip-Start. Reine Datenabbildung, keine FreeCut-Änderung.
 
 ## Lücken-Liste (gegen unsere heutige ffmpeg-Pipeline)
 
-| HOOKCUT-Funktion | In FreeCut? | Aufwand für Hybrid |
+| selfsign-Funktion | In FreeCut? | Aufwand für Hybrid |
 |---|---|---|
 | 9:16-Export | ✅ nativ (`--resolution`) | keiner |
 | Song über stummes Video | ✅ Mehrspur + `muted`/`volume` | keiner |
@@ -58,7 +58,7 @@ Cues relativ zum Clip-Start. Reine Datenabbildung, keine FreeCut-Änderung.
 ## Vorbehalte (fließen in die Produktentscheidung ein)
 - **Nur Chromium-Browser** (Chrome/Edge 113+, Brave/Arc) — kein Safari/Firefox.
   Für eine Musiker-Zielgruppe (viel iPhone/Safari) eine echte Einschränkung,
-  wenn HOOKCUT im Browser laufen soll.
+  wenn selfsign im Browser laufen soll.
 - **„Open source, not open contribution"**: MIT-Lizenz erlaubt Fork/kommerzielle
   Nutzung, aber wir müssten einen eigenen Fork pflegen und Upstream-Updates
   manuell nachziehen.
@@ -94,5 +94,5 @@ anfühlt und der Export auf einem echten Rechner sauber läuft.
 2. Klappt ein 9:16-MP4-Export mit eingebrannten Untertiteln?
 3. Kann man eine zweite Tonspur (Song) über das Video legen?
 
-Fällt Teil B positiv aus → Folgeplan: HOOKCUT-Analyse → `freecut_adapter.py`
+Fällt Teil B positiv aus → Folgeplan: selfsign-Analyse → `freecut_adapter.py`
 → FreeCut-Projekt automatisch erzeugen und im Browser öffnen.

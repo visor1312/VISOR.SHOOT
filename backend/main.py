@@ -1,4 +1,4 @@
-"""FastAPI-Endpunkte fuer HOOKCUT (Sync + Viral Hook Detector).
+"""FastAPI-Endpunkte fuer selfsign (Sync + Viral Hook Detector).
 
 Duenne Schicht ueber db.py und den pipeline/-Modulen: hier haengen die
 Routen fuer Sync, Hook-Erkennung, Styles, Wochen-Content und Canvas. Das
@@ -61,7 +61,7 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="HOOKCUT", lifespan=_lifespan,
+    title="selfsign", lifespan=_lifespan,
     # Online abgeschaltet (HOOKCUT_API_DOCS=0): /docs, /redoc und
     # /openapi.json listen sonst jedem Besucher saemtliche Routen samt
     # Parametern auf, auch die Admin-Routen. Lokal bleibt es an, dort ist es
@@ -145,7 +145,7 @@ def require_tools() -> None:
     if not config.TOOLS_ENABLED:
         raise HTTPException(
             503,
-            "Diese Funktion laeuft nur in der HOOKCUT-App auf deinem Rechner. "
+            "Diese Funktion laeuft nur in der selfsign-App auf deinem Rechner. "
             "Im Netzwerk stehen die Video-Werkzeuge nicht zur Verfuegung.",
         )
 
@@ -431,7 +431,7 @@ def hook_preview(job_id: str, index: int, user: dict = Depends(auth.get_current_
 def _run_analyze_job(job_id: str) -> None:
     """Editor-Analyse (Etappe 3): NUR Zahlen, KEIN Rendern.
 
-    Der HOOKCUT-Editor (editor/, FreeCut-Fork) uebernimmt Schnitt und Export
+    Der selfsign-Editor (editor/, FreeCut-Fork) uebernimmt Schnitt und Export
     selbst im Browser - er braucht von uns nur Sync-Versatz, Hook-Fenster und
     Dauern, um die Timeline vorzubereiten.
     """

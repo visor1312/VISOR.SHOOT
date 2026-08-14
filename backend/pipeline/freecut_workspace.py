@@ -154,7 +154,7 @@ def build_workspace(
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
-    project_name: str = "HOOKCUT Export",
+    project_name: str = "selfsign Export",
 ) -> dict:
     """Legt einen render-fertigen Workspace an. Rueckgabe: {project_id,
     workspace_dir, render_args} - render_args ist die Argumentliste fuer
@@ -279,7 +279,7 @@ def build_workspace(
 
     project = {
         "id": project_id, "name": project_name,
-        "description": "Automatisch von HOOKCUT erzeugt",
+        "description": "Automatisch von selfsign erzeugt",
         "createdAt": 0, "updatedAt": 0, "duration": duration_frames,
         "schemaVersion": 1,
         "metadata": {"width": width, "height": height, "fps": fps, "backgroundColor": "#000000"},

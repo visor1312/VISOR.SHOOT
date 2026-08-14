@@ -1,7 +1,7 @@
 @echo off
 setlocal
 REM ===================================================================
-REM  HOOKCUT Hintergrund-Render TESTEN (Machbarkeits-Test)
+REM  selfsign Hintergrund-Render TESTEN (Machbarkeits-Test)
 REM
 REM  Beweist, dass FreeCut ferngesteuert (ohne Editor-Fenster) ein
 REM  fertiges, gestyltes 9:16-Video rendern kann.
@@ -12,7 +12,7 @@ REM ===================================================================
 cd /d "%~dp0"
 
 echo ==============================================
-echo   HOOKCUT Render-Test
+echo   selfsign Render-Test
 echo ==============================================
 echo.
 echo Ziehe gleich die Dateien mit der Maus in DIESES Fenster

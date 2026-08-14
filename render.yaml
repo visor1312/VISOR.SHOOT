@@ -2,13 +2,13 @@
 # aus dieser Datei heraus anlegen laesst - nichts muss von Hand geklickt
 # werden ausser den Geheimnissen.
 #
-# Wichtig zum Verstaendnis: HOOKCUT laeuft hier als EIN Dienst. Das Backend
+# Wichtig zum Verstaendnis: selfsign laeuft hier als EIN Dienst. Das Backend
 # liefert die gebaute Oberflaeche gleich mit aus (siehe Dockerfile), deshalb
 # gibt es keinen zweiten "Static Site"-Dienst und kein CORS-Problem.
 
 services:
   - type: web
-    name: hookcut
+    name: selfsign
     runtime: docker
     dockerfilePath: ./Dockerfile
     region: frankfurt          # naeher an Deutschland = spuerbar schneller
@@ -24,7 +24,7 @@ services:
     # aus - bei jedem Update ist die Seite kurz weg. Das ist der Preis dafuer,
     # dass die Daten ein Update ueberleben.
     disk:
-      name: hookcut-daten
+      name: selfsign-daten
       mountPath: /var/hookcut
       sizeGB: 5
 

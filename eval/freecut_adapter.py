@@ -1,6 +1,6 @@
 """FreeCut-Evaluation - Adapter-Prototyp (Teil A des Spikes).
 
-Beweist die Kernfrage des Spikes: Kann unsere HOOKCUT-Analyse eine fertige
+Beweist die Kernfrage des Spikes: Kann unsere selfsign-Analyse eine fertige
 FreeCut-Timeline programmatisch erzeugen? Antwort laut FreeCut-Quellcode: JA.
 
 FreeCut hat ein datei-basiertes Projektformat (`project.json`) und eine
@@ -9,7 +9,7 @@ ohne UI ein Projekt hydrieren, bearbeiten und rendern. Das Datenmodell
 (src/types/project.ts, src/types/timeline.ts) passt fast 1:1 auf unsere
 Analyse-Ausgabe:
 
-    HOOKCUT-Analyse            ->  FreeCut-Projekt
+    selfsign-Analyse            ->  FreeCut-Projekt
     ------------------------------------------------------------------
     offset_ms (sync_offset.py) ->  Startposition der Song-Tonspur
     hook_start/end (hook_detect)-> Trim von Video- und Tonspur auf den Hook
@@ -65,7 +65,7 @@ class HookcutAnalysis:
 def build_freecut_project(
     a: HookcutAnalysis,
     *,
-    name: str = "HOOKCUT Export",
+    name: str = "selfsign Export",
     width: int = 1080,
     height: int = 1920,   # 9:16 hochkant
     fps: int = 30,
@@ -139,7 +139,7 @@ def build_freecut_project(
             })
 
     return {
-        "id": _fid(), "name": name, "description": "Automatisch aus HOOKCUT erzeugt",
+        "id": _fid(), "name": name, "description": "Automatisch aus selfsign erzeugt",
         "createdAt": now, "updatedAt": now,
         "duration": hook_len_frames,
         "schemaVersion": 1,

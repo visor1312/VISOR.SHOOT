@@ -53,7 +53,7 @@ export default function CreateCanvasWizard({
           <p className="text-sm text-muted leading-relaxed">
             Ein Canvas ist ein kurzer, sich wiederholender 9:16-Clip, der auf
             Spotify dein Cover ersetzt. Tracks mit Canvas bekommen deutlich mehr
-            Streams. HOOKCUT schneidet den energiereichsten Moment zu.
+            Streams. selfsign schneidet den energiereichsten Moment zu.
           </p>
 
           <FilePick label="Performance-Video" icon={<Video size={18} className="text-brand-400" />}

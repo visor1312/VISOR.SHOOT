@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 146 72" fill="none">
+  <!-- selfsign Bildmarke: drei aufsteigende Signalbalken, die in eine
+       Unterschrift uebergehen (Signal + Signatur = selbst signierte Identitaet).
+
+       WICHTIG: Das hier ist NACHGEBAUT anhand der Marken-Uebersicht, nicht die
+       Originaldatei. Sobald die echte SVG vorliegt, einfach DIESE Datei damit
+       ueberschreiben - Dateiname beibehalten. Die Oberflaeche laedt sie ueber
+       web/src/components/Logo.tsx an allen Stellen (Seitenleiste, Anmeldung,
+       Ladebildschirm) und der Browser-Tab ueber web/index.html. Es ist also
+       genau ein Handgriff, kein Code muss angefasst werden. -->
+  <g stroke="#B7FF00" stroke-width="15" stroke-linecap="round">
+    <path d="M8 64 V43"/>
+    <path d="M34 64 V27"/>
+    <path d="M60 64 V20 C60 10 76 10 79 24 C82 38 82 54 93 54 C104 54 101 30 111 30 C120 30 124 44 130 52"/>
+  </g>
+</svg>
