@@ -9,6 +9,16 @@ sitze?* Alles andere steht in `README.md` (Bedienung) und
 
 ## 1. Aktualisieren und starten — ein Doppelklick
 
+> **Einmalig, wenn dein Ordner noch `update-hookcut.bat` enthält:**
+> Diesen einen Update-Schritt **nicht** über die `.bat` machen. Beim
+> Umbenennen zu `update-selfsign.bat` würde `git pull` genau die Datei
+> ersetzen, die gerade läuft — Windows lässt das nicht zu, und der Vorgang
+> bricht mitten drin ab.
+>
+> Stattdessen: **`cmd-hier.bat` doppelklicken**, dann `git pull` eintippen und
+> Enter. Fenster schließen. Danach heißt die Datei `update-selfsign.bat` und
+> ab dann gilt wieder der normale Weg unten.
+
 **`update-selfsign.bat` doppelklicken.** Das war's. Das Skript macht der Reihe
 nach:
 

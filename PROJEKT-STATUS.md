@@ -454,6 +454,16 @@ Benachrichtigungen · „Bleibt-online"-Features Smart Link / EPK.
 
 ## Wichtige gelernte Lektionen (nicht wiederholen!)
 
+0. **Eine laufende `.bat` darf sich nicht selbst umbenennen lassen.** Windows
+   hält die Datei offen; ein `git pull`, der genau sie umbenennt, bricht mit
+   „Permission denied" ab — und der Ordner ist halb aktualisiert. Passiert bei
+   `update-hookcut.bat` → `update-selfsign.bat`. Seitdem ist die Arbeit in
+   `_update.bat` ausgelagert (neutraler Name, wird nie umbenannt); die
+   sichtbare `update-selfsign.bat` übergibt und beendet sich sofort.
+   Festgehalten in `tests/test_anleitung_stimmt.py`.
+   **Beim Umbenennen von `.bat`-Dateien immer mitdenken: kommt der Besitzer
+   mit den ALTEN Namen an, die er noch auf der Platte hat?**
+
 1. **Vocal-MENGE ist kein Hook-Signal** (Rap: Strophen sind vocal-dichter als
    Hooks). Hook-Ranking = Wiederholung × Energie × Position. vocal_score nur
    informativ. Demucs bleibt für Transkription wertvoll.

@@ -39,9 +39,27 @@ def test_genannte_datei_gibt_es(datei):
 def test_update_skript_installiert_auch_npm():
     """Ohne diesen Schritt bricht der Start mit "Cannot find module", sobald
     eine neue Oberflaechen-Bibliothek dazukommt."""
-    text = (PROJEKT / "update-selfsign.bat").read_text(encoding="utf-8")
+    text = (PROJEKT / "_update.bat").read_text(encoding="utf-8")
     assert "npm install" in text
     assert "pip install -r requirements.txt" in text
+
+
+def test_der_pull_laeuft_nicht_in_der_datei_die_er_umbenennen_koennte():
+    """Windows haelt eine laufende .bat offen. Benennt ein git pull genau die
+    Datei um, die gerade laeuft, bricht er mit "Permission denied" ab und der
+    Ordner ist halb aktualisiert - genau so ist es bei
+    update-hookcut.bat -> update-selfsign.bat passiert.
+
+    Deshalb: die sichtbare Datei uebergibt an _update.bat und beendet sich.
+    Sie darf selbst KEIN git pull enthalten."""
+    sichtbar = (PROJEKT / "update-selfsign.bat").read_text(encoding="utf-8")
+    # Nur die Befehlszeilen zaehlen - im REM-Kommentar steht "git pull"
+    # absichtlich, weil dort der Grund erklaert wird.
+    befehle = [z for z in sichtbar.splitlines()
+               if not z.strip().upper().startswith("REM")]
+    assert not any("git pull" in z for z in befehle)
+    assert "_update.bat" in sichtbar
+    assert "git pull" in (PROJEKT / "_update.bat").read_text(encoding="utf-8")
 
 
 def test_testmodus_setzt_den_richtigen_schalter():
